@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: #E0E5EC;
+  --color-text-main: #2D3748;
+  --color-text-muted: #718096;
+  --color-accent-blue: #4D7CFE;
+  --color-accent-green: #00C9A7;
+}
+
+@layer utilities {
+  .shadow-neu-flat {
+    box-shadow: 8px 8px 16px #c5cad1, -8px -8px 16px #ffffff;
+  }
+  .shadow-neu-pressed {
+    box-shadow: inset 5px 5px 10px #c5cad1, inset -5px -5px 10px #ffffff;
+  }
+  .shadow-neu-circle {
+    box-shadow: 6px 6px 12px #c5cad1, -6px -6px 12px #ffffff;
+  }
+}
+
+body {
+  background-color: var(--color-bg-base);
+  color: var(--color-text-main);
+  overscroll-behavior: contain;
+}
