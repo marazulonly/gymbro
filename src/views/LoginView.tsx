@@ -3,7 +3,6 @@ import { useStore } from '../store';
 import { NeuInput } from '../components/ui/NeuInput';
 import { NeuButton } from '../components/ui/NeuButton';
 import { NeuCard } from '../components/ui/NeuCard';
-import { Dumbbell } from 'lucide-react';
 
 export function LoginView() {
   const login = useStore((state) => state.login);
@@ -29,8 +28,8 @@ export function LoginView() {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-8 px-6 -mt-20">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-20 h-20 rounded-full shadow-neu-flat flex items-center justify-center bg-[#E0E5EC]">
-          <Dumbbell className="w-10 h-10 text-[#4D7CFE]" />
+        <div className="w-20 h-20 rounded-full shadow-neu-flat flex items-center justify-center bg-[#E0E5EC] overflow-hidden p-3">
+          <img src="/gymbro.svg" alt="GymBro Logo" className="w-full h-full object-contain" />
         </div>
         <h1 className="text-3xl font-bold text-[#2D3748]">GymBro</h1>
         <p className="text-[#718096] text-sm">Tu compañero de entrenamiento</p>
