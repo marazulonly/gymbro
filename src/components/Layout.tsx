@@ -1,5 +1,5 @@
 import { useStore } from "@/store";
-import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User } from "lucide-react";
+import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database } from "lucide-react";
 import { NeuButton } from "./ui/NeuButton";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
@@ -22,6 +22,7 @@ export function Layout({ children }: { children: (activeTab: number) => React.Re
         return [
           { icon: <Users />, label: "Atletas" },
           { icon: <ClipboardList />, label: "Rutinas" },
+          { icon: <Database />, label: "Ejercicios" },
           { icon: <Activity />, label: "Revisiones" },
         ];
       case 'cliente':

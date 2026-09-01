@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Usuario": {
+      "title": "Usuario",
+      "description": "User profile containing personal information and roles.",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string", "maxLength": 100 },
+        "dni": { "type": "string", "maxLength": 20 },
+        "whatsapp": { "type": "string", "maxLength": 20 },
+        "fecha_nacimiento": { "type": "string", "maxLength": 20 },
+        "sexo": { "type": "string", "enum": ["masculino", "femenino", "otro"] },
+        "estado_suscripcion": { "type": "string", "enum": ["activo", "inactivo"] },
+        "rol": { "type": "string", "enum": ["admin", "entrenador", "cliente"] },
+        "id_entrenador": { "type": "string", "maxLength": 128 },
+        "avatar_url": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["nombre", "dni", "rol", "estado_suscripcion", "sexo", "fecha_nacimiento"]
+    },
+    "Ejercicio": {
+      "title": "Ejercicio",
+      "description": "Global catalog of exercises.",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string", "maxLength": 100 },
+        "grupo_muscular": { "type": "string", "maxLength": 100 },
+        "video_url": { "type": "string", "maxLength": 500 },
+        "instrucciones": { "type": "string", "maxLength": 1000 }
+      },
+      "required": ["nombre", "grupo_muscular"]
+    },
+    "Rutina": {
+      "title": "Rutina",
+      "description": "Routine assigned to a client.",
+      "type": "object",
+      "properties": {
+        "id_cliente": { "type": "string", "maxLength": 128 },
+        "id_entrenador": { "type": "string", "maxLength": 128 },
+        "nombre_sesion": { "type": "string", "maxLength": 100 },
+        "dia_semana": { "type": "number", "minimum": 0, "maximum": 6 }
+      },
+      "required": ["id_cliente", "id_entrenador", "nombre_sesion", "dia_semana"]
+    },
+    "EjercicioRutina": {
+      "title": "EjercicioRutina",
+      "description": "An exercise within a routine.",
+      "type": "object",
+      "properties": {
+        "id_rutina": { "type": "string", "maxLength": 128 },
+        "id_ejercicio": { "type": "string", "maxLength": 128 },
+        "series_objetivo": { "type": "number", "minimum": 1, "maximum": 20 },
+        "reps_objetivo": { "type": "string", "maxLength": 50 },
+        "tempo": { "type": "string", "maxLength": 20 },
+        "descanso_segundos": { "type": "number", "minimum": 0, "maximum": 600 },
+        "rpe_objetivo": { "type": "number", "minimum": 1, "maximum": 10 }
+      },
+      "required": ["id_rutina", "id_ejercicio", "series_objetivo", "reps_objetivo", "descanso_segundos"]
+    }
+  },
+  "firestore": {
+    "usuarios/{userId}": {
+      "schema": { "$ref": "Usuario" },
+      "description": "User profiles. Accessible by the user themselves, their assigned trainer, and admins."
+    },
+    "ejercicios/{ejercicioId}": {
+      "schema": { "$ref": "Ejercicio" },
+      "description": "Global exercises catalog. Readable by all authenticated users, writable by admins."
+    },
+    "rutinas/{rutinaId}": {
+      "schema": { "$ref": "Rutina" },
+      "description": "Routines for clients. Readable by the client and their trainer. Writable by the trainer and admins."
+    },
+    "ejerciciosRutina/{ejercicioRutinaId}": {
+      "schema": { "$ref": "EjercicioRutina" },
+      "description": "Exercises for routines. Same access as Rutinas."
+    }
+  }
+}

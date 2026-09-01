@@ -1,0 +1,117 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // HELPER FUNCTIONS
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    function getUserRole(uid) {
+      return get(/databases/$(database)/documents/usuarios/$(uid)).data.rol;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'admin';
+    }
+
+    function isEntrenador() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'entrenador';
+    }
+
+    // VALIDATORS
+    function isValidUsuario(data) {
+      return data.keys().hasAll(["nombre", "dni", "rol", "estado_suscripcion", "sexo", "fecha_nacimiento"])
+        && data.nombre is string && data.nombre.size() <= 100
+        && data.dni is string && data.dni.size() <= 20
+        && data.rol in ['admin', 'entrenador', 'cliente']
+        && data.estado_suscripcion in ['activo', 'inactivo']
+        && data.sexo in ['masculino', 'femenino', 'otro']
+        && data.fecha_nacimiento is string && data.fecha_nacimiento.size() <= 20;
+    }
+
+    function isValidEjercicio(data) {
+      return data.keys().hasAll(["nombre", "grupo_muscular"])
+        && data.nombre is string && data.nombre.size() <= 100
+        && data.grupo_muscular is string && data.grupo_muscular.size() <= 100;
+    }
+
+    function isValidRutina(data) {
+      return data.keys().hasAll(["id_cliente", "id_entrenador", "nombre_sesion", "dia_semana"])
+        && data.id_cliente is string && data.id_cliente.size() <= 128
+        && data.id_entrenador is string && data.id_entrenador.size() <= 128
+        && data.nombre_sesion is string && data.nombre_sesion.size() <= 100
+        && data.dia_semana is number && data.dia_semana >= 0 && data.dia_semana <= 6;
+    }
+
+    function isValidEjercicioRutina(data) {
+      return data.keys().hasAll(["id_rutina", "id_ejercicio", "series_objetivo", "reps_objetivo", "descanso_segundos"])
+        && data.id_rutina is string && data.id_rutina.size() <= 128
+        && data.id_ejercicio is string && data.id_ejercicio.size() <= 128
+        && data.series_objetivo is number && data.series_objetivo >= 1 && data.series_objetivo <= 20
+        && data.reps_objetivo is string && data.reps_objetivo.size() <= 50
+        && data.descanso_segundos is number && data.descanso_segundos >= 0 && data.descanso_segundos <= 600;
+    }
+
+    // MATCHERS
+    match /usuarios/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin() || existing().id_entrenador == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || resource.data.id_entrenador == request.auth.uid || request.auth.uid == userId);
+      
+      allow create: if isSignedIn() && isValidId(userId) && isValidUsuario(incoming()) && (
+        isAdmin() || (isEntrenador() && incoming().id_entrenador == request.auth.uid && incoming().rol == 'cliente')
+      );
+      
+      allow update: if isSignedIn() && isValidId(userId) && isValidUsuario(incoming()) && (
+        isAdmin() ||
+        (isEntrenador() && existing().id_entrenador == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['nombre', 'dni', 'whatsapp', 'fecha_nacimiento', 'sexo', 'contrasena', 'estado_suscripcion'])) ||
+        (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['nombre', 'dni', 'whatsapp', 'fecha_nacimiento', 'sexo', 'contrasena']))
+      );
+      
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    match /ejercicios/{ejercicioId} {
+      allow read: if isSignedIn() && isValidId(ejercicioId);
+      allow create: if (isAdmin() || isEntrenador()) && isValidId(ejercicioId) && isValidEjercicio(incoming());
+      allow update: if (isAdmin() || isEntrenador()) && isValidId(ejercicioId) && isValidEjercicio(incoming());
+      allow delete: if (isAdmin() || isEntrenador()) && isValidId(ejercicioId);
+    }
+
+    match /rutinas/{rutinaId} {
+      allow get: if isSignedIn() && isValidId(rutinaId) && (isAdmin() || existing().id_cliente == request.auth.uid || existing().id_entrenador == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || resource.data.id_cliente == request.auth.uid || resource.data.id_entrenador == request.auth.uid);
+      
+      allow create: if isSignedIn() && isValidId(rutinaId) && isValidRutina(incoming()) && (isAdmin() || (isEntrenador() && incoming().id_entrenador == request.auth.uid));
+      allow update: if isSignedIn() && isValidId(rutinaId) && isValidRutina(incoming()) && (isAdmin() || (isEntrenador() && existing().id_entrenador == request.auth.uid));
+      allow delete: if isSignedIn() && isValidId(rutinaId) && (isAdmin() || (isEntrenador() && existing().id_entrenador == request.auth.uid));
+    }
+
+    match /ejerciciosRutina/{ejercicioRutinaId} {
+      allow get: if isSignedIn() && isValidId(ejercicioRutinaId) && (
+        isAdmin() || 
+        get(/databases/$(database)/documents/rutinas/$(existing().id_rutina)).data.id_cliente == request.auth.uid || 
+        get(/databases/$(database)/documents/rutinas/$(existing().id_rutina)).data.id_entrenador == request.auth.uid
+      );
+      allow list: if isSignedIn(); // We could leave list open as long as clients don't read others, but actually list is better secured using where clause if denormalized. Since it's not denormalized, we will just allow read for any signed in user to avoid O(N) cost on get() per item in list, since it's just exercise metadata.
+      
+      allow create: if isSignedIn() && isValidId(ejercicioRutinaId) && isValidEjercicioRutina(incoming()) && (
+        isAdmin() || 
+        (isEntrenador() && get(/databases/$(database)/documents/rutinas/$(incoming().id_rutina)).data.id_entrenador == request.auth.uid)
+      );
+      allow update: if isSignedIn() && isValidId(ejercicioRutinaId) && isValidEjercicioRutina(incoming()) && (
+        isAdmin() || 
+        (isEntrenador() && get(/databases/$(database)/documents/rutinas/$(existing().id_rutina)).data.id_entrenador == request.auth.uid)
+      );
+      allow delete: if isSignedIn() && isValidId(ejercicioRutinaId) && (
+        isAdmin() || 
+        (isEntrenador() && get(/databases/$(database)/documents/rutinas/$(existing().id_rutina)).data.id_entrenador == request.auth.uid)
+      );
+    }
+  }
+}

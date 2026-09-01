@@ -14,6 +14,9 @@ interface AppState {
   deleteUsuario: (id: string) => void;
   planNutricion: PlanNutricion;
   ejercicios: Ejercicio[];
+  addEjercicio: (ejercicio: Ejercicio) => void;
+  updateEjercicio: (ejercicio: Ejercicio) => void;
+  deleteEjercicio: (id: string) => void;
   rutinas: Rutina[];
   ejerciciosRutina: EjercicioRutina[];
 }
@@ -94,6 +97,13 @@ export const useStore = create<AppState>((set, get) => ({
     agua_litros: 2.5, pasos_meta: 10000
   },
   ejercicios: mockEjercicios,
+  addEjercicio: (ejercicio) => set((state) => ({ ejercicios: [...state.ejercicios, ejercicio] })),
+  updateEjercicio: (updatedEjercicio) => set((state) => ({
+    ejercicios: state.ejercicios.map(e => e.id === updatedEjercicio.id ? updatedEjercicio : e)
+  })),
+  deleteEjercicio: (id) => set((state) => ({
+    ejercicios: state.ejercicios.filter(e => e.id !== id)
+  })),
   rutinas: mockRutinas,
   ejerciciosRutina: mockEjerciciosRutina,
 }));

@@ -10,7 +10,8 @@ import { ProfileModal } from "@/components/ProfileModal";
 export function TrainerView({ tab }: { tab: number }) {
   if (tab === 0) return <AthletesList />;
   if (tab === 1) return <RoutineBuilder />;
-  if (tab === 2) return <Checkins />;
+  if (tab === 2) return <ExercisesLibrary />;
+  if (tab === 3) return <Checkins />;
   return null;
 }
 
@@ -201,6 +202,138 @@ function RoutineBuilder() {
         <Plus className="w-4 h-4" />
         Añadir Ejercicio
       </NeuButton>
+    </div>
+  );
+}
+
+function ExercisesLibrary() {
+  const { ejercicios, addEjercicio, updateEjercicio, deleteEjercicio } = useStore();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isEditing, setIsEditing] = useState<string | null>(null);
+  
+  // Edit states
+  const [nombre, setNombre] = useState('');
+  const [grupo, setGrupo] = useState('');
+  const [instrucciones, setInstrucciones] = useState('');
+
+  const filtered = ejercicios.filter(e => e.nombre.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const handleEdit = (id: string) => {
+    const ej = ejercicios.find(e => e.id === id);
+    if (ej) {
+      setNombre(ej.nombre);
+      setGrupo(ej.grupo_muscular);
+      setInstrucciones(ej.instrucciones || '');
+      setIsEditing(id);
+    }
+  };
+
+  const handleAddNew = () => {
+    setNombre('');
+    setGrupo('');
+    setInstrucciones('');
+    setIsEditing('new');
+  };
+
+  const handleSave = () => {
+    if (!nombre || !grupo) return;
+    if (isEditing === 'new') {
+      addEjercicio({
+        id: `e${Date.now()}`,
+        nombre,
+        grupo_muscular: grupo,
+        instrucciones: instrucciones || undefined
+      });
+    } else if (isEditing) {
+      updateEjercicio({
+        id: isEditing,
+        nombre,
+        grupo_muscular: grupo,
+        instrucciones: instrucciones || undefined
+      });
+    }
+    setIsEditing(null);
+  };
+
+  const handleDelete = () => {
+    if (isEditing && isEditing !== 'new') {
+      if (window.confirm('¿Eliminar este ejercicio?')) {
+        deleteEjercicio(isEditing);
+        setIsEditing(null);
+      }
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-4 mb-2">
+          <NeuButton variant="circle" className="w-10 h-10 shadow-neu-flat" onClick={() => setIsEditing(null)}>
+            <ArrowLeft className="w-5 h-5 text-[#718096]" />
+          </NeuButton>
+          <h2 className="text-xl font-bold text-[#2D3748]">{isEditing === 'new' ? 'Nuevo Ejercicio' : 'Editar Ejercicio'}</h2>
+        </div>
+        
+        <NeuCard className="p-4">
+          <div className="flex flex-col gap-4">
+            <NeuInput label="Nombre del Ejercicio" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+            <NeuInput label="Grupo Muscular" value={grupo} onChange={(e) => setGrupo(e.target.value)} />
+            <div className="flex flex-col gap-1 w-full">
+              <span className="text-sm font-medium text-[#718096] pl-2">Instrucciones / Alternativas</span>
+              <textarea 
+                className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-3 text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20 resize-none h-24 text-sm"
+                value={instrucciones}
+                onChange={(e) => setInstrucciones(e.target.value)}
+              />
+            </div>
+
+            <NeuButton onClick={handleSave} className="mt-2 h-12 text-[#4D7CFE] font-bold">
+              Guardar Ejercicio
+            </NeuButton>
+
+            {isEditing !== 'new' && (
+              <NeuButton onClick={handleDelete} className="mt-1 h-12 text-red-500 font-bold border-2 border-red-200/50">
+                Eliminar
+              </NeuButton>
+            )}
+          </div>
+        </NeuCard>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-between items-center mb-1">
+        <h2 className="text-2xl font-bold text-[#2D3748]">Ejercicios</h2>
+        <NeuButton variant="circle" className="w-10 h-10" onClick={handleAddNew}>
+          <Plus className="w-5 h-5 text-[#4D7CFE]" />
+        </NeuButton>
+      </div>
+
+      <NeuInput 
+        placeholder="Buscar ejercicio..." 
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="mb-2"
+      />
+
+      <div className="flex flex-col gap-3">
+        {filtered.map(ej => (
+          <NeuCard key={ej.id} className="flex justify-between items-center py-3 px-4" onClick={() => handleEdit(ej.id)}>
+            <div className="flex flex-col">
+              <span className="font-bold text-[#2D3748] text-sm">{ej.nombre}</span>
+              <span className="text-[10px] text-[#718096]">{ej.grupo_muscular}</span>
+            </div>
+            <NeuButton variant="circle" className="w-8 h-8 shadow-neu-pressed text-[#4D7CFE] !p-0 flex items-center justify-center shrink-0">
+              <ChevronRight className="w-4 h-4" />
+            </NeuButton>
+          </NeuCard>
+        ))}
+        {filtered.length === 0 && (
+          <p className="text-center text-[#718096] my-4 text-sm">No se encontraron ejercicios.</p>
+        )}
+      </div>
     </div>
   );
 }
