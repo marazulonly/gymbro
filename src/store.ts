@@ -137,21 +137,56 @@ const mockPlanNutricion: PlanNutricion = {
   pasos_meta: 10000
 };
 
-// Local storage helper for persisting session
-const SAVED_USER_KEY = 'gymbro_current_user_id';
-const savedUserId = typeof window !== 'undefined' ? localStorage.getItem(SAVED_USER_KEY) : null;
+// Local storage keys
+const USERS_STORAGE_KEY = 'gymbro_usuarios_data';
+const CURRENT_USER_KEY = 'gymbro_current_user_data';
+const SAVED_USER_ID_KEY = 'gymbro_current_user_id';
+const EJERCICIOS_STORAGE_KEY = 'gymbro_ejercicios_data';
+const RUTINAS_STORAGE_KEY = 'gymbro_rutinas_data';
+const EJERCICIOS_RUTINA_STORAGE_KEY = 'gymbro_ejercicios_rutina_data';
+const PLAN_NUTRICION_STORAGE_KEY = 'gymbro_plan_nutricion_data';
+
+function getStoredItem<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch (e) {
+    console.warn(`Error reading ${key} from localStorage:`, e);
+    return fallback;
+  }
+}
+
+function setStoredItem<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn(`Error saving ${key} to localStorage:`, e);
+  }
+}
+
+// Initial state loaded from LocalStorage (or default baseline if first time ever)
+const initialUsuarios = getStoredItem<Usuario[]>(USERS_STORAGE_KEY, mockUsuarios);
+const initialCurrentUser = getStoredItem<Usuario | null>(CURRENT_USER_KEY, null);
+const initialEjercicios = getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, mockEjercicios);
+const initialRutinas = getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas);
+const initialEjerciciosRutina = getStoredItem<EjercicioRutina[]>(EJERCICIOS_RUTINA_STORAGE_KEY, mockEjerciciosRutina);
+const initialPlanNutricion = getStoredItem<PlanNutricion>(PLAN_NUTRICION_STORAGE_KEY, mockPlanNutricion);
 
 export const useStore = create<AppState>((set, get) => ({
   isCloudReady: false,
-  currentRole: 'cliente',
+  currentRole: initialCurrentUser?.rol || 'cliente',
   setCurrentRole: (role) => set({ currentRole: role }),
-  isLoggedIn: false,
-  currentUser: null,
-  usuarios: mockUsuarios,
-  ejercicios: mockEjercicios,
-  rutinas: mockRutinas,
-  ejerciciosRutina: mockEjerciciosRutina,
-  planNutricion: mockPlanNutricion,
+  isLoggedIn: !!initialCurrentUser,
+  currentUser: initialCurrentUser,
+  usuarios: initialUsuarios,
+  ejercicios: initialEjercicios,
+  rutinas: initialRutinas,
+  ejerciciosRutina: initialEjerciciosRutina,
+  planNutricion: initialPlanNutricion,
 
   login: (dni, contrasena) => {
     const user = get().usuarios.find(u => u.dni.trim() === dni.trim() && u.contrasena === contrasena);
@@ -159,7 +194,10 @@ export const useStore = create<AppState>((set, get) => ({
       if (user.estado_suscripcion === 'inactivo' && user.rol === 'cliente') {
         return { success: false, error: 'Cuenta inactiva por falta de pago.' };
       }
-      localStorage.setItem(SAVED_USER_KEY, user.id);
+      setStoredItem(CURRENT_USER_KEY, user);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(SAVED_USER_ID_KEY, user.id);
+      }
       set({ isLoggedIn: true, currentUser: user, currentRole: user.rol });
       return { success: true };
     }
@@ -167,13 +205,17 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   logout: () => {
-    localStorage.removeItem(SAVED_USER_KEY);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(SAVED_USER_ID_KEY);
+      localStorage.removeItem(CURRENT_USER_KEY);
+    }
     set({ isLoggedIn: false, currentUser: null });
   },
 
   addUsuario: async (usuario) => {
-    // Optimistic update
-    set((state) => ({ usuarios: [...state.usuarios.filter(u => u.id !== usuario.id), usuario] }));
+    const updated = [...get().usuarios.filter(u => u.id !== usuario.id), usuario];
+    set({ usuarios: updated });
+    setStoredItem(USERS_STORAGE_KEY, updated);
     try {
       await setDoc(doc(db, 'usuarios', usuario.id), cleanObject(usuario));
     } catch (err) {
@@ -182,11 +224,16 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateUsuario: async (updatedUsuario) => {
-    // Optimistic update
-    set((state) => ({
-      usuarios: state.usuarios.map(u => u.id === updatedUsuario.id ? updatedUsuario : u),
-      currentUser: state.currentUser?.id === updatedUsuario.id ? updatedUsuario : state.currentUser
-    }));
+    const updatedList = get().usuarios.map(u => u.id === updatedUsuario.id ? updatedUsuario : u);
+    const updatedCurrent = get().currentUser?.id === updatedUsuario.id ? updatedUsuario : get().currentUser;
+    set({
+      usuarios: updatedList,
+      currentUser: updatedCurrent
+    });
+    setStoredItem(USERS_STORAGE_KEY, updatedList);
+    if (updatedCurrent) {
+      setStoredItem(CURRENT_USER_KEY, updatedCurrent);
+    }
     try {
       await setDoc(doc(db, 'usuarios', updatedUsuario.id), cleanObject(updatedUsuario), { merge: true });
     } catch (err) {
@@ -195,10 +242,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteUsuario: async (id) => {
-    // Optimistic update
-    set((state) => ({
-      usuarios: state.usuarios.filter(u => u.id !== id)
-    }));
+    const updatedList = get().usuarios.filter(u => u.id !== id);
+    set({ usuarios: updatedList });
+    setStoredItem(USERS_STORAGE_KEY, updatedList);
     try {
       await deleteDoc(doc(db, 'usuarios', id));
     } catch (err) {
@@ -208,6 +254,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   updatePlanNutricion: async (plan) => {
     set({ planNutricion: plan });
+    setStoredItem(PLAN_NUTRICION_STORAGE_KEY, plan);
     try {
       await setDoc(doc(db, 'planesNutricion', plan.id), cleanObject(plan), { merge: true });
     } catch (err) {
@@ -216,7 +263,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addEjercicio: async (ejercicio) => {
-    set((state) => ({ ejercicios: [...state.ejercicios.filter(e => e.id !== ejercicio.id), ejercicio] }));
+    const updated = [...get().ejercicios.filter(e => e.id !== ejercicio.id), ejercicio];
+    set({ ejercicios: updated });
+    setStoredItem(EJERCICIOS_STORAGE_KEY, updated);
     try {
       await setDoc(doc(db, 'ejercicios', ejercicio.id), cleanObject(ejercicio));
     } catch (err) {
@@ -225,9 +274,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateEjercicio: async (updatedEjercicio) => {
-    set((state) => ({
-      ejercicios: state.ejercicios.map(e => e.id === updatedEjercicio.id ? updatedEjercicio : e)
-    }));
+    const updated = get().ejercicios.map(e => e.id === updatedEjercicio.id ? updatedEjercicio : e);
+    set({ ejercicios: updated });
+    setStoredItem(EJERCICIOS_STORAGE_KEY, updated);
     try {
       await setDoc(doc(db, 'ejercicios', updatedEjercicio.id), cleanObject(updatedEjercicio), { merge: true });
     } catch (err) {
@@ -236,9 +285,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteEjercicio: async (id) => {
-    set((state) => ({
-      ejercicios: state.ejercicios.filter(e => e.id !== id)
-    }));
+    const updated = get().ejercicios.filter(e => e.id !== id);
+    set({ ejercicios: updated });
+    setStoredItem(EJERCICIOS_STORAGE_KEY, updated);
     try {
       await deleteDoc(doc(db, 'ejercicios', id));
     } catch (err) {
@@ -247,7 +296,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addRutina: async (rutina) => {
-    set((state) => ({ rutinas: [...state.rutinas.filter(r => r.id !== rutina.id), rutina] }));
+    const updated = [...get().rutinas.filter(r => r.id !== rutina.id), rutina];
+    set({ rutinas: updated });
+    setStoredItem(RUTINAS_STORAGE_KEY, updated);
     try {
       await setDoc(doc(db, 'rutinas', rutina.id), cleanObject(rutina));
     } catch (err) {
@@ -256,9 +307,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateRutina: async (updatedRutina) => {
-    set((state) => ({
-      rutinas: state.rutinas.map(r => r.id === updatedRutina.id ? updatedRutina : r)
-    }));
+    const updated = get().rutinas.map(r => r.id === updatedRutina.id ? updatedRutina : r);
+    set({ rutinas: updated });
+    setStoredItem(RUTINAS_STORAGE_KEY, updated);
     try {
       await setDoc(doc(db, 'rutinas', updatedRutina.id), cleanObject(updatedRutina), { merge: true });
     } catch (err) {
@@ -267,9 +318,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteRutina: async (id) => {
-    set((state) => ({
-      rutinas: state.rutinas.filter(r => r.id !== id)
-    }));
+    const updated = get().rutinas.filter(r => r.id !== id);
+    set({ rutinas: updated });
+    setStoredItem(RUTINAS_STORAGE_KEY, updated);
     try {
       await deleteDoc(doc(db, 'rutinas', id));
     } catch (err) {
@@ -278,7 +329,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addEjercicioRutina: async (item) => {
-    set((state) => ({ ejerciciosRutina: [...state.ejerciciosRutina.filter(er => er.id !== item.id), item] }));
+    const updated = [...get().ejerciciosRutina.filter(er => er.id !== item.id), item];
+    set({ ejerciciosRutina: updated });
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updated);
     try {
       await setDoc(doc(db, 'ejerciciosRutina', item.id), cleanObject(item));
     } catch (err) {
@@ -287,9 +340,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateEjercicioRutina: async (item) => {
-    set((state) => ({
-      ejerciciosRutina: state.ejerciciosRutina.map(er => er.id === item.id ? item : er)
-    }));
+    const updated = get().ejerciciosRutina.map(er => er.id === item.id ? item : er);
+    set({ ejerciciosRutina: updated });
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updated);
     try {
       await setDoc(doc(db, 'ejerciciosRutina', item.id), cleanObject(item), { merge: true });
     } catch (err) {
@@ -298,9 +351,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteEjercicioRutina: async (id) => {
-    set((state) => ({
-      ejerciciosRutina: state.ejerciciosRutina.filter(er => er.id !== id)
-    }));
+    const updated = get().ejerciciosRutina.filter(er => er.id !== id);
+    set({ ejerciciosRutina: updated });
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updated);
     try {
       await deleteDoc(doc(db, 'ejerciciosRutina', id));
     } catch (err) {
@@ -309,12 +362,42 @@ export const useStore = create<AppState>((set, get) => ({
   },
 }));
 
-// Setup Firestore real-time synchronization and auto-seeding
+// Setup Firestore real-time synchronization
+// Strictly respects user changes in the cloud and keeps local storage updated
 export function initFirestoreSync() {
-  // 1. Usuarios listener & initial seeding
+  // 1. Usuarios listener - cloud is source of truth, updates local storage
   onSnapshot(collection(db, 'usuarios'), async (snapshot) => {
-    if (snapshot.empty) {
-      console.log('Seeding initial usuarios to Firestore...');
+    if (!snapshot.empty) {
+      const users: Usuario[] = [];
+      snapshot.forEach((docSnap) => {
+        users.push({ id: docSnap.id, ...docSnap.data() } as Usuario);
+      });
+      
+      // Update store and local storage
+      setStoredItem(USERS_STORAGE_KEY, users);
+      
+      useStore.setState((state) => {
+        let updatedCurrentUser = state.currentUser;
+        if (state.currentUser) {
+          const fresh = users.find(u => u.id === state.currentUser?.id);
+          if (fresh) {
+            updatedCurrentUser = fresh;
+            setStoredItem(CURRENT_USER_KEY, fresh);
+          }
+        } else {
+          const savedId = typeof window !== 'undefined' ? localStorage.getItem(SAVED_USER_ID_KEY) : null;
+          if (savedId) {
+            const matched = users.find(u => u.id === savedId);
+            if (matched) {
+              setStoredItem(CURRENT_USER_KEY, matched);
+              return { usuarios: users, currentUser: matched, isLoggedIn: true, currentRole: matched.rol, isCloudReady: true };
+            }
+          }
+        }
+        return { usuarios: users, currentUser: updatedCurrentUser, isCloudReady: true };
+      });
+    } else {
+      // If collection in cloud is completely empty on very first install, push initial baseline once without overwriting
       try {
         const batch = writeBatch(db);
         mockUsuarios.forEach((user) => {
@@ -322,35 +405,23 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error seeding initial usuarios:', e);
+        console.error('Error saving initial users to Firestore:', e);
       }
-    } else {
-      const users: Usuario[] = [];
-      snapshot.forEach((docSnap) => {
-        users.push({ id: docSnap.id, ...docSnap.data() } as Usuario);
-      });
-      useStore.setState((state) => {
-        let updatedCurrentUser = state.currentUser;
-        if (state.currentUser) {
-          const fresh = users.find(u => u.id === state.currentUser?.id);
-          if (fresh) updatedCurrentUser = fresh;
-        } else if (savedUserId) {
-          const matched = users.find(u => u.id === savedUserId);
-          if (matched) {
-            return { usuarios: users, currentUser: matched, isLoggedIn: true, currentRole: matched.rol, isCloudReady: true };
-          }
-        }
-        return { usuarios: users, currentUser: updatedCurrentUser, isCloudReady: true };
-      });
     }
   }, (error) => {
     console.error('Firestore usuarios subscription error:', error);
   });
 
-  // 2. Ejercicios listener & initial seeding
+  // 2. Ejercicios listener
   onSnapshot(collection(db, 'ejercicios'), async (snapshot) => {
-    if (snapshot.empty) {
-      console.log('Seeding initial ejercicios to Firestore...');
+    if (!snapshot.empty) {
+      const ejs: Ejercicio[] = [];
+      snapshot.forEach((docSnap) => {
+        ejs.push({ id: docSnap.id, ...docSnap.data() } as Ejercicio);
+      });
+      setStoredItem(EJERCICIOS_STORAGE_KEY, ejs);
+      useStore.setState({ ejercicios: ejs });
+    } else {
       try {
         const batch = writeBatch(db);
         mockEjercicios.forEach((ej) => {
@@ -358,23 +429,23 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error seeding initial ejercicios:', e);
+        console.error('Error saving initial ejercicios:', e);
       }
-    } else {
-      const ejs: Ejercicio[] = [];
-      snapshot.forEach((docSnap) => {
-        ejs.push({ id: docSnap.id, ...docSnap.data() } as Ejercicio);
-      });
-      useStore.setState({ ejercicios: ejs });
     }
   }, (error) => {
     console.error('Firestore ejercicios subscription error:', error);
   });
 
-  // 3. Rutinas listener & initial seeding
+  // 3. Rutinas listener
   onSnapshot(collection(db, 'rutinas'), async (snapshot) => {
-    if (snapshot.empty) {
-      console.log('Seeding initial rutinas to Firestore...');
+    if (!snapshot.empty) {
+      const ruts: Rutina[] = [];
+      snapshot.forEach((docSnap) => {
+        ruts.push({ id: docSnap.id, ...docSnap.data() } as Rutina);
+      });
+      setStoredItem(RUTINAS_STORAGE_KEY, ruts);
+      useStore.setState({ rutinas: ruts });
+    } else {
       try {
         const batch = writeBatch(db);
         mockRutinas.forEach((r) => {
@@ -382,23 +453,23 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error seeding initial rutinas:', e);
+        console.error('Error saving initial rutinas:', e);
       }
-    } else {
-      const ruts: Rutina[] = [];
-      snapshot.forEach((docSnap) => {
-        ruts.push({ id: docSnap.id, ...docSnap.data() } as Rutina);
-      });
-      useStore.setState({ rutinas: ruts });
     }
   }, (error) => {
     console.error('Firestore rutinas subscription error:', error);
   });
 
-  // 4. EjerciciosRutina listener & initial seeding
+  // 4. EjerciciosRutina listener
   onSnapshot(collection(db, 'ejerciciosRutina'), async (snapshot) => {
-    if (snapshot.empty) {
-      console.log('Seeding initial ejerciciosRutina to Firestore...');
+    if (!snapshot.empty) {
+      const ers: EjercicioRutina[] = [];
+      snapshot.forEach((docSnap) => {
+        ers.push({ id: docSnap.id, ...docSnap.data() } as EjercicioRutina);
+      });
+      setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, ers);
+      useStore.setState({ ejerciciosRutina: ers });
+    } else {
       try {
         const batch = writeBatch(db);
         mockEjerciciosRutina.forEach((er) => {
@@ -406,33 +477,27 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error seeding initial ejerciciosRutina:', e);
+        console.error('Error saving initial ejerciciosRutina:', e);
       }
-    } else {
-      const ers: EjercicioRutina[] = [];
-      snapshot.forEach((docSnap) => {
-        ers.push({ id: docSnap.id, ...docSnap.data() } as EjercicioRutina);
-      });
-      useStore.setState({ ejerciciosRutina: ers });
     }
   }, (error) => {
     console.error('Firestore ejerciciosRutina subscription error:', error);
   });
 
-  // 5. PlanNutricion listener & initial seeding
+  // 5. PlanNutricion listener
   onSnapshot(collection(db, 'planesNutricion'), async (snapshot) => {
-    if (snapshot.empty) {
+    if (!snapshot.empty) {
+      snapshot.forEach((docSnap) => {
+        const plan = { id: docSnap.id, ...docSnap.data() } as PlanNutricion;
+        setStoredItem(PLAN_NUTRICION_STORAGE_KEY, plan);
+        useStore.setState({ planNutricion: plan });
+      });
+    } else {
       try {
         await setDoc(doc(db, 'planesNutricion', mockPlanNutricion.id), cleanObject(mockPlanNutricion));
       } catch (e) {
-        console.error('Error seeding initial planNutricion:', e);
+        console.error('Error saving initial planNutricion:', e);
       }
-    } else {
-      snapshot.forEach((docSnap) => {
-        if (docSnap.id === 'pn1' || docSnap.data().id_cliente === 'u1') {
-          useStore.setState({ planNutricion: { id: docSnap.id, ...docSnap.data() } as PlanNutricion });
-        }
-      });
     }
   }, (error) => {
     console.error('Firestore planesNutricion subscription error:', error);
