@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useStore } from "@/store";
+import React, { useState, useEffect } from "react";
+import { useStore, getClientRoutines, getDiaSemanaNombre, getDiaSemanaCorto, isRutinaDescanso } from "@/store";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
@@ -24,11 +24,16 @@ import {
   Sparkles,
   Sliders,
   Check,
-  X
+  X,
+  ArrowRightLeft,
+  Eraser,
+  Coffee,
+  AlertTriangle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "@/components/ProfileModal";
 import { AthleteProgressModal } from "@/components/AthleteProgressModal";
+import { AthleteProgressView } from "@/components/AthleteProgressView";
 import { Rutina, EjercicioRutina, Usuario, Ejercicio } from "@/types";
 
 export function TrainerView({ 
@@ -44,9 +49,11 @@ export function TrainerView({
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>(athletes[0]?.id || "xb-9988-fit");
+  const [routineViewMode, setRoutineViewMode] = useState<"gestionar" | "progreso">("gestionar");
 
-  const handleSelectAthleteForRoutines = (athleteId: string) => {
+  const handleSelectAthleteForRoutines = (athleteId: string, mode: "gestionar" | "progreso" = "gestionar") => {
     setSelectedAthleteId(athleteId);
+    setRoutineViewMode(mode);
     if (onNavigateTab) {
       onNavigateTab(1); // Switch to Rutinas tab
     }
@@ -59,7 +66,8 @@ export function TrainerView({
     return (
       <RoutineManager 
         selectedAthleteId={selectedAthleteId} 
-        onSelectAthlete={setSelectedAthleteId} 
+        onSelectAthlete={setSelectedAthleteId}
+        initialViewMode={routineViewMode}
       />
     );
   }
@@ -69,16 +77,16 @@ export function TrainerView({
 }
 
 const DIAS_SEMANA = [
-  { id: 1, label: "Lunes (Día 1)" },
-  { id: 2, label: "Martes (Día 2)" },
-  { id: 3, label: "Miércoles (Día 3)" },
-  { id: 4, label: "Jueves (Día 4)" },
-  { id: 5, label: "Viernes (Día 5)" },
-  { id: 6, label: "Sábado (Día 6)" },
-  { id: 0, label: "Domingo (Día 7)" },
+  { id: 1, label: "Lunes", corto: "Lun" },
+  { id: 2, label: "Martes", corto: "Mar" },
+  { id: 3, label: "Miércoles", corto: "Mié" },
+  { id: 4, label: "Jueves", corto: "Jue" },
+  { id: 5, label: "Viernes", corto: "Vie" },
+  { id: 6, label: "Sábado", corto: "Sáb" },
+  { id: 0, label: "Domingo", corto: "Dom" },
 ];
 
-function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: string) => void }) {
+function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: string, mode?: "gestionar" | "progreso") => void }) {
   const { currentUser, usuarios, addUsuario, rutinas, fichasProgreso } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -240,13 +248,25 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                     </span>
                   </div>
 
-                  <NeuButton
-                    className="px-3 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1.5 h-8 shadow-neu-flat"
-                    onClick={() => onManageRoutines(athlete.id)}
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    Editar Rutinas
-                  </NeuButton>
+                  <div className="flex items-center gap-1.5">
+                    <NeuButton
+                      className="px-2.5 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1 h-8 shadow-neu-flat"
+                      onClick={() => onManageRoutines(athlete.id, "progreso")}
+                      title="Ver pantalla Tu Progreso de la atleta"
+                    >
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>Progreso</span>
+                    </NeuButton>
+
+                    <NeuButton
+                      className="px-2.5 py-1 text-xs text-[#2D3748] font-bold flex items-center gap-1 h-8 shadow-neu-flat"
+                      onClick={() => onManageRoutines(athlete.id, "gestionar")}
+                      title="Editar rutinas y ejercicios"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Rutinas</span>
+                    </NeuButton>
+                  </div>
                 </div>
 
                 {/* Progress quick glance & action */}
@@ -312,9 +332,11 @@ interface RoutineFormExercise {
 function RoutineManager({
   selectedAthleteId,
   onSelectAthlete,
+  initialViewMode = "gestionar",
 }: {
   selectedAthleteId: string;
   onSelectAthlete: (id: string) => void;
+  initialViewMode?: "gestionar" | "progreso";
 }) {
   const { 
     currentUser, 
@@ -329,8 +351,20 @@ function RoutineManager({
     updateEjercicioRutina,
     deleteEjercicioRutina,
     assignBasePlanToAthlete,
-    copyRoutinesToAthlete
+    copyRoutinesToAthlete,
+    clearRutinaEjercicios,
+    moveRutinaToDay,
+    toggleRutinaDescanso
   } = useStore();
+
+  const [viewMode, setViewMode] = useState<"gestionar" | "progreso">(initialViewMode);
+  const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
+
+  useEffect(() => {
+    if (initialViewMode) {
+      setViewMode(initialViewMode);
+    }
+  }, [initialViewMode, selectedAthleteId]);
 
   const athletes = usuarios
     .filter((u) => u.rol === "cliente")
@@ -340,6 +374,15 @@ function RoutineManager({
   // If no athlete selected or ID invalid, fallback
   const effectiveAthleteId = currentAthlete?.id || "xb-9988-fit";
 
+  // Day of week filter state for trainer - defaults to "todos" to show all routine days
+  const todayDay = new Date().getDay();
+  const [selectedDayFilter, setSelectedDayFilter] = useState<number | "todos">("todos");
+  const [showRestDays, setShowRestDays] = useState(false);
+
+  // Modals for routine management
+  const [moveModalRoutine, setMoveModalRoutine] = useState<Rutina | null>(null);
+  const [clearConfirmRoutine, setClearConfirmRoutine] = useState<Rutina | null>(null);
+
   // Editing / Creating routine state
   const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -347,8 +390,20 @@ function RoutineManager({
   // Routine Form Fields
   const [formNombreSesion, setFormNombreSesion] = useState("");
   const [formDiaSemana, setFormDiaSemana] = useState<number>(1);
+  const [formEsDescanso, setFormEsDescanso] = useState(false);
   const [formExercises, setFormExercises] = useState<RoutineFormExercise[]>([]);
   
+  // Duplicate exercise warning state
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+
+  // Auto clear warning after 6 seconds
+  useEffect(() => {
+    if (duplicateWarning) {
+      const timer = setTimeout(() => setDuplicateWarning(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [duplicateWarning]);
+
   // Exercise Pickers & Modals
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
   const [quickAddTargetRoutineId, setQuickAddTargetRoutineId] = useState<string | null>(null);
@@ -374,9 +429,15 @@ function RoutineManager({
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Routines for the selected athlete
-  const athleteRoutines = rutinas
-    .filter((r) => r.id_cliente === effectiveAthleteId)
-    .sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
+  const athleteRoutines = getClientRoutines(rutinas, currentAthlete);
+  const activeAthleteRoutines = athleteRoutines.filter((r) => !isRutinaDescanso(r) && !r.es_descanso);
+  const restRoutines = athleteRoutines.filter((r) => isRutinaDescanso(r) || r.es_descanso);
+
+  // Reset day filter to all routine days whenever athlete changes
+  useEffect(() => {
+    setSelectedDayFilter("todos");
+    setShowRestDays(false);
+  }, [selectedAthleteId]);
 
   // Extract unique muscle groups for filter
   const muscleGroups = Array.from(new Set(ejercicios.map((e) => e.grupo_muscular))).filter(Boolean);
@@ -386,6 +447,7 @@ function RoutineManager({
     setIsCreatingNew(false);
     setFormNombreSesion(rutina.nombre_sesion);
     setFormDiaSemana(rutina.dia_semana);
+    setFormEsDescanso(rutina.es_descanso || false);
 
     const relatedErs = ejerciciosRutina.filter((er) => er.id_rutina === rutina.id);
     const mapped: RoutineFormExercise[] = relatedErs.map((er) => {
@@ -404,11 +466,61 @@ function RoutineManager({
     setFormExercises(mapped);
   };
 
-  const startCreateRoutine = () => {
+  const checkExerciseDuplicateOnDay = (exerciseId: string, day: number, targetRoutineId?: string | null): { isDuplicate: boolean; reason?: string } => {
+    // 1. If inside routine creation/editing form
+    if (isCreatingNew || editingRoutineId) {
+      if (formExercises.some((item) => item.id_ejercicio === exerciseId)) {
+        return { isDuplicate: true, reason: "Este ejercicio ya está agregado a esta sesión." };
+      }
+      // Check other routines of this athlete on the same day
+      const sameDayRoutines = rutinas.filter(
+        (r) => r.id_cliente === effectiveAthleteId && r.dia_semana === day && r.id !== editingRoutineId
+      );
+      const sameDayRoutineIds = sameDayRoutines.map((r) => r.id);
+      const existsInOther = ejerciciosRutina.some(
+        (er) => sameDayRoutineIds.includes(er.id_rutina) && er.id_ejercicio === exerciseId
+      );
+      if (existsInOther) {
+        return { isDuplicate: true, reason: "Este ejercicio ya está asignado a otra rutina de este mismo día." };
+      }
+      return { isDuplicate: false };
+    }
+
+    // 2. If quick-adding to an existing routine
+    if (targetRoutineId) {
+      const targetRutina = rutinas.find((r) => r.id === targetRoutineId);
+      if (!targetRutina) return { isDuplicate: false };
+      const athleteId = targetRutina.id_cliente;
+      const targetDay = targetRutina.dia_semana;
+
+      // Find all routines of this athlete for this day
+      const sameDayRoutines = rutinas.filter(
+        (r) => r.id_cliente === athleteId && r.dia_semana === targetDay
+      );
+      const sameDayRoutineIds = sameDayRoutines.map((r) => r.id);
+      const exists = ejerciciosRutina.some(
+        (er) => sameDayRoutineIds.includes(er.id_rutina) && er.id_ejercicio === exerciseId
+      );
+      if (exists) {
+        return { isDuplicate: true, reason: "Este ejercicio ya está programado en este día." };
+      }
+    }
+
+    return { isDuplicate: false };
+  };
+
+  const startCreateRoutine = (suggestedDay?: number) => {
     setEditingRoutineId(null);
     setIsCreatingNew(true);
-    setFormNombreSesion(`Día ${athleteRoutines.length + 1}: Nueva Sesión`);
-    setFormDiaSemana((athleteRoutines.length % 7) + 1);
+    const validDay = typeof suggestedDay === "number" ? suggestedDay : undefined;
+    const targetDay = validDay !== undefined 
+      ? validDay 
+      : typeof selectedDayFilter === "number" 
+      ? selectedDayFilter 
+      : ((athleteRoutines.length % 7) + 1);
+    setFormNombreSesion(`${getDiaSemanaNombre(targetDay)}: Sesión Principal`);
+    setFormDiaSemana(targetDay);
+    setFormEsDescanso(false);
     setFormExercises([]);
   };
 
@@ -435,6 +547,19 @@ function RoutineManager({
 
   const handleAddExerciseToRoutine = async (ej: Ejercicio) => {
     if (quickAddTargetRoutineId) {
+      const targetRutina = rutinas.find((r) => r.id === quickAddTargetRoutineId);
+      const targetDay = targetRutina?.dia_semana ?? 1;
+      const check = checkExerciseDuplicateOnDay(ej.id, targetDay, quickAddTargetRoutineId);
+      if (check.isDuplicate) {
+        const dayName = getDiaSemanaNombre(targetDay);
+        const warningMsg = `⚠️ Advertencia: El ejercicio "${ej.nombre}" ya está asignado en este día (${dayName}). No se puede duplicar el mismo ejercicio en el mismo día.`;
+        setDuplicateWarning(warningMsg);
+        try {
+          window.alert(warningMsg);
+        } catch (_) {}
+        return;
+      }
+
       // Adding directly to an existing routine on the screen
       const erPayload: EjercicioRutina = {
         id: `er_${quickAddTargetRoutineId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
@@ -454,6 +579,17 @@ function RoutineManager({
     }
 
     // Adding inside the routine form
+    const check = checkExerciseDuplicateOnDay(ej.id, formDiaSemana, editingRoutineId);
+    if (check.isDuplicate) {
+      const dayName = getDiaSemanaNombre(formDiaSemana);
+      const warningMsg = `⚠️ Advertencia: El ejercicio "${ej.nombre}" ya está asignado en este día (${dayName}). No se puede duplicar el mismo ejercicio en el mismo día.`;
+      setDuplicateWarning(warningMsg);
+      try {
+        window.alert(warningMsg);
+      } catch (_) {}
+      return;
+    }
+
     const newEx: RoutineFormExercise = {
       tempId: `tmp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       id_ejercicio: ej.id,
@@ -506,6 +642,39 @@ function RoutineManager({
     e.preventDefault();
     if (!formNombreSesion.trim() || !effectiveAthleteId) return;
 
+    // Check for duplicate exercises in the form
+    const exerciseIds = formExercises.map((ex) => ex.id_ejercicio);
+    const duplicateId = exerciseIds.find((id, idx) => exerciseIds.indexOf(id) !== idx);
+    if (duplicateId) {
+      const dupEx = ejercicios.find((ex) => ex.id === duplicateId);
+      const dayName = getDiaSemanaNombre(formDiaSemana);
+      const warningMsg = `⚠️ Advertencia: El ejercicio "${dupEx?.nombre || 'seleccionado'}" está duplicado en este día (${dayName}). No se puede duplicar el mismo ejercicio en el mismo día.`;
+      setDuplicateWarning(warningMsg);
+      try {
+        window.alert(warningMsg);
+      } catch (_) {}
+      return;
+    }
+
+    // Check if another routine of the athlete on this same day already contains any of these exercises
+    const sameDayOtherRoutines = rutinas.filter(
+      (r) => r.id_cliente === effectiveAthleteId && r.dia_semana === formDiaSemana && r.id !== editingRoutineId
+    );
+    const sameDayOtherIds = sameDayOtherRoutines.map((r) => r.id);
+    const conflictingEr = ejerciciosRutina.find(
+      (er) => sameDayOtherIds.includes(er.id_rutina) && exerciseIds.includes(er.id_ejercicio)
+    );
+    if (conflictingEr) {
+      const confEx = ejercicios.find((ex) => ex.id === conflictingEr.id_ejercicio);
+      const dayName = getDiaSemanaNombre(formDiaSemana);
+      const warningMsg = `⚠️ Advertencia: El ejercicio "${confEx?.nombre || 'seleccionado'}" ya está asignado en otra sesión de este mismo día (${dayName}). No se puede duplicar en el mismo día.`;
+      setDuplicateWarning(warningMsg);
+      try {
+        window.alert(warningMsg);
+      } catch (_) {}
+      return;
+    }
+
     setIsSyncing(true);
     try {
       if (isCreatingNew) {
@@ -516,6 +685,7 @@ function RoutineManager({
           id_entrenador: currentUser?.id || "entrenador1",
           nombre_sesion: formNombreSesion,
           dia_semana: formDiaSemana,
+          es_descanso: formEsDescanso,
         };
         await addRutina(newRutina);
 
@@ -539,6 +709,7 @@ function RoutineManager({
           id_entrenador: currentUser?.id || "entrenador1",
           nombre_sesion: formNombreSesion,
           dia_semana: formDiaSemana,
+          es_descanso: formEsDescanso,
         };
         await updateRutina(updatedRutina);
 
@@ -633,6 +804,28 @@ function RoutineManager({
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Rest Day Switch */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#E0E5EC] shadow-neu-pressed mt-1">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-lg ${formEsDescanso ? 'bg-amber-100 text-amber-700' : 'bg-[#c5cad1]/20 text-[#718096]'}`}>
+                  <Coffee className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-[#2D3748]">Día de Descanso Recomendado</span>
+                  <span className="text-[10px] text-[#718096]">
+                    Los días de descanso no se mostrarán al atleta en su lista activa de rutinas
+                  </span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                id="routine-form-rest-toggle"
+                checked={formEsDescanso}
+                onChange={(e) => setFormEsDescanso(e.target.checked)}
+                className="w-4 h-4 accent-[#4D7CFE] cursor-pointer"
+              />
             </div>
           </NeuCard>
 
@@ -895,9 +1088,140 @@ function RoutineManager({
         </div>
       </NeuCard>
 
+      {/* View Mode Switcher: Rutinas vs Vista "Tu Progreso" */}
+      <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+        <button
+          type="button"
+          onClick={() => setViewMode("gestionar")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            viewMode === "gestionar"
+              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+              : "text-[#718096] hover:text-[#2D3748]"
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span>Gestión de Rutinas</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("progreso")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            viewMode === "progreso"
+              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+              : "text-[#718096] hover:text-[#2D3748]"
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          <span>Ver "Tu Progreso"</span>
+        </button>
+      </div>
+
+      {viewMode === "progreso" ? (
+        <AthleteProgressView
+          athleteId={effectiveAthleteId}
+          isTrainerView={true}
+          onBack={() => setViewMode("gestionar")}
+          onOpenPhysicalFicha={() => setProgressModalAthlete(currentAthlete)}
+        />
+      ) : (
+        <>
+          {/* Day Selector Navigation Bar for Trainer (Shows all days with routines, hiding rest days) */}
+          <div className="flex flex-col gap-1.5">
+        <div className="flex justify-between items-center px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-[#718096] uppercase tracking-wider">
+              Días con Rutina ({activeAthleteRoutines.length})
+            </span>
+            {restRoutines.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowRestDays(!showRestDays)}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition-all flex items-center gap-1 ${
+                  showRestDays 
+                    ? "bg-amber-100 text-amber-800 shadow-sm"
+                    : "bg-[#E0E5EC] shadow-neu-pressed text-[#a0aec0] hover:text-[#718096]"
+                }`}
+                title={showRestDays ? "Ocultar días de descanso" : "Mostrar días de descanso ocultos"}
+              >
+                <Coffee className="w-3 h-3" />
+                <span>{showRestDays ? "Ocultar descansos" : `${restRoutines.length} descanso(s) oculto(s)`}</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setSelectedDayFilter("todos")}
+              className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-all ${
+                selectedDayFilter === "todos"
+                  ? "bg-[#4D7CFE] text-white shadow-sm"
+                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+              }`}
+            >
+              Todos ({activeAthleteRoutines.length})
+            </button>
+            <button
+              onClick={() => startCreateRoutine()}
+              className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#E0E5EC] shadow-neu-flat text-[#00C9A7] hover:text-[#00B094] flex items-center gap-1"
+              title="Programar rutina para un nuevo día"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Añadir Día</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {(showRestDays ? athleteRoutines : activeAthleteRoutines).map((routine) => {
+            const isSelected = selectedDayFilter === routine.dia_semana;
+            const exercisesCount = ejerciciosRutina.filter((er) => er.id_rutina === routine.id).length;
+            const isRest = routine.es_descanso || isRutinaDescanso(routine);
+            const isToday = routine.dia_semana === todayDay;
+            const dayName = getDiaSemanaNombre(routine.dia_semana);
+
+            return (
+              <button
+                key={routine.id}
+                id={`trainer-btn-day-${routine.dia_semana}`}
+                onClick={() => {
+                  if (selectedDayFilter === routine.dia_semana) {
+                    setSelectedDayFilter("todos");
+                  } else {
+                    setSelectedDayFilter(routine.dia_semana);
+                  }
+                }}
+                className={`flex-1 min-w-[84px] py-2 px-1.5 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                  isSelected
+                    ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE] ring-2 ring-[#4D7CFE]/40 font-bold"
+                    : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748] font-medium active:shadow-neu-pressed"
+                }`}
+              >
+                <span className="text-xs font-bold leading-tight">{dayName}</span>
+                {isToday && (
+                  <span className="text-[8px] font-black uppercase tracking-wider bg-[#4D7CFE] text-white px-1.5 py-0.2 rounded-full shadow-sm">
+                    Hoy
+                  </span>
+                )}
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold ${
+                    isSelected
+                      ? "bg-[#4D7CFE]/15 text-[#4D7CFE]"
+                      : isRest
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-[#c5cad1]/25 text-[#718096]"
+                  }`}
+                >
+                  {isRest ? "Descanso" : `${exercisesCount} ej.`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* List of Routines for Athlete */}
       <div className="flex flex-col gap-3.5">
-        {athleteRoutines.length === 0 ? (
+        {activeAthleteRoutines.length === 0 && !showRestDays ? (
           <NeuCard inset className="p-6 text-center text-[#718096] text-xs flex flex-col items-center gap-3">
             <ClipboardList className="w-10 h-10 text-[#718096]/40" />
             <div>
@@ -917,7 +1241,7 @@ function RoutineManager({
               </NeuButton>
               <NeuButton
                 className="text-[#4D7CFE] text-xs font-bold px-3 py-2 flex items-center gap-1"
-                onClick={startCreateRoutine}
+                onClick={() => startCreateRoutine()}
               >
                 <Plus className="w-4 h-4" />
                 Crear Sesión Manual
@@ -925,59 +1249,137 @@ function RoutineManager({
             </div>
           </NeuCard>
         ) : (
-          athleteRoutines.map((rutina) => {
-            const relatedErs = ejerciciosRutina.filter((er) => er.id_rutina === rutina.id);
-            const diaObj = DIAS_SEMANA.find((d) => d.id === rutina.dia_semana);
+          (() => {
+            const routinesSource = showRestDays ? athleteRoutines : activeAthleteRoutines;
+            const displayedRoutines = selectedDayFilter === "todos"
+              ? routinesSource
+              : routinesSource.filter((r) => r.dia_semana === selectedDayFilter);
 
-            return (
-              <NeuCard key={rutina.id} className="p-4 flex flex-col gap-3">
-                {/* Routine Card Header */}
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-md shadow-neu-pressed">
-                        {diaObj?.label || `Día ${rutina.dia_semana}`}
-                      </span>
-                      <span className="text-[10px] text-[#718096] font-medium">
-                        {relatedErs.length} ejercicios
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-sm text-[#2D3748] leading-tight">
-                      {rutina.nombre_sesion}
-                    </h3>
+            if (displayedRoutines.length === 0 && selectedDayFilter !== "todos") {
+              const selectedDiaObj = DIAS_SEMANA.find((d) => d.id === selectedDayFilter);
+              return (
+                <NeuCard inset className="p-6 text-center text-[#718096] text-xs flex flex-col items-center gap-3">
+                  <Calendar className="w-10 h-10 text-[#718096]/40" />
+                  <div>
+                    <p className="font-bold text-[#2D3748] text-sm">
+                      Sin rutina activa para el {selectedDiaObj?.label || getDiaSemanaNombre(selectedDayFilter)}
+                    </p>
+                    <p className="text-[11px] text-[#718096] mt-0.5">
+                      Puedes programar una sesión para este día o volver a ver todos los días con rutina.
+                    </p>
                   </div>
-
-                  {/* Actions: Edit / Quick Add / Delete */}
-                  <div className="flex gap-1.5 items-center">
+                  <div className="flex gap-2 mt-2">
                     <NeuButton
-                      variant="circle"
-                      className="w-8 h-8 shadow-neu-flat text-[#00C9A7] !p-0 flex items-center justify-center"
-                      onClick={() => {
-                        setQuickAddTargetRoutineId(rutina.id);
-                        setExercisePickerOpen(true);
-                      }}
-                      title="Añadir ejercicio a esta rutina"
+                      className="text-[#4D7CFE] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                      onClick={() => startCreateRoutine(selectedDayFilter)}
                     >
                       <Plus className="w-4 h-4" />
+                      Programar Rutina
                     </NeuButton>
                     <NeuButton
-                      variant="circle"
-                      className="w-8 h-8 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center"
-                      onClick={() => startEditRoutine(rutina)}
-                      title="Editar Sesión"
+                      className="text-[#718096] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                      onClick={() => setSelectedDayFilter("todos")}
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </NeuButton>
-                    <NeuButton
-                      variant="circle"
-                      className="w-8 h-8 shadow-neu-flat text-red-500 !p-0 flex items-center justify-center"
-                      onClick={() => handleDeleteRoutine(rutina.id, rutina.nombre_sesion)}
-                      title="Eliminar Rutina"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      Ver Todos los Días
                     </NeuButton>
                   </div>
-                </div>
+                </NeuCard>
+              );
+            }
+
+            return displayedRoutines.map((rutina) => {
+              const relatedErs = ejerciciosRutina.filter((er) => er.id_rutina === rutina.id);
+              const diaObj = DIAS_SEMANA.find((d) => d.id === rutina.dia_semana);
+              const isRest = rutina.es_descanso || isRutinaDescanso(rutina);
+              const isToday = rutina.dia_semana === todayDay;
+
+              return (
+                <NeuCard key={rutina.id} className="p-4 flex flex-col gap-3">
+                  {/* Routine Card Header */}
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-md shadow-neu-pressed">
+                          {diaObj?.label || `Día ${rutina.dia_semana}`}
+                        </span>
+                        {isToday && (
+                          <span className="text-[8px] font-black uppercase tracking-wider bg-[#4D7CFE] text-white px-1.5 py-0.2 rounded-full shadow-sm">
+                            Hoy
+                          </span>
+                        )}
+                        {isRest && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <Coffee className="w-3 h-3" />
+                            Descanso (Oculto al atleta)
+                          </span>
+                        )}
+                        <span className="text-[10px] text-[#718096] font-medium">
+                          {relatedErs.length} ejercicios
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-sm text-[#2D3748] leading-tight">
+                        {rutina.nombre_sesion}
+                      </h3>
+                    </div>
+
+                    {/* Actions: Edit / Quick Add / Move / Clear / Rest / Delete */}
+                    <div className="flex gap-1.5 items-center">
+                      <NeuButton
+                        variant="circle"
+                        className="w-8 h-8 shadow-neu-flat text-[#00C9A7] !p-0 flex items-center justify-center"
+                        onClick={() => {
+                          setQuickAddTargetRoutineId(rutina.id);
+                          setExercisePickerOpen(true);
+                        }}
+                        title="Añadir ejercicio a esta rutina"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </NeuButton>
+                      <NeuButton
+                        variant="circle"
+                        className="w-8 h-8 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center"
+                        onClick={() => setMoveModalRoutine(rutina)}
+                        title="Mover rutina a otro día"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                      </NeuButton>
+                      <NeuButton
+                        variant="circle"
+                        className="w-8 h-8 shadow-neu-flat text-amber-600 !p-0 flex items-center justify-center disabled:opacity-40"
+                        onClick={() => setClearConfirmRoutine(rutina)}
+                        disabled={relatedErs.length === 0}
+                        title="Limpiar ejercicios de esta rutina"
+                      >
+                        <Eraser className="w-3.5 h-3.5" />
+                      </NeuButton>
+                      <NeuButton
+                        variant="circle"
+                        className={`w-8 h-8 shadow-neu-flat !p-0 flex items-center justify-center ${
+                          isRest ? "text-amber-700 bg-amber-100" : "text-[#718096]"
+                        }`}
+                        onClick={() => toggleRutinaDescanso(rutina.id)}
+                        title={isRest ? "Activar rutina de entrenamiento" : "Marcar como día de descanso"}
+                      >
+                        <Coffee className="w-3.5 h-3.5" />
+                      </NeuButton>
+                      <NeuButton
+                        variant="circle"
+                        className="w-8 h-8 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center"
+                        onClick={() => startEditRoutine(rutina)}
+                        title="Editar Sesión"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </NeuButton>
+                      <NeuButton
+                        variant="circle"
+                        className="w-8 h-8 shadow-neu-flat text-red-500 !p-0 flex items-center justify-center"
+                        onClick={() => handleDeleteRoutine(rutina.id, rutina.nombre_sesion)}
+                        title="Eliminar Rutina"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </NeuButton>
+                    </div>
+                  </div>
 
                 {/* Exercises list inside routine card */}
                 <div className="flex flex-col gap-2 pt-1 border-t border-[#c5cad1]/20">
@@ -1066,9 +1468,11 @@ function RoutineManager({
                 </div>
               </NeuCard>
             );
-          })
-        )}
+          });
+        })())}
       </div>
+    </>
+  )}
 
       {/* Quick Exercise Parameters Editor Modal */}
       <AnimatePresence>
@@ -1252,8 +1656,157 @@ function RoutineManager({
         )}
       </AnimatePresence>
 
+      {/* Move Routine to Another Day Modal */}
+      <AnimatePresence>
+        {moveModalRoutine && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-[#4D7CFE]/10 text-[#4D7CFE]">
+                    <ArrowRightLeft className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-[#2D3748]">Mover Rutina de Día</h3>
+                    <span className="text-xs text-[#718096]">Reorganizar planificación</span>
+                  </div>
+                </div>
+                <NeuButton
+                  variant="circle"
+                  className="w-7 h-7 shadow-neu-flat"
+                  onClick={() => setMoveModalRoutine(null)}
+                >
+                  <X className="w-4 h-4 text-[#718096]" />
+                </NeuButton>
+              </div>
+
+              <p className="text-xs text-[#718096]">
+                Mover <strong className="text-[#2D3748]">{moveModalRoutine.nombre_sesion}</strong> (actualmente en {getDiaSemanaNombre(moveModalRoutine.dia_semana)}) a otro día de la semana:
+              </p>
+
+              <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+                {DIAS_SEMANA.filter((d) => d.id !== moveModalRoutine.dia_semana).map((dia) => {
+                  const targetRoutine = athleteRoutines.find((r) => r.dia_semana === dia.id);
+                  const isToday = dia.id === todayDay;
+
+                  return (
+                    <button
+                      key={dia.id}
+                      onClick={async () => {
+                        await moveRutinaToDay(moveModalRoutine.id, dia.id);
+                        setSelectedDayFilter(dia.id);
+                        setMoveModalRoutine(null);
+                      }}
+                      className="p-3 rounded-2xl bg-[#E0E5EC] shadow-neu-flat hover:shadow-neu-pressed active:shadow-neu-pressed flex items-center justify-between text-left transition-all"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-[#2D3748]">{dia.label}</span>
+                        {isToday && (
+                          <span className="text-[8px] font-black uppercase bg-[#4D7CFE] text-white px-1.5 py-0.2 rounded-full">
+                            Hoy
+                          </span>
+                        )}
+                      </div>
+                      {targetRoutine ? (
+                        <span className="text-[10px] text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md font-bold">
+                          Intercambiar con: {targetRoutine.nombre_sesion}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md font-bold">
+                          Día Libre
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <NeuButton
+                className="h-10 text-[#718096] text-xs font-medium"
+                onClick={() => setMoveModalRoutine(null)}
+              >
+                Cancelar
+              </NeuButton>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Clear Routine Exercises Confirmation Modal */}
+      <AnimatePresence>
+        {clearConfirmRoutine && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-700">
+                  <Eraser className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#2D3748]">Limpiar Ejercicios</h3>
+                  <span className="text-xs text-[#718096]">{clearConfirmRoutine.nombre_sesion}</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#718096] leading-relaxed">
+                ¿Estás seguro de que deseas eliminar todos los ejercicios de la sesión del día{" "}
+                <strong className="text-[#2D3748]">{getDiaSemanaNombre(clearConfirmRoutine.dia_semana)}</strong>?
+                <br />
+                <span className="text-[11px] text-[#718096]/80 mt-1 block">
+                  La sesión permanecerá programada para este día pero quedará limpia para agregar nuevos ejercicios.
+                </span>
+              </p>
+
+              <div className="flex gap-2">
+                <NeuButton
+                  className="flex-1 h-11 text-red-600 font-bold text-xs"
+                  onClick={async () => {
+                    await clearRutinaEjercicios(clearConfirmRoutine.id);
+                    setClearConfirmRoutine(null);
+                  }}
+                >
+                  Limpiar Ejercicios
+                </NeuButton>
+                <NeuButton
+                  className="px-4 h-11 text-[#718096] text-xs"
+                  onClick={() => setClearConfirmRoutine(null)}
+                >
+                  Cancelar
+                </NeuButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Reusable Exercise Picker Modal */}
       {renderExercisePickerModal()}
+
+      {/* Physical Evaluation Modal if requested */}
+      <AthleteProgressModal
+        isOpen={!!progressModalAthlete}
+        onClose={() => setProgressModalAthlete(null)}
+        athlete={progressModalAthlete}
+      />
     </div>
   );
 

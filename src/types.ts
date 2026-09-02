@@ -30,6 +30,7 @@ export interface Rutina {
   id_entrenador: string;
   nombre_sesion: string;
   dia_semana: number; // 0 = Domingo, 1 = Lunes, etc.
+  es_descanso?: boolean;
 }
 
 export interface EjercicioRutina {

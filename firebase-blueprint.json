@@ -39,7 +39,8 @@
         "id_cliente": { "type": "string", "maxLength": 128 },
         "id_entrenador": { "type": "string", "maxLength": 128 },
         "nombre_sesion": { "type": "string", "maxLength": 100 },
-        "dia_semana": { "type": "number", "minimum": 0, "maximum": 6 }
+        "dia_semana": { "type": "number", "minimum": 0, "maximum": 6 },
+        "es_descanso": { "type": "boolean" }
       },
       "required": ["id_cliente", "id_entrenador", "nombre_sesion", "dia_semana"]
     },

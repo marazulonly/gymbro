@@ -67,6 +67,8 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
       sexo,
       contrasena,
       estado_suscripcion,
+      color_acento: isEditingOther ? targetUser.color_acento : accentColor,
+      modo_tema: isEditingOther ? targetUser.modo_tema : themeMode,
     });
     onClose();
   };

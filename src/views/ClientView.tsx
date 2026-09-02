@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
-import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight } from "lucide-react";
-import { useStore, getClientRoutines } from "@/store";
+import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles } from "lucide-react";
+import { useStore, getClientRoutines, getClientActiveRoutines, getDiaSemanaNombre, getDiaSemanaCorto } from "@/store";
 import { motion, AnimatePresence } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AthleteProgressView } from "@/components/AthleteProgressView";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
   const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
@@ -25,24 +26,34 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
 
 function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) => void }) {
   const { currentUser, rutinas, planNutricion, ejerciciosRutina, ejercicios } = useStore();
-  const clientRoutines = getClientRoutines(rutinas, currentUser);
-  const todayRoutine = clientRoutines[0] || rutinas[0];
+  const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
+  const todayDay = new Date().getDay();
+  const todayRoutine = activeRoutines.find((r) => r.dia_semana === todayDay);
   
   return (
     <div className="flex flex-col gap-4 h-full pb-6">
       <div>
         <h2 className="text-2xl font-light text-[var(--color-text-main)]">Hola,</h2>
         <h3 className="text-3xl font-bold text-[var(--color-accent-blue)]">{currentUser?.nombre || 'Atleta'}</h3>
-        <p className="text-xs text-[var(--color-text-muted)] mt-0.5 font-medium">Plan personalizado de 5 días activo</p>
+        <p className="text-xs text-[var(--color-text-muted)] mt-0.5 font-medium">
+          {activeRoutines.length} días de entrenamiento programados por tu entrenador
+        </p>
       </div>
 
-      {todayRoutine && (
+      {todayRoutine ? (
         <NeuCard className="flex items-center justify-between py-3 px-4">
           <div className="flex flex-col max-w-[75%]">
-            <span className="text-[var(--color-accent-blue)] text-xs font-bold uppercase tracking-wider">Rutina de hoy</span>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[var(--color-accent-blue)] text-xs font-bold uppercase tracking-wider">
+                Rutina de Hoy • {getDiaSemanaNombre(todayRoutine.dia_semana)}
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded shadow-sm">
+                Hoy
+              </span>
+            </div>
             <span className="text-[var(--color-text-main)] text-lg font-bold truncate">{todayRoutine.nombre_sesion}</span>
             <span className="text-[11px] text-[var(--color-text-muted)]">
-              {ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id).length} ejercicios programados
+              {ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id).length} ejercicios recomendados
             </span>
           </div>
           <NeuButton 
@@ -52,6 +63,33 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
           >
             <Play className="w-5 h-5 ml-1" />
           </NeuButton>
+        </NeuCard>
+      ) : (
+        <NeuCard className="flex items-center justify-between py-3.5 px-4 bg-[var(--color-bg-base)]">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
+              <Coffee className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-[var(--color-accent-blue)] uppercase tracking-wider">
+                Día de Descanso Recomendado
+              </span>
+              <span className="text-sm font-bold text-[var(--color-text-main)]">
+                Recuperación activa y descanso
+              </span>
+              <span className="text-[11px] text-[var(--color-text-muted)]">
+                {activeRoutines.length > 0 ? `Próxima sesión: ${getDiaSemanaNombre(activeRoutines[0].dia_semana)}` : 'Sin sesiones activas'}
+              </span>
+            </div>
+          </div>
+          {activeRoutines.length > 0 && (
+            <NeuButton
+              className="px-3 py-1.5 text-xs font-bold text-[var(--color-accent-blue)] h-8 flex items-center gap-1"
+              onClick={() => onStartWorkout(activeRoutines[0].id)}
+            >
+              <span>Ver Plan</span>
+            </NeuButton>
+          )}
         </NeuCard>
       )}
 
@@ -66,10 +104,10 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         
         <NeuCard className="flex flex-col items-center justify-center gap-1.5 py-4">
           <div className="w-12 h-12 flex items-center justify-center rounded-full shadow-neu-pressed">
-            <span className="text-base font-bold text-[var(--color-accent-blue)]">5/5</span>
+            <span className="text-base font-bold text-[var(--color-accent-blue)]">{activeRoutines.length}/7</span>
           </div>
           <div className="text-[11px] text-[var(--color-text-muted)] text-center">
-            Días del Plan<br/>Registrados
+            Días de Entrenamiento<br/>Programados
           </div>
         </NeuCard>
       </div>
@@ -92,29 +130,43 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         </NeuCard>
       </div>
 
-      {/* 5-Day Weekly Routine Roadmap */}
+      {/* Weekly Routine Roadmap (Only active workout days) */}
       <div className="flex flex-col gap-2.5 mt-1">
         <div className="flex justify-between items-center ml-1">
-          <h4 className="font-bold text-[var(--color-text-main)] text-sm">Plan Semanal Completo (5 Días)</h4>
+          <h4 className="font-bold text-[var(--color-text-main)] text-sm">Plan Semanal de Entrenamiento</h4>
           <span className="text-[10px] font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-full shadow-neu-flat">
-            {clientRoutines.length} Días
+            {activeRoutines.length} Días Activos
           </span>
         </div>
 
         <div className="flex flex-col gap-2.5">
-          {clientRoutines.map((routine, idx) => {
+          {activeRoutines.map((routine) => {
             const routineErs = ejerciciosRutina.filter(er => er.id_rutina === routine.id);
+            const dayName = getDiaSemanaNombre(routine.dia_semana);
+            const isToday = routine.dia_semana === todayDay;
+
             return (
               <NeuCard 
                 key={routine.id} 
-                className="p-3.5 flex flex-col gap-2 cursor-pointer hover:shadow-neu-pressed transition-all"
+                className={`p-3.5 flex flex-col gap-2 cursor-pointer hover:shadow-neu-pressed transition-all ${
+                  isToday ? 'ring-2 ring-[var(--color-accent-blue)]/30' : ''
+                }`}
                 onClick={() => onStartWorkout(routine.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center text-xs font-bold text-[var(--color-accent-blue)]">
-                      {routine.dia_semana || idx + 1}
+                    <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
+                      isToday 
+                        ? 'bg-[var(--color-accent-blue)] text-white shadow-sm' 
+                        : 'shadow-neu-pressed text-[var(--color-accent-blue)]'
+                    }`}>
+                      {dayName}
                     </span>
+                    {isToday && (
+                      <span className="text-[9px] font-black uppercase text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-1.5 py-0.2 rounded shadow-neu-pressed">
+                        Hoy
+                      </span>
+                    )}
                     <span className="font-bold text-xs text-[var(--color-text-main)]">{routine.nombre_sesion}</span>
                   </div>
                   <NeuButton 
@@ -138,7 +190,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                           key={er.id} 
                           className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] font-medium"
                         >
-                          {ex?.nombre || 'Ejercicio'} ({er.series_objetivo}x{er.reps_objetivo})
+                          {ex?.nombre || 'Ejercicio'} ({er.series_objetivo}×{er.reps_objetivo})
                         </span>
                       );
                     })}
@@ -161,11 +213,14 @@ function LiveWorkout({
   onClearInitialRoutine?: () => void; 
 }) {
   const { currentUser, rutinas, ejerciciosRutina, ejercicios } = useStore();
-  const clientRoutines = getClientRoutines(rutinas, currentUser);
+  const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
+  const todayDay = new Date().getDay();
 
-  const [selectedRoutineId, setSelectedRoutineId] = useState<string>(
-    initialRoutineId || clientRoutines[0]?.id || rutinas[0]?.id || 'r1'
-  );
+  // Find routine matching today's day of week, or fallback to first active routine
+  const todayRoutine = activeRoutines.find((r) => r.dia_semana === todayDay);
+  const defaultRoutineId = initialRoutineId || todayRoutine?.id || activeRoutines[0]?.id || 'r1';
+
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string>(defaultRoutineId);
 
   useEffect(() => {
     if (initialRoutineId) {
@@ -174,9 +229,16 @@ function LiveWorkout({
     }
   }, [initialRoutineId, onClearInitialRoutine]);
 
-  // Keep selectedRoutineId valid
-  const currentRoutine = clientRoutines.find(r => r.id === selectedRoutineId) || clientRoutines[0] || rutinas[0];
-  const routineExercises = ejerciciosRutina.filter(er => er.id_rutina === currentRoutine?.id);
+  // Keep selectedRoutineId valid among active routines
+  useEffect(() => {
+    if (activeRoutines.length > 0 && !activeRoutines.some((r) => r.id === selectedRoutineId)) {
+      const matchToday = activeRoutines.find((r) => r.dia_semana === todayDay);
+      setSelectedRoutineId(matchToday ? matchToday.id : activeRoutines[0].id);
+    }
+  }, [activeRoutines, selectedRoutineId, todayDay]);
+
+  const currentRoutine = activeRoutines.find((r) => r.id === selectedRoutineId) || activeRoutines[0];
+  const routineExercises = ejerciciosRutina.filter((er) => er.id_rutina === currentRoutine?.id);
   
   const [isWorkoutStarted, setIsWorkoutStarted] = useState(false);
   const [completedExercises, setCompletedExercises] = useState<Set<number>>(new Set());
@@ -192,13 +254,6 @@ function LiveWorkout({
   const [reps, setReps] = useState(currentEr?.reps_objetivo?.split('-')[0] || "10");
   const [weight, setWeight] = useState("12.5");
   const [rpe, setRpe] = useState(currentEr?.rpe_objetivo?.toString() || "8");
-
-  // Reset exercise index when routine changes
-  useEffect(() => {
-    if (clientRoutines.length > 0 && !clientRoutines.some(r => r.id === selectedRoutineId)) {
-      setSelectedRoutineId(clientRoutines[0].id);
-    }
-  }, [clientRoutines, selectedRoutineId]);
 
   // Update inputs when exercise changes
   useEffect(() => {
@@ -266,45 +321,61 @@ function LiveWorkout({
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-[#718096]">
         <Dumbbell className="w-12 h-12 mb-2 opacity-50" />
-        <p>No hay rutina programada.</p>
+        <p>No hay rutinas activas programadas.</p>
       </div>
     );
   }
 
   if (!isWorkoutStarted) {
+    const isCurrentDayToday = currentRoutine.dia_semana === todayDay;
+
     return (
       <div className="flex flex-col gap-3 h-full pb-4">
-        {/* Day Selector Navigation Bar (5 Days) */}
+        {/* Day Selector Navigation Bar - Days of Week */}
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between items-center px-1">
             <span className="text-[11px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">
-              Seleccionar Día de Entrenamiento
+              Días de Entrenamiento
             </span>
             <span className="text-[10px] font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-full shadow-neu-pressed">
-              5 Sesiones
+              {activeRoutines.length} Sesiones
             </span>
           </div>
 
-          <div className="grid grid-cols-5 gap-1.5">
-            {clientRoutines.map((r, i) => {
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {activeRoutines.map((r) => {
               const isSelected = r.id === currentRoutine?.id;
               const exercisesCount = ejerciciosRutina.filter(er => er.id_rutina === r.id).length;
+              const dayName = getDiaSemanaNombre(r.dia_semana);
+              const isToday = r.dia_semana === todayDay;
+
               return (
                 <button
                   key={r.id}
-                  id={`btn-day-${r.dia_semana || i + 1}`}
+                  id={`btn-day-${r.dia_semana}`}
                   onClick={() => {
                     setSelectedRoutineId(r.id);
                     setCompletedExercises(new Set());
                   }}
-                  className={`py-2 px-1 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
+                  className={`flex-1 min-w-[78px] py-2.5 px-2 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-1 ${
                     isSelected
-                      ? 'bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)] ring-2 ring-[var(--color-accent-blue)]/30 font-bold'
+                      ? 'bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)] ring-2 ring-[var(--color-accent-blue)]/40 font-bold'
                       : 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] font-medium active:shadow-neu-pressed'
                   }`}
                 >
-                  <span className="text-xs leading-none">Día {r.dia_semana || i + 1}</span>
-                  <span className={`text-[9px] px-1.5 py-0.2 rounded-md mt-0.5 font-bold ${isSelected ? 'bg-[var(--color-accent-blue)] text-white shadow-sm' : 'bg-[#c5cad1]/40 text-[var(--color-text-muted)]'}`}>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold leading-tight">{dayName}</span>
+                  </div>
+                  {isToday && (
+                    <span className="text-[8px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded-full shadow-sm">
+                      Hoy
+                    </span>
+                  )}
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold ${
+                    isSelected 
+                      ? 'bg-[var(--color-accent-blue)]/15 text-[var(--color-accent-blue)]' 
+                      : 'bg-[#c5cad1]/25 text-[var(--color-text-muted)]'
+                  }`}>
                     {exercisesCount > 0 ? `${exercisesCount} ej.` : 'Sesión'}
                   </span>
                 </button>
@@ -313,9 +384,32 @@ function LiveWorkout({
           </div>
         </div>
 
-        <div className="flex flex-col mt-1">
-          <span className="text-[var(--color-accent-blue)] font-bold text-xs tracking-widest uppercase">Plan Semanal Activo</span>
+        {/* Notice if today is rest day */}
+        {!todayRoutine && (
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed text-xs text-[var(--color-text-muted)] border border-[#c5cad1]/20">
+            <Coffee className="w-4 h-4 text-[var(--color-accent-blue)] flex-shrink-0" />
+            <span>
+              <strong>Hoy es día de descanso recomendado.</strong> Mostrando sesión de <strong>{getDiaSemanaNombre(currentRoutine.dia_semana)}</strong>.
+            </span>
+          </div>
+        )}
+
+        {/* Routine Title & Day header */}
+        <div className="flex flex-col mt-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[var(--color-accent-blue)] font-bold text-xs tracking-widest uppercase">
+              {getDiaSemanaNombre(currentRoutine.dia_semana)}
+            </span>
+            {isCurrentDayToday && (
+              <span className="text-[9px] font-black uppercase bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded shadow-sm">
+                Rutina de Hoy
+              </span>
+            )}
+          </div>
           <h2 className="text-lg font-bold text-[var(--color-text-main)] leading-snug">{currentRoutine.nombre_sesion}</h2>
+          <span className="text-xs text-[var(--color-text-muted)]">
+            {routineExercises.length} ejercicios recomendados por tu entrenador
+          </span>
         </div>
         
         {routineExercises.length === 0 ? (
@@ -527,6 +621,7 @@ const mockData = [
 
 function ClientProgress() {
   const { currentUser, fichasProgreso } = useStore();
+  const [subTab, setSubTab] = useState<"progreso" | "ficha">("progreso");
   const ficha = fichasProgreso.find((f) => f.id_cliente === currentUser?.id);
 
   let diasRestantes: number | null = null;
@@ -536,11 +631,55 @@ function ClientProgress() {
     diasRestantes = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
   }
 
+  if (subTab === "progreso") {
+    return (
+      <div className="flex flex-col gap-3">
+        {/* Toggle sub-view pill */}
+        <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+          <button
+            onClick={() => setSubTab("progreso")}
+            className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Tu Progreso</span>
+          </button>
+          <button
+            onClick={() => setSubTab("ficha")}
+            className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[#718096] hover:text-[#2D3748]"
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>Control Físico & Medidas</span>
+          </button>
+        </div>
+
+        <AthleteProgressView onOpenPhysicalFicha={() => setSubTab("ficha")} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 h-full pb-10">
+      {/* Toggle sub-view pill */}
+      <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+        <button
+          onClick={() => setSubTab("progreso")}
+          className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[#718096] hover:text-[#2D3748]"
+        >
+          <Activity className="w-3.5 h-3.5" />
+          <span>Tu Progreso</span>
+        </button>
+        <button
+          onClick={() => setSubTab("ficha")}
+          className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+        >
+          <Scale className="w-3.5 h-3.5" />
+          <span>Control Físico & Medidas</span>
+        </button>
+      </div>
+
       <div>
-        <h2 className="text-2xl font-bold text-[#2D3748]">Mi Progreso</h2>
-        <span className="text-xs text-[#718096]">Evaluaciones físicas y control de avances</span>
+        <h2 className="text-2xl font-bold text-[#2D3748]">Control Físico & Medidas</h2>
+        <span className="text-xs text-[#718096]">Evaluaciones antropométricas y control de chequeos</span>
       </div>
 
       {/* Ficha de Evaluación del Entrenador */}

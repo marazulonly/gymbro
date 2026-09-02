@@ -36,6 +36,9 @@ interface AppState {
   addRutina: (rutina: Rutina) => Promise<void>;
   updateRutina: (rutina: Rutina) => Promise<void>;
   deleteRutina: (id: string) => Promise<void>;
+  clearRutinaEjercicios: (rutinaId: string) => Promise<void>;
+  moveRutinaToDay: (rutinaId: string, nuevoDia: number) => Promise<void>;
+  toggleRutinaDescanso: (rutinaId: string, esDescanso?: boolean) => Promise<void>;
   ejerciciosRutina: EjercicioRutina[];
   addEjercicioRutina: (item: EjercicioRutina) => Promise<void>;
   updateEjercicioRutina: (item: EjercicioRutina) => Promise<void>;
@@ -61,7 +64,7 @@ function cleanObject<T extends Record<string, any>>(obj: T): T {
 const mockUsuarios: Usuario[] = [
   { id: 'admin1', nombre: 'Admin GymBro', dni: '12345678', whatsapp: '999999999', fecha_nacimiento: '1990-01-01', sexo: 'masculino', contrasena: '0000', estado_suscripcion: 'activo', rol: 'admin' },
   { id: 'entrenador1', nombre: 'Coach Roberto', dni: '87654321', whatsapp: '988888888', fecha_nacimiento: '1985-05-15', sexo: 'masculino', contrasena: '0000', estado_suscripcion: 'activo', rol: 'entrenador' },
-  { id: 'xb-9988-fit', nombre: 'Xiomara Ballón', dni: '11111111', whatsapp: '977777777', fecha_nacimiento: '1998-03-20', sexo: 'femenino', contrasena: '0000', estado_suscripcion: 'activo', rol: 'cliente', id_entrenador: 'entrenador1' },
+  { id: 'u1', nombre: 'Xiomara Ballón', dni: '10101010', whatsapp: '977777777', fecha_nacimiento: '1998-03-20', sexo: 'femenino', contrasena: '0000', estado_suscripcion: 'activo', rol: 'cliente', id_entrenador: 'entrenador1' },
 ];
 
 const mockEjercicios: Ejercicio[] = [
@@ -106,11 +109,11 @@ const mockEjercicios: Ejercicio[] = [
 ];
 
 const mockRutinas: Rutina[] = [
-  { id: 'r1', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 1: Tren Superior (A) - Empuje y Tirón Vertical', dia_semana: 1 },
-  { id: 'r2', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 2: Tren Inferior (A) - Cuádriceps y Glúteo', dia_semana: 2 },
-  { id: 'r3', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 3: Full Body - Fuerza, Glúteos y Core', dia_semana: 3 },
-  { id: 'r4', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 4: Tren Superior (B) - Tirón Horizontal y Hombros', dia_semana: 4 },
-  { id: 'r5', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 5: Tren Inferior (B) - Cadena Posterior y Unilaterales', dia_semana: 5 },
+  { id: 'r1', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Tren Superior (A) - Empuje y Tirón Vertical', dia_semana: 1, es_descanso: false },
+  { id: 'r2', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Tren Inferior (A) - Cuádriceps y Glúteo', dia_semana: 2, es_descanso: false },
+  { id: 'r3', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Full Body - Fuerza, Glúteos y Core', dia_semana: 3, es_descanso: false },
+  { id: 'r4', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Tren Superior (B) - Tirón Horizontal y Hombros', dia_semana: 4, es_descanso: false },
+  { id: 'r5', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Tren Inferior (B) - Cadena Posterior y Unilaterales', dia_semana: 5, es_descanso: false },
 ];
 
 const mockEjerciciosRutina: EjercicioRutina[] = [
@@ -202,6 +205,21 @@ const FICHAS_PROGRESO_STORAGE_KEY = 'gymbro_fichas_progreso_data';
 const THEME_MODE_STORAGE_KEY = 'gymbro_theme_mode';
 const ACCENT_COLOR_STORAGE_KEY = 'gymbro_accent_color';
 
+export const getUserAccentKey = (userId: string) => `gymbro_user_accent_${userId}`;
+export const getUserThemeKey = (userId: string) => `gymbro_user_theme_${userId}`;
+
+export function getUserAccentColor(user?: Usuario | null): string {
+  if (!user) return '#4D7CFE';
+  if (user.color_acento) return user.color_acento;
+  return getStoredItem<string>(getUserAccentKey(user.id), '#4D7CFE');
+}
+
+export function getUserThemeMode(user?: Usuario | null): 'light' | 'dark' {
+  if (!user) return 'light';
+  if (user.modo_tema) return user.modo_tema;
+  return getStoredItem<'light' | 'dark'>(getUserThemeKey(user.id), 'light');
+}
+
 export function applyThemeToDocument(theme: 'light' | 'dark', accent: string) {
   if (typeof window === 'undefined') return;
   const root = document.documentElement;
@@ -238,40 +256,106 @@ function setStoredItem<T>(key: string, value: T): void {
   }
 }
 
+export interface DiaSemanaMeta {
+  numero: number; // 1 = Lunes, ..., 6 = Sábado, 0 = Domingo
+  nombre: string;
+  corto: string;
+}
+
+export const DIAS_DE_LA_SEMANA: DiaSemanaMeta[] = [
+  { numero: 1, nombre: 'Lunes', corto: 'Lun' },
+  { numero: 2, nombre: 'Martes', corto: 'Mar' },
+  { numero: 3, nombre: 'Miércoles', corto: 'Mié' },
+  { numero: 4, nombre: 'Jueves', corto: 'Jue' },
+  { numero: 5, nombre: 'Viernes', corto: 'Vie' },
+  { numero: 6, nombre: 'Sábado', corto: 'Sáb' },
+  { numero: 0, nombre: 'Domingo', corto: 'Dom' },
+];
+
+export function getDiaSemanaNombre(dia: number): string {
+  const found = DIAS_DE_LA_SEMANA.find((d) => d.numero === dia);
+  return found ? found.nombre : `Día ${dia}`;
+}
+
+export function getDiaSemanaCorto(dia: number): string {
+  const found = DIAS_DE_LA_SEMANA.find((d) => d.numero === dia);
+  return found ? found.corto : `D${dia}`;
+}
+
+export function isRutinaDescanso(r?: Rutina | null): boolean {
+  if (!r) return true;
+  if (r.es_descanso === true) return true;
+  if (r.nombre_sesion && r.nombre_sesion.toLowerCase().includes('descanso')) return true;
+  return false;
+}
+
+export function isXiomaraBallon(user?: { id?: string; dni?: string; nombre?: string } | null): boolean {
+  if (!user) return false;
+  const id = (user.id || '').toLowerCase();
+  const dni = (user.dni || '').trim();
+  const nombre = (user.nombre || '').toLowerCase();
+  return (
+    id === 'u1' ||
+    id === 'xb-9988-fit' ||
+    id === 'cliente1' ||
+    dni === '10101010' ||
+    dni === '11111111' ||
+    nombre.includes('xiomara')
+  );
+}
+
 export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | null): Rutina[] {
   if (!rutinas || rutinas.length === 0) return mockRutinas;
 
   // Filter for matching client
-  let matched = rutinas.filter((r) => {
-    if (!currentUser) return true;
-    if (r.id_cliente === currentUser.id) return true;
-    // Match common athlete IDs for demo and migration
-    if (
-      (currentUser.id === 'xb-9988-fit' || currentUser.id === 'cliente1' || currentUser.dni === '11111111') &&
-      (r.id_cliente === 'xb-9988-fit' || r.id_cliente === 'cliente1' || !r.id_cliente)
-    ) {
-      return true;
+  let matched: Rutina[] = [];
+
+  if (!currentUser) {
+    matched = rutinas;
+  } else if (isXiomaraBallon(currentUser)) {
+    // For Xiomara Ballón: include all routines configured for her by the trainer
+    const u1Routines = rutinas.filter((r) => r.id_cliente === 'u1');
+    if (u1Routines.length > 0) {
+      matched = u1Routines;
+    } else {
+      matched = rutinas.filter(
+        (r) =>
+          r.id_cliente === currentUser.id ||
+          r.id_cliente === 'xb-9988-fit' ||
+          r.id_cliente === 'u1' ||
+          !r.id_cliente
+      );
     }
-    if (!r.id_cliente) return true;
-    return false;
-  });
+  } else {
+    matched = rutinas.filter((r) => r.id_cliente === currentUser.id);
+  }
 
   // If nothing matched, use all rutinas
   if (matched.length === 0) {
     matched = rutinas;
   }
 
-  // Deduplicate by dia_semana (1 to 5)
-  const map = new Map<number, Rutina>();
-  matched.forEach((r, idx) => {
-    const day = r.dia_semana || (idx % 7) + 1;
-    if (!map.has(day)) {
-      map.set(day, r);
+  // Deduplicate by routine ID to preserve all configured sessions
+  const map = new Map<string, Rutina>();
+  matched.forEach((r) => {
+    if (r && r.id) {
+      map.set(r.id, r);
     }
   });
 
-  const sorted = Array.from(map.values()).sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
+  const dayOrderMap: { [key: number]: number } = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7 };
+  const sorted = Array.from(map.values()).sort((a, b) => {
+    const orderA = dayOrderMap[a.dia_semana] ?? 99;
+    const orderB = dayOrderMap[b.dia_semana] ?? 99;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.nombre_sesion || '').localeCompare(b.nombre_sesion || '');
+  });
   return sorted.length > 0 ? sorted : mockRutinas;
+}
+
+export function getClientActiveRoutines(rutinas: Rutina[], currentUser?: Usuario | null): Rutina[] {
+  const all = getClientRoutines(rutinas, currentUser);
+  return all.filter((r) => !isRutinaDescanso(r) && !r.es_descanso);
 }
 
 function mergeWithMock<T extends { id: string }>(stored: T[], mock: T[]): T[] {
@@ -281,15 +365,16 @@ function mergeWithMock<T extends { id: string }>(stored: T[], mock: T[]): T[] {
   return Array.from(map.values());
 }
 
-// Initial state loaded from LocalStorage (or default baseline if first time ever)
-const initialThemeMode = getStoredItem<'light' | 'dark'>(THEME_MODE_STORAGE_KEY, 'light');
-const initialAccentColor = getStoredItem<string>(ACCENT_COLOR_STORAGE_KEY, '#4D7CFE');
+// Initial state: If a user was previously logged in, apply their individual color & theme mode. Otherwise neutral default.
+const initialUsuarios = mergeWithMock(getStoredItem<Usuario[]>(USERS_STORAGE_KEY, mockUsuarios), mockUsuarios);
+const initialCurrentUser = getStoredItem<Usuario | null>(CURRENT_USER_KEY, null);
+
+const initialThemeMode = initialCurrentUser ? getUserThemeMode(initialCurrentUser) : 'light';
+const initialAccentColor = initialCurrentUser ? getUserAccentColor(initialCurrentUser) : '#4D7CFE';
 
 // Apply immediately on module load
 applyThemeToDocument(initialThemeMode, initialAccentColor);
 
-const initialUsuarios = mergeWithMock(getStoredItem<Usuario[]>(USERS_STORAGE_KEY, mockUsuarios), mockUsuarios);
-const initialCurrentUser = getStoredItem<Usuario | null>(CURRENT_USER_KEY, null);
 const initialEjercicios = mergeWithMock(getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, mockEjercicios), mockEjercicios);
 const initialRutinas = mergeWithMock(getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas), mockRutinas);
 const initialEjerciciosRutina = mergeWithMock(getStoredItem<EjercicioRutina[]>(EJERCICIOS_RUTINA_STORAGE_KEY, mockEjerciciosRutina), mockEjerciciosRutina);
@@ -304,11 +389,41 @@ export const useStore = create<AppState>((set, get) => ({
     setStoredItem(THEME_MODE_STORAGE_KEY, mode);
     applyThemeToDocument(mode, get().accentColor);
     set({ themeMode: mode });
+
+    // Persist individually for currently logged in user
+    const currentUser = get().currentUser;
+    if (currentUser) {
+      setStoredItem(getUserThemeKey(currentUser.id), mode);
+      const updatedUser: Usuario = { ...currentUser, modo_tema: mode };
+      const updatedList = get().usuarios.map((u) => (u.id === currentUser.id ? updatedUser : u));
+      set({ currentUser: updatedUser, usuarios: updatedList });
+      setStoredItem(CURRENT_USER_KEY, updatedUser);
+      setStoredItem(USERS_STORAGE_KEY, updatedList);
+
+      setDoc(doc(db, 'usuarios', currentUser.id), { modo_tema: mode }, { merge: true }).catch((err) => {
+        console.warn('Error saving individual theme mode to Firestore:', err);
+      });
+    }
   },
   setAccentColor: (color) => {
     setStoredItem(ACCENT_COLOR_STORAGE_KEY, color);
     applyThemeToDocument(get().themeMode, color);
     set({ accentColor: color });
+
+    // Persist individually for currently logged in user
+    const currentUser = get().currentUser;
+    if (currentUser) {
+      setStoredItem(getUserAccentKey(currentUser.id), color);
+      const updatedUser: Usuario = { ...currentUser, color_acento: color };
+      const updatedList = get().usuarios.map((u) => (u.id === currentUser.id ? updatedUser : u));
+      set({ currentUser: updatedUser, usuarios: updatedList });
+      setStoredItem(CURRENT_USER_KEY, updatedUser);
+      setStoredItem(USERS_STORAGE_KEY, updatedList);
+
+      setDoc(doc(db, 'usuarios', currentUser.id), { color_acento: color }, { merge: true }).catch((err) => {
+        console.warn('Error saving individual accent color to Firestore:', err);
+      });
+    }
   },
   currentRole: initialCurrentUser?.rol || 'cliente',
   setCurrentRole: (role) => set({ currentRole: role }),
@@ -322,16 +437,37 @@ export const useStore = create<AppState>((set, get) => ({
   fichasProgreso: initialFichasProgreso,
 
   login: (dni, contrasena) => {
-    const user = get().usuarios.find(u => u.dni.trim() === dni.trim() && u.contrasena === contrasena);
+    const trimmedDni = dni.trim();
+    const user = get().usuarios.find((u) => {
+      const isDniMatch =
+        u.dni.trim() === trimmedDni ||
+        (trimmedDni === '11111111' && isXiomaraBallon(u)) ||
+        (trimmedDni === '10101010' && isXiomaraBallon(u));
+      return isDniMatch && u.contrasena === contrasena;
+    });
     if (user) {
       if (user.estado_suscripcion === 'inactivo' && user.rol === 'cliente') {
         return { success: false, error: 'Cuenta inactiva por falta de pago.' };
       }
+
+      // Automatically activate this individual user's chosen color & theme
+      const userAccent = getUserAccentColor(user);
+      const userTheme = getUserThemeMode(user);
+      applyThemeToDocument(userTheme, userAccent);
+      setStoredItem(THEME_MODE_STORAGE_KEY, userTheme);
+      setStoredItem(ACCENT_COLOR_STORAGE_KEY, userAccent);
+
       setStoredItem(CURRENT_USER_KEY, user);
       if (typeof window !== 'undefined') {
         localStorage.setItem(SAVED_USER_ID_KEY, user.id);
       }
-      set({ isLoggedIn: true, currentUser: user, currentRole: user.rol });
+      set({ 
+        isLoggedIn: true, 
+        currentUser: user, 
+        currentRole: user.rol,
+        accentColor: userAccent,
+        themeMode: userTheme
+      });
       return { success: true };
     }
     return { success: false, error: 'Credenciales incorrectas.' };
@@ -342,7 +478,17 @@ export const useStore = create<AppState>((set, get) => ({
       localStorage.removeItem(SAVED_USER_ID_KEY);
       localStorage.removeItem(CURRENT_USER_KEY);
     }
-    set({ isLoggedIn: false, currentUser: null });
+    // Return to neutral default theme for login screen
+    applyThemeToDocument('light', '#4D7CFE');
+    setStoredItem(THEME_MODE_STORAGE_KEY, 'light');
+    setStoredItem(ACCENT_COLOR_STORAGE_KEY, '#4D7CFE');
+
+    set({ 
+      isLoggedIn: false, 
+      currentUser: null,
+      accentColor: '#4D7CFE',
+      themeMode: 'light'
+    });
   },
 
   addUsuario: async (usuario) => {
@@ -358,7 +504,28 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateUsuario: async (updatedUsuario) => {
     const updatedList = get().usuarios.map(u => u.id === updatedUsuario.id ? updatedUsuario : u);
-    const updatedCurrent = get().currentUser?.id === updatedUsuario.id ? updatedUsuario : get().currentUser;
+    const isCurrent = get().currentUser?.id === updatedUsuario.id;
+    const updatedCurrent = isCurrent ? updatedUsuario : get().currentUser;
+    
+    // If editing currently logged in user, activate their colors if modified
+    if (isCurrent) {
+      if (updatedUsuario.color_acento) {
+        setStoredItem(getUserAccentKey(updatedUsuario.id), updatedUsuario.color_acento);
+        setStoredItem(ACCENT_COLOR_STORAGE_KEY, updatedUsuario.color_acento);
+      }
+      if (updatedUsuario.modo_tema) {
+        setStoredItem(getUserThemeKey(updatedUsuario.id), updatedUsuario.modo_tema);
+        setStoredItem(THEME_MODE_STORAGE_KEY, updatedUsuario.modo_tema);
+      }
+      const activeColor = updatedUsuario.color_acento || get().accentColor;
+      const activeTheme = updatedUsuario.modo_tema || get().themeMode;
+      applyThemeToDocument(activeTheme, activeColor);
+      set({
+        accentColor: activeColor,
+        themeMode: activeTheme
+      });
+    }
+
     set({
       usuarios: updatedList,
       currentUser: updatedCurrent
@@ -469,7 +636,81 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  clearRutinaEjercicios: async (rutinaId: string) => {
+    const toDelete = get().ejerciciosRutina.filter((er) => er.id_rutina === rutinaId);
+    const updatedErs = get().ejerciciosRutina.filter((er) => er.id_rutina !== rutinaId);
+
+    set({ ejerciciosRutina: updatedErs });
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updatedErs);
+
+    try {
+      for (const item of toDelete) {
+        await deleteDoc(doc(db, 'ejerciciosRutina', item.id));
+      }
+    } catch (err) {
+      console.error('Error clearing ejercicios from Firestore:', err);
+    }
+  },
+
+  moveRutinaToDay: async (rutinaId: string, nuevoDia: number) => {
+    const current = get().rutinas.find((r) => r.id === rutinaId);
+    if (!current) return;
+
+    // Check if another routine of the same client already occupies nuevoDia
+    const occupying = get().rutinas.find(
+      (r) => r.id_cliente === current.id_cliente && r.dia_semana === nuevoDia && r.id !== rutinaId
+    );
+
+    const oldDia = current.dia_semana;
+    const updatedRutinas = get().rutinas.map((r) => {
+      if (r.id === rutinaId) {
+        return { ...r, dia_semana: nuevoDia };
+      }
+      if (occupying && r.id === occupying.id) {
+        // Swap days
+        return { ...r, dia_semana: oldDia };
+      }
+      return r;
+    });
+
+    set({ rutinas: updatedRutinas });
+    setStoredItem(RUTINAS_STORAGE_KEY, updatedRutinas);
+
+    try {
+      await setDoc(doc(db, 'rutinas', rutinaId), { dia_semana: nuevoDia }, { merge: true });
+      if (occupying) {
+        await setDoc(doc(db, 'rutinas', occupying.id), { dia_semana: oldDia }, { merge: true });
+      }
+    } catch (err) {
+      console.error('Error moving rutina to day in Firestore:', err);
+    }
+  },
+
+  toggleRutinaDescanso: async (rutinaId: string, esDescanso?: boolean) => {
+    const currentRutina = get().rutinas.find((r) => r.id === rutinaId);
+    const targetDescanso = esDescanso !== undefined ? esDescanso : !currentRutina?.es_descanso;
+    const updatedRutinas = get().rutinas.map((r) =>
+      r.id === rutinaId ? { ...r, es_descanso: targetDescanso } : r
+    );
+    set({ rutinas: updatedRutinas });
+    setStoredItem(RUTINAS_STORAGE_KEY, updatedRutinas);
+
+    try {
+      await setDoc(doc(db, 'rutinas', rutinaId), { es_descanso: targetDescanso }, { merge: true });
+    } catch (err) {
+      console.error('Error toggling rutina descanso in Firestore:', err);
+    }
+  },
+
   addEjercicioRutina: async (item) => {
+    // Guard against duplicate exercises in the same routine
+    const existingInSameRoutine = get().ejerciciosRutina.find(
+      (er) => er.id_rutina === item.id_rutina && er.id_ejercicio === item.id_ejercicio && er.id !== item.id
+    );
+    if (existingInSameRoutine) {
+      console.warn(`Prevented duplicate exercise ${item.id_ejercicio} in routine ${item.id_rutina}`);
+      return;
+    }
     const updated = [...get().ejerciciosRutina.filter(er => er.id !== item.id), item];
     set({ ejerciciosRutina: updated });
     setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updated);
@@ -537,11 +778,11 @@ export const useStore = create<AppState>((set, get) => ({
 
   assignBasePlanToAthlete: async (athleteId: string, trainerId: string) => {
     const baseRoutines = [
-      { idSuffix: 'd1', nombre: 'Día 1: Tren Superior (A) - Empuje y Tirón Vertical', dia: 1, baseId: 'r1' },
-      { idSuffix: 'd2', nombre: 'Día 2: Tren Inferior (A) - Cuádriceps y Glúteo', dia: 2, baseId: 'r2' },
-      { idSuffix: 'd3', nombre: 'Día 3: Full Body - Fuerza, Glúteos y Core', dia: 3, baseId: 'r3' },
-      { idSuffix: 'd4', nombre: 'Día 4: Tren Superior (B) - Tirón Horizontal y Hombros', dia: 4, baseId: 'r4' },
-      { idSuffix: 'd5', nombre: 'Día 5: Tren Inferior (B) - Cadena Posterior y Unilaterales', dia: 5, baseId: 'r5' },
+      { idSuffix: 'd1', nombre: 'Tren Superior (A) - Empuje y Tirón Vertical', dia: 1, baseId: 'r1' },
+      { idSuffix: 'd2', nombre: 'Tren Inferior (A) - Cuádriceps y Glúteo', dia: 2, baseId: 'r2' },
+      { idSuffix: 'd3', nombre: 'Full Body - Fuerza, Glúteos y Core', dia: 3, baseId: 'r3' },
+      { idSuffix: 'd4', nombre: 'Tren Superior (B) - Tirón Horizontal y Hombros', dia: 4, baseId: 'r4' },
+      { idSuffix: 'd5', nombre: 'Tren Inferior (B) - Cadena Posterior y Unilaterales', dia: 5, baseId: 'r5' },
     ];
 
     const newRoutines: Rutina[] = [];
@@ -558,6 +799,7 @@ export const useStore = create<AppState>((set, get) => ({
         id_entrenador: trainerId || 'entrenador1',
         nombre_sesion: br.nombre,
         dia_semana: br.dia,
+        es_descanso: false,
       };
       newRoutines.push(rItem);
       batch.set(doc(db, 'rutinas', routineId), cleanObject(rItem));
@@ -668,23 +910,64 @@ export function initFirestoreSync() {
       
       useStore.setState((state) => {
         let updatedCurrentUser = state.currentUser;
+        let newAccent = state.accentColor;
+        let newTheme = state.themeMode;
+
         if (state.currentUser) {
-          const fresh = users.find(u => u.id === state.currentUser?.id);
+          const fresh = users.find(
+            (u) =>
+              u.id === state.currentUser?.id ||
+              (isXiomaraBallon(state.currentUser) && isXiomaraBallon(u))
+          );
           if (fresh) {
             updatedCurrentUser = fresh;
             setStoredItem(CURRENT_USER_KEY, fresh);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(SAVED_USER_ID_KEY, fresh.id);
+            }
+            const freshAccent = getUserAccentColor(fresh);
+            const freshTheme = getUserThemeMode(fresh);
+            if (freshAccent !== state.accentColor || freshTheme !== state.themeMode) {
+              newAccent = freshAccent;
+              newTheme = freshTheme;
+              applyThemeToDocument(newTheme, newAccent);
+            }
           }
         } else {
           const savedId = typeof window !== 'undefined' ? localStorage.getItem(SAVED_USER_ID_KEY) : null;
           if (savedId) {
-            const matched = users.find(u => u.id === savedId);
+            const matched = users.find(
+              (u) =>
+                u.id === savedId ||
+                ((savedId === 'xb-9988-fit' || savedId === 'u1') && isXiomaraBallon(u))
+            );
             if (matched) {
               setStoredItem(CURRENT_USER_KEY, matched);
-              return { usuarios: users, currentUser: matched, isLoggedIn: true, currentRole: matched.rol, isCloudReady: true };
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(SAVED_USER_ID_KEY, matched.id);
+              }
+              const matchedAccent = getUserAccentColor(matched);
+              const matchedTheme = getUserThemeMode(matched);
+              applyThemeToDocument(matchedTheme, matchedAccent);
+              return { 
+                usuarios: users, 
+                currentUser: matched, 
+                isLoggedIn: true, 
+                currentRole: matched.rol, 
+                isCloudReady: true,
+                accentColor: matchedAccent,
+                themeMode: matchedTheme
+              };
             }
           }
         }
-        return { usuarios: users, currentUser: updatedCurrentUser, isCloudReady: true };
+        return { 
+          usuarios: users, 
+          currentUser: updatedCurrentUser, 
+          isCloudReady: true,
+          accentColor: newAccent,
+          themeMode: newTheme
+        };
       });
     } else {
       // If collection in cloud is completely empty on very first install, push initial baseline once without overwriting
