@@ -26,7 +26,7 @@ export default function App() {
       {(activeTab, setActiveTab) => (
         <>
           {currentRole === 'cliente' && <ClientView tab={activeTab} onNavigateTab={setActiveTab} />}
-          {currentRole === 'entrenador' && <TrainerView tab={activeTab} />}
+          {currentRole === 'entrenador' && <TrainerView tab={activeTab} onNavigateTab={setActiveTab} />}
           {currentRole === 'admin' && <AdminView tab={activeTab} />}
         </>
       )}

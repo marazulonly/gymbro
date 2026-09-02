@@ -19,33 +19,64 @@ import {
   User,
   ClipboardList,
   Flame,
-  Scale
+  Scale,
+  Copy,
+  Sparkles,
+  Sliders,
+  Check,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "@/components/ProfileModal";
 import { AthleteProgressModal } from "@/components/AthleteProgressModal";
-import { Rutina, EjercicioRutina, Usuario } from "@/types";
+import { Rutina, EjercicioRutina, Usuario, Ejercicio } from "@/types";
 
-export function TrainerView({ tab }: { tab: number }) {
-  if (tab === 0) return <AthletesList />;
-  if (tab === 1) return <RoutineManager />;
+export function TrainerView({ 
+  tab, 
+  onNavigateTab 
+}: { 
+  tab: number; 
+  onNavigateTab?: (tab: number) => void;
+}) {
+  const { usuarios } = useStore();
+  const athletes = usuarios.filter((u) => u.rol === "cliente");
+  const [selectedAthleteId, setSelectedAthleteId] = useState<string>(athletes[0]?.id || "xb-9988-fit");
+
+  const handleSelectAthleteForRoutines = (athleteId: string) => {
+    setSelectedAthleteId(athleteId);
+    if (onNavigateTab) {
+      onNavigateTab(1); // Switch to Rutinas tab
+    }
+  };
+
+  if (tab === 0) {
+    return <AthletesList onManageRoutines={handleSelectAthleteForRoutines} />;
+  }
+  if (tab === 1) {
+    return (
+      <RoutineManager 
+        selectedAthleteId={selectedAthleteId} 
+        onSelectAthlete={setSelectedAthleteId} 
+      />
+    );
+  }
   if (tab === 2) return <ExercisesLibrary />;
   if (tab === 3) return <CheckinsDashboard />;
   return null;
 }
 
 const DIAS_SEMANA = [
-  { id: 1, label: "Lunes" },
-  { id: 2, label: "Martes" },
-  { id: 3, label: "Miércoles" },
-  { id: 4, label: "Jueves" },
-  { id: 5, label: "Viernes" },
-  { id: 6, label: "Sábado" },
-  { id: 0, label: "Domingo" },
+  { id: 1, label: "Lunes (Día 1)" },
+  { id: 2, label: "Martes (Día 2)" },
+  { id: 3, label: "Miércoles (Día 3)" },
+  { id: 4, label: "Jueves (Día 4)" },
+  { id: 5, label: "Viernes (Día 5)" },
+  { id: 6, label: "Sábado (Día 6)" },
+  { id: 0, label: "Domingo (Día 7)" },
 ];
 
-function AthletesList() {
-  const { currentUser, usuarios, addUsuario, fichasProgreso } = useStore();
+function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: string) => void }) {
+  const { currentUser, usuarios, addUsuario, rutinas, fichasProgreso } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
@@ -62,8 +93,9 @@ function AthletesList() {
     e.preventDefault();
     if (!nombre || !dni) return;
 
+    const newUserId = `u_${Date.now()}`;
     await addUsuario({
-      id: `u${Date.now()}`,
+      id: newUserId,
       nombre,
       dni,
       whatsapp,
@@ -72,7 +104,7 @@ function AthletesList() {
       contrasena: "0000",
       estado_suscripcion: "activo",
       rol: "cliente",
-      id_entrenador: currentUser?.id,
+      id_entrenador: currentUser?.id || "entrenador1",
     });
 
     setIsAdding(false);
@@ -80,6 +112,9 @@ function AthletesList() {
     setDni("");
     setWhatsapp("");
     setFecha("");
+    
+    // Automatically open routine management for the newly created athlete
+    onManageRoutines(newUserId);
   };
 
   if (isAdding) {
@@ -94,7 +129,7 @@ function AthletesList() {
 
         <NeuCard className="p-4">
           <form onSubmit={handleAdd} className="flex flex-col gap-4">
-            <NeuInput label="DNI" value={dni} onChange={(e) => setDni(e.target.value)} required />
+            <NeuInput label="DNI / Documento" value={dni} onChange={(e) => setDni(e.target.value)} required />
             <NeuInput label="Nombre Completo" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
             <NeuInput label="WhatsApp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
             <NeuInput label="Fecha de Nacimiento" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
@@ -117,7 +152,7 @@ function AthletesList() {
             </p>
 
             <NeuButton type="submit" className="mt-2 h-12 text-[#4D7CFE] font-bold">
-              Guardar Atleta
+              Guardar Atleta y Asignar Rutinas
             </NeuButton>
           </form>
         </NeuCard>
@@ -130,7 +165,7 @@ function AthletesList() {
       <div className="flex justify-between items-center mb-1">
         <div>
           <h2 className="text-2xl font-bold text-[#2D3748]">Mis Atletas</h2>
-          <span className="text-xs text-[#718096]">Gestión de atletas y control físico</span>
+          <span className="text-xs text-[#718096]">Gestión de rutinas, ejercicios y control físico</span>
         </div>
         <NeuButton variant="circle" className="w-10 h-10 shadow-neu-flat" onClick={() => setIsAdding(true)}>
           <Plus className="w-5 h-5 text-[#4D7CFE]" />
@@ -143,6 +178,8 @@ function AthletesList() {
         ) : (
           athletes.map((athlete) => {
             const ficha = fichasProgreso.find((f) => f.id_cliente === athlete.id);
+            const athleteRoutinesCount = rutinas.filter((r) => r.id_cliente === athlete.id).length;
+
             let checkinText = "Sin ficha";
             let daysBadge = null;
 
@@ -188,8 +225,26 @@ function AthletesList() {
                   </NeuButton>
                 </div>
 
+                {/* Routine status info banner */}
+                <div className="flex items-center justify-between bg-[#E0E5EC] px-3 py-2 rounded-xl shadow-neu-pressed">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Dumbbell className="w-4 h-4 text-[#4D7CFE]" />
+                    <span className="text-[#2D3748] font-bold">
+                      {athleteRoutinesCount > 0 ? `${athleteRoutinesCount} Días de Rutina` : "Sin rutinas"}
+                    </span>
+                  </div>
+
+                  <NeuButton
+                    className="px-3 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1.5 h-8 shadow-neu-flat"
+                    onClick={() => onManageRoutines(athlete.id)}
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    Editar Rutinas
+                  </NeuButton>
+                </div>
+
                 {/* Progress quick glance & action */}
-                <div className="flex items-center justify-between pt-2 border-t border-[#c5cad1]/30">
+                <div className="flex items-center justify-between pt-1 border-t border-[#c5cad1]/30">
                   <div className="flex items-center gap-2">
                     <Activity className="w-3.5 h-3.5 text-[#4D7CFE]" />
                     <span className="text-[11px] font-medium text-[#718096]">{checkinText}</span>
@@ -209,11 +264,11 @@ function AthletesList() {
                   </div>
 
                   <NeuButton
-                    className="px-3 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1 h-8"
+                    className="px-3 py-1 text-xs text-[#718096] font-bold flex items-center gap-1 h-8"
                     onClick={() => setProgressModalAthlete(athlete)}
                   >
                     <Scale className="w-3.5 h-3.5" />
-                    Ficha de Progreso
+                    Ficha
                   </NeuButton>
                 </div>
               </NeuCard>
@@ -248,7 +303,13 @@ interface RoutineFormExercise {
   rpe_objetivo: number;
 }
 
-function RoutineManager() {
+function RoutineManager({
+  selectedAthleteId,
+  onSelectAthlete,
+}: {
+  selectedAthleteId: string;
+  onSelectAthlete: (id: string) => void;
+}) {
   const { 
     currentUser, 
     usuarios, 
@@ -259,11 +320,17 @@ function RoutineManager() {
     updateRutina, 
     deleteRutina, 
     addEjercicioRutina, 
-    deleteEjercicioRutina 
+    updateEjercicioRutina,
+    deleteEjercicioRutina,
+    assignBasePlanToAthlete,
+    copyRoutinesToAthlete
   } = useStore();
 
   const athletes = usuarios.filter((u) => u.rol === "cliente");
-  const [selectedAthleteId, setSelectedAthleteId] = useState<string>(athletes[0]?.id || "xb-9988-fit");
+  const currentAthlete = athletes.find((a) => a.id === selectedAthleteId) || athletes[0];
+
+  // If no athlete selected or ID invalid, fallback
+  const effectiveAthleteId = currentAthlete?.id || "xb-9988-fit";
 
   // Editing / Creating routine state
   const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
@@ -273,13 +340,38 @@ function RoutineManager() {
   const [formNombreSesion, setFormNombreSesion] = useState("");
   const [formDiaSemana, setFormDiaSemana] = useState<number>(1);
   const [formExercises, setFormExercises] = useState<RoutineFormExercise[]>([]);
+  
+  // Exercise Pickers & Modals
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
+  const [quickAddTargetRoutineId, setQuickAddTargetRoutineId] = useState<string | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
+  const [selectedMuscleFilter, setSelectedMuscleFilter] = useState<string>("todos");
 
-  const currentAthlete = athletes.find((a) => a.id === selectedAthleteId) || athletes[0];
+  // Inline Quick Exercise Parameter Editor State
+  const [editingExerciseParam, setEditingExerciseParam] = useState<{
+    id: string; // er id
+    ejercicioNombre: string;
+    series: number;
+    reps: string;
+    tempo: string;
+    descanso: number;
+    rpe: number;
+  } | null>(null);
+
+  // Copy modal state
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [sourceAthleteIdForCopy, setSourceAthleteIdForCopy] = useState<string>("");
+
+  // Loading state feedback
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Routines for the selected athlete
   const athleteRoutines = rutinas
-    .filter((r) => r.id_cliente === selectedAthleteId)
-    .sort((a, b) => a.dia_semana - b.dia_semana);
+    .filter((r) => r.id_cliente === effectiveAthleteId)
+    .sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
+
+  // Extract unique muscle groups for filter
+  const muscleGroups = Array.from(new Set(ejercicios.map((e) => e.grupo_muscular))).filter(Boolean);
 
   const startEditRoutine = (rutina: Rutina) => {
     setEditingRoutineId(rutina.id);
@@ -312,9 +404,50 @@ function RoutineManager() {
     setFormExercises([]);
   };
 
-  const handleAddExerciseToRoutine = (ej: (typeof ejercicios)[0]) => {
+  const handleAssignBasePlan = async () => {
+    if (!currentAthlete) return;
+    setIsSyncing(true);
+    try {
+      await assignBasePlanToAthlete(currentAthlete.id, currentUser?.id || "entrenador1");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleCopyFromAthlete = async () => {
+    if (!sourceAthleteIdForCopy || !currentAthlete) return;
+    setIsSyncing(true);
+    try {
+      await copyRoutinesToAthlete(sourceAthleteIdForCopy, currentAthlete.id, currentUser?.id || "entrenador1");
+      setIsCopyModalOpen(false);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleAddExerciseToRoutine = async (ej: Ejercicio) => {
+    if (quickAddTargetRoutineId) {
+      // Adding directly to an existing routine on the screen
+      const erPayload: EjercicioRutina = {
+        id: `er_${quickAddTargetRoutineId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        id_rutina: quickAddTargetRoutineId,
+        id_ejercicio: ej.id,
+        series_objetivo: 3,
+        reps_objetivo: "10-12",
+        tempo: "3-0-1-0",
+        descanso_segundos: 90,
+        rpe_objetivo: 8,
+      };
+      await addEjercicioRutina(erPayload);
+      setQuickAddTargetRoutineId(null);
+      setExercisePickerOpen(false);
+      setExerciseSearch("");
+      return;
+    }
+
+    // Adding inside the routine form
     const newEx: RoutineFormExercise = {
-      tempId: `tmp_${Date.now()}_${Math.random()}`,
+      tempId: `tmp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       id_ejercicio: ej.id,
       nombre_ejercicio: ej.nombre,
       series_objetivo: 3,
@@ -338,67 +471,95 @@ function RoutineManager() {
     setFormExercises((prev) => prev.filter((item) => item.tempId !== tempId));
   };
 
+  const handleDirectDeleteExerciseFromRoutine = async (erId: string, exName: string) => {
+    if (window.confirm(`¿Quitar "${exName}" de esta rutina?`)) {
+      await deleteEjercicioRutina(erId);
+    }
+  };
+
+  const handleSaveQuickParamEdit = async () => {
+    if (!editingExerciseParam) return;
+    const existing = ejerciciosRutina.find((er) => er.id === editingExerciseParam.id);
+    if (existing) {
+      const updated: EjercicioRutina = {
+        ...existing,
+        series_objetivo: Number(editingExerciseParam.series) || 3,
+        reps_objetivo: String(editingExerciseParam.reps) || "10-12",
+        tempo: String(editingExerciseParam.tempo) || "3-0-1-0",
+        descanso_segundos: Number(editingExerciseParam.descanso) || 90,
+        rpe_objetivo: Number(editingExerciseParam.rpe) || 8,
+      };
+      await updateEjercicioRutina(updated);
+    }
+    setEditingExerciseParam(null);
+  };
+
   const handleSaveRoutine = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formNombreSesion.trim() || !selectedAthleteId) return;
+    if (!formNombreSesion.trim() || !effectiveAthleteId) return;
 
-    if (isCreatingNew) {
-      const newRoutineId = `r_${selectedAthleteId}_${Date.now()}`;
-      const newRutina: Rutina = {
-        id: newRoutineId,
-        id_cliente: selectedAthleteId,
-        id_entrenador: currentUser?.id || "entrenador1",
-        nombre_sesion: formNombreSesion,
-        dia_semana: formDiaSemana,
-      };
-      await addRutina(newRutina);
-
-      for (const ex of formExercises) {
-        const erPayload: EjercicioRutina = {
-          id: `er_${newRoutineId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-          id_rutina: newRoutineId,
-          id_ejercicio: ex.id_ejercicio,
-          series_objetivo: Number(ex.series_objetivo) || 3,
-          reps_objetivo: String(ex.reps_objetivo) || "10-12",
-          tempo: String(ex.tempo) || "3-0-1-0",
-          descanso_segundos: Number(ex.descanso_segundos) || 90,
-          rpe_objetivo: Number(ex.rpe_objetivo) || 8,
+    setIsSyncing(true);
+    try {
+      if (isCreatingNew) {
+        const newRoutineId = `r_${effectiveAthleteId}_${Date.now()}`;
+        const newRutina: Rutina = {
+          id: newRoutineId,
+          id_cliente: effectiveAthleteId,
+          id_entrenador: currentUser?.id || "entrenador1",
+          nombre_sesion: formNombreSesion,
+          dia_semana: formDiaSemana,
         };
-        await addEjercicioRutina(erPayload);
-      }
-    } else if (editingRoutineId) {
-      const updatedRutina: Rutina = {
-        id: editingRoutineId,
-        id_cliente: selectedAthleteId,
-        id_entrenador: currentUser?.id || "entrenador1",
-        nombre_sesion: formNombreSesion,
-        dia_semana: formDiaSemana,
-      };
-      await updateRutina(updatedRutina);
+        await addRutina(newRutina);
 
-      // Clean existing exercises and re-add updated
-      const oldErs = ejerciciosRutina.filter((er) => er.id_rutina === editingRoutineId);
-      for (const old of oldErs) {
-        await deleteEjercicioRutina(old.id);
-      }
-
-      for (const ex of formExercises) {
-        const erPayload: EjercicioRutina = {
-          id: `er_${editingRoutineId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-          id_rutina: editingRoutineId,
-          id_ejercicio: ex.id_ejercicio,
-          series_objetivo: Number(ex.series_objetivo) || 3,
-          reps_objetivo: String(ex.reps_objetivo) || "10-12",
-          tempo: String(ex.tempo) || "3-0-1-0",
-          descanso_segundos: Number(ex.descanso_segundos) || 90,
-          rpe_objetivo: Number(ex.rpe_objetivo) || 8,
+        for (const ex of formExercises) {
+          const erPayload: EjercicioRutina = {
+            id: `er_${newRoutineId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            id_rutina: newRoutineId,
+            id_ejercicio: ex.id_ejercicio,
+            series_objetivo: Number(ex.series_objetivo) || 3,
+            reps_objetivo: String(ex.reps_objetivo) || "10-12",
+            tempo: String(ex.tempo) || "3-0-1-0",
+            descanso_segundos: Number(ex.descanso_segundos) || 90,
+            rpe_objetivo: Number(ex.rpe_objetivo) || 8,
+          };
+          await addEjercicioRutina(erPayload);
+        }
+      } else if (editingRoutineId) {
+        const updatedRutina: Rutina = {
+          id: editingRoutineId,
+          id_cliente: effectiveAthleteId,
+          id_entrenador: currentUser?.id || "entrenador1",
+          nombre_sesion: formNombreSesion,
+          dia_semana: formDiaSemana,
         };
-        await addEjercicioRutina(erPayload);
+        await updateRutina(updatedRutina);
+
+        // Clean existing exercises and re-add updated
+        const oldErs = ejerciciosRutina.filter((er) => er.id_rutina === editingRoutineId);
+        for (const old of oldErs) {
+          await deleteEjercicioRutina(old.id);
+        }
+
+        for (const ex of formExercises) {
+          const erPayload: EjercicioRutina = {
+            id: `er_${editingRoutineId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            id_rutina: editingRoutineId,
+            id_ejercicio: ex.id_ejercicio,
+            series_objetivo: Number(ex.series_objetivo) || 3,
+            reps_objetivo: String(ex.reps_objetivo) || "10-12",
+            tempo: String(ex.tempo) || "3-0-1-0",
+            descanso_segundos: Number(ex.descanso_segundos) || 90,
+            rpe_objetivo: Number(ex.rpe_objetivo) || 8,
+          };
+          await addEjercicioRutina(erPayload);
+        }
       }
+
+      setEditingRoutineId(null);
+      setIsCreatingNew(false);
+    } finally {
+      setIsSyncing(false);
     }
-
-    setEditingRoutineId(null);
-    setIsCreatingNew(false);
   };
 
   const handleDeleteRoutine = async (id: string, nombre: string) => {
@@ -407,13 +568,17 @@ function RoutineManager() {
     }
   };
 
-  // If in Edit / Create mode
-  if (isCreatingNew || editingRoutineId) {
-    const filteredEjercicios = ejercicios.filter((e) =>
+  // Filtered exercises for picker modal
+  const filteredEjercicios = ejercicios.filter((e) => {
+    const matchesSearch = 
       e.nombre.toLowerCase().includes(exerciseSearch.toLowerCase()) ||
-      e.grupo_muscular.toLowerCase().includes(exerciseSearch.toLowerCase())
-    );
+      e.grupo_muscular.toLowerCase().includes(exerciseSearch.toLowerCase());
+    const matchesGroup = selectedMuscleFilter === "todos" || e.grupo_muscular === selectedMuscleFilter;
+    return matchesSearch && matchesGroup;
+  });
 
+  // If currently in Full Edit / Create Mode
+  if (isCreatingNew || editingRoutineId) {
     return (
       <div className="flex flex-col gap-4 pb-16">
         <div className="flex items-center gap-3 mb-1">
@@ -431,7 +596,7 @@ function RoutineManager() {
             <h2 className="text-xl font-bold text-[#2D3748]">
               {isCreatingNew ? "Nueva Rutina" : "Editar Rutina"}
             </h2>
-            <span className="text-xs text-[#718096]">Para: {currentAthlete?.nombre}</span>
+            <span className="text-xs text-[#4D7CFE] font-medium">Atleta: {currentAthlete?.nombre}</span>
           </div>
         </div>
 
@@ -465,12 +630,15 @@ function RoutineManager() {
           <div className="flex justify-between items-center px-1">
             <h3 className="font-bold text-sm text-[#2D3748] flex items-center gap-2">
               <Dumbbell className="w-4 h-4 text-[#4D7CFE]" />
-              Ejercicios de la Rutina ({formExercises.length})
+              Ejercicios de la Sesión ({formExercises.length})
             </h3>
             <NeuButton
               type="button"
               className="px-3 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1"
-              onClick={() => setExercisePickerOpen(true)}
+              onClick={() => {
+                setQuickAddTargetRoutineId(null);
+                setExercisePickerOpen(true);
+              }}
             >
               <Plus className="w-3.5 h-3.5" />
               Añadir Ejercicio
@@ -478,8 +646,19 @@ function RoutineManager() {
           </div>
 
           {formExercises.length === 0 ? (
-            <NeuCard inset className="p-6 text-center text-[#718096] text-xs">
-              No has añadido ejercicios a esta rutina. Haz clic en "Añadir Ejercicio" para seleccionar de la biblioteca.
+            <NeuCard inset className="p-6 text-center text-[#718096] text-xs flex flex-col items-center gap-2">
+              <Dumbbell className="w-8 h-8 text-[#718096]/40" />
+              <p>No has añadido ejercicios a esta rutina.</p>
+              <NeuButton
+                type="button"
+                className="text-[#4D7CFE] text-xs font-bold mt-1"
+                onClick={() => {
+                  setQuickAddTargetRoutineId(null);
+                  setExercisePickerOpen(true);
+                }}
+              >
+                Seleccionar de Biblioteca
+              </NeuButton>
             </NeuCard>
           ) : (
             <div className="flex flex-col gap-3">
@@ -491,9 +670,9 @@ function RoutineManager() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                   >
-                    <NeuCard className="p-3 flex flex-col gap-2">
+                    <NeuCard className="p-3 flex flex-col gap-2.5">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-xs text-[#4D7CFE] uppercase tracking-wider">
+                        <span className="font-bold text-xs text-[#4D7CFE] uppercase tracking-wider truncate max-w-[240px]">
                           {index + 1}. {ex.nombre_ejercicio}
                         </span>
                         <NeuButton
@@ -501,7 +680,7 @@ function RoutineManager() {
                           variant="circle"
                           className="w-7 h-7 shadow-neu-flat text-red-500 !p-0 flex items-center justify-center"
                           onClick={() => handleRemoveFormExercise(ex.tempId)}
-                          title="Quitar ejercicio"
+                          title="Disminuir / Quitar ejercicio"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </NeuButton>
@@ -529,14 +708,14 @@ function RoutineManager() {
                           required
                         />
                         <NeuInput
-                          label="Descanso"
+                          label="Descanso (s)"
                           type="number"
                           value={ex.descanso_segundos}
                           onChange={(e) =>
                             handleUpdateFormExercise(ex.tempId, "descanso_segundos", Number(e.target.value))
                           }
                           className="text-center text-xs h-9"
-                          placeholder="90s"
+                          placeholder="90"
                         />
                         <NeuInput
                           label="RPE / RIR"
@@ -551,14 +730,14 @@ function RoutineManager() {
                       </div>
 
                       <div className="flex gap-2 items-center">
-                        <span className="text-[10px] text-[#718096] pl-1">Tempo:</span>
+                        <span className="text-[10px] text-[#718096] pl-1 font-medium">Tempo:</span>
                         <input
                           type="text"
                           value={ex.tempo}
                           onChange={(e) =>
                             handleUpdateFormExercise(ex.tempId, "tempo", e.target.value)
                           }
-                          className="w-24 text-center rounded-lg bg-[#E0E5EC] px-2 py-0.5 text-xs text-[#2D3748] shadow-neu-pressed outline-none"
+                          className="w-28 text-center rounded-lg bg-[#E0E5EC] px-2 py-0.5 text-xs text-[#2D3748] shadow-neu-pressed outline-none"
                           placeholder="3-0-1-0"
                         />
                       </div>
@@ -573,9 +752,10 @@ function RoutineManager() {
             <NeuButton
               type="submit"
               className="flex-1 h-12 text-[#00C9A7] font-bold text-sm flex items-center justify-center gap-2"
+              disabled={isSyncing}
             >
               <Save className="w-4 h-4" />
-              Guardar Rutina
+              {isSyncing ? "Guardando..." : "Guardar Rutina"}
             </NeuButton>
             <NeuButton
               type="button"
@@ -590,61 +770,20 @@ function RoutineManager() {
           </div>
         </form>
 
-        {/* Exercise Picker Modal */}
-        <AnimatePresence>
-          {exercisePickerOpen && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed inset-0 z-50 bg-[#E0E5EC]/95 backdrop-blur-sm flex flex-col p-4 max-w-md mx-auto"
-            >
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-bold text-base text-[#2D3748]">Seleccionar Ejercicio</h3>
-                <NeuButton
-                  variant="circle"
-                  className="w-8 h-8 shadow-neu-flat"
-                  onClick={() => setExercisePickerOpen(false)}
-                >
-                  <ArrowLeft className="w-4 h-4 text-[#718096]" />
-                </NeuButton>
-              </div>
-
-              <NeuInput
-                placeholder="Buscar ejercicio o grupo..."
-                value={exerciseSearch}
-                onChange={(e) => setExerciseSearch(e.target.value)}
-                className="mb-3"
-              />
-
-              <div className="flex-1 overflow-y-auto flex flex-col gap-2 pb-6">
-                {filteredEjercicios.map((ej) => (
-                  <NeuCard
-                    key={ej.id}
-                    className="p-3 flex justify-between items-center cursor-pointer active:shadow-neu-pressed"
-                    onClick={() => handleAddExerciseToRoutine(ej)}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-bold text-xs text-[#2D3748]">{ej.nombre}</span>
-                      <span className="text-[10px] text-[#718096]">{ej.grupo_muscular}</span>
-                    </div>
-                    <Plus className="w-4 h-4 text-[#4D7CFE]" />
-                  </NeuCard>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Reusable Exercise Picker Modal */}
+        {renderExercisePickerModal()}
       </div>
     );
   }
 
+  // MAIN ROUTINE MANAGER VIEW
   return (
-    <div className="flex flex-col gap-4 pb-12">
+    <div className="flex flex-col gap-4 pb-16">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-[#2D3748]">Rutinas</h2>
-          <span className="text-xs text-[#718096]">Asigna, edita y borra sesiones</span>
+          <span className="text-xs text-[#718096]">Asignación y edición de ejercicios por atleta</span>
         </div>
         <NeuButton
           className="px-3 py-1.5 text-xs text-[#4D7CFE] font-bold flex items-center gap-1.5"
@@ -655,35 +794,125 @@ function RoutineManager() {
         </NeuButton>
       </div>
 
-      {/* Athlete Selector */}
+      {/* Athlete Selector Horizontal Pills */}
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-semibold text-[#718096] pl-1">Seleccionar Atleta</span>
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {athletes.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => setSelectedAthleteId(a.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                selectedAthleteId === a.id
-                  ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]"
-                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096]"
-              }`}
-            >
-              {a.nombre}
-            </button>
-          ))}
+          {athletes.map((a) => {
+            const count = rutinas.filter((r) => r.id_cliente === a.id).length;
+            const isSelected = effectiveAthleteId === a.id;
+            return (
+              <button
+                key={a.id}
+                onClick={() => onSelectAthlete(a.id)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                  isSelected
+                    ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]"
+                    : "bg-[#E0E5EC] shadow-neu-flat text-[#718096]"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
+                  isSelected ? "bg-[#4D7CFE] text-white" : "bg-[#E0E5EC] shadow-neu-pressed text-[#718096]"
+                }`}>
+                  {a.nombre.charAt(0)}
+                </div>
+                <span>{a.nombre}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                  count > 0 ? "bg-[#4D7CFE]/10 text-[#4D7CFE]" : "bg-gray-200 text-gray-500"
+                }`}>
+                  {count}d
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Routine Cards for Athlete */}
-      <div className="flex flex-col gap-3">
+      {/* Selected Athlete Banner & Actions */}
+      <NeuCard className="p-3.5 flex flex-col gap-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[#4D7CFE]">
+              {currentAthlete?.nombre.charAt(0)}
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-sm text-[#2D3748]">{currentAthlete?.nombre}</span>
+              <span className="text-[10px] text-[#718096]">
+                DNI: {currentAthlete?.dni} • {athleteRoutines.length} sesiones programadas
+              </span>
+            </div>
+          </div>
+
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+              currentAthlete?.estado_suscripcion === "inactivo"
+                ? "bg-red-100 text-red-600"
+                : "bg-emerald-100 text-emerald-700"
+            }`}
+          >
+            {currentAthlete?.estado_suscripcion === "inactivo" ? "Inactivo" : "Activo"}
+          </span>
+        </div>
+
+        {/* Quick action buttons for athlete */}
+        <div className="flex gap-2 pt-1 border-t border-[#c5cad1]/30">
+          <NeuButton
+            className="flex-1 py-1.5 text-xs text-[#4D7CFE] font-bold flex items-center justify-center gap-1 h-8"
+            onClick={startCreateRoutine}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Añadir Sesión
+          </NeuButton>
+
+          {athleteRoutines.length === 0 ? (
+            <NeuButton
+              className="flex-1 py-1.5 text-xs text-[#00C9A7] font-bold flex items-center justify-center gap-1 h-8"
+              onClick={handleAssignBasePlan}
+              disabled={isSyncing}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {isSyncing ? "Asignando..." : "Asignar Plan 5 Días"}
+            </NeuButton>
+          ) : (
+            <NeuButton
+              className="px-3 py-1.5 text-xs text-[#718096] font-medium flex items-center justify-center gap-1 h-8"
+              onClick={() => setIsCopyModalOpen(true)}
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copiar de...
+            </NeuButton>
+          )}
+        </div>
+      </NeuCard>
+
+      {/* List of Routines for Athlete */}
+      <div className="flex flex-col gap-3.5">
         {athleteRoutines.length === 0 ? (
           <NeuCard inset className="p-6 text-center text-[#718096] text-xs flex flex-col items-center gap-3">
-            <ClipboardList className="w-8 h-8 text-[#718096]/50" />
-            <p>Este atleta aún no tiene rutinas asignadas.</p>
-            <NeuButton className="text-[#4D7CFE] text-xs font-bold" onClick={startCreateRoutine}>
-              Crear Primera Rutina
-            </NeuButton>
+            <ClipboardList className="w-10 h-10 text-[#718096]/40" />
+            <div>
+              <p className="font-bold text-[#2D3748] text-sm">Esta atleta aún no tiene rutinas asignadas</p>
+              <p className="text-[11px] text-[#718096] mt-0.5">
+                Puedes asignarle el plan estructurado base de 5 días o crear rutinas personalizadas desde cero.
+              </p>
+            </div>
+            <div className="flex gap-2 mt-2">
+              <NeuButton
+                className="text-[#00C9A7] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                onClick={handleAssignBasePlan}
+                disabled={isSyncing}
+              >
+                <Sparkles className="w-4 h-4" />
+                {isSyncing ? "Cargando..." : "Asignar Plan Base (5 Días)"}
+              </NeuButton>
+              <NeuButton
+                className="text-[#4D7CFE] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                onClick={startCreateRoutine}
+              >
+                <Plus className="w-4 h-4" />
+                Crear Sesión Manual
+              </NeuButton>
+            </div>
           </NeuCard>
         ) : (
           athleteRoutines.map((rutina) => {
@@ -692,23 +921,40 @@ function RoutineManager() {
 
             return (
               <NeuCard key={rutina.id} className="p-4 flex flex-col gap-3">
+                {/* Routine Card Header */}
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-md shadow-neu-pressed w-fit mb-1">
-                      {diaObj?.label || `Día ${rutina.dia_semana}`}
-                    </span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-md shadow-neu-pressed">
+                        {diaObj?.label || `Día ${rutina.dia_semana}`}
+                      </span>
+                      <span className="text-[10px] text-[#718096] font-medium">
+                        {relatedErs.length} ejercicios
+                      </span>
+                    </div>
                     <h3 className="font-bold text-sm text-[#2D3748] leading-tight">
                       {rutina.nombre_sesion}
                     </h3>
                   </div>
 
-                  {/* Actions: Edit / Delete */}
-                  <div className="flex gap-2">
+                  {/* Actions: Edit / Quick Add / Delete */}
+                  <div className="flex gap-1.5 items-center">
+                    <NeuButton
+                      variant="circle"
+                      className="w-8 h-8 shadow-neu-flat text-[#00C9A7] !p-0 flex items-center justify-center"
+                      onClick={() => {
+                        setQuickAddTargetRoutineId(rutina.id);
+                        setExercisePickerOpen(true);
+                      }}
+                      title="Añadir ejercicio a esta rutina"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </NeuButton>
                     <NeuButton
                       variant="circle"
                       className="w-8 h-8 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center"
                       onClick={() => startEditRoutine(rutina)}
-                      title="Editar Rutina"
+                      title="Editar Sesión"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </NeuButton>
@@ -723,24 +969,86 @@ function RoutineManager() {
                   </div>
                 </div>
 
-                {/* Exercises preview inside routine */}
-                <div className="flex flex-col gap-1.5 pt-1">
+                {/* Exercises list inside routine card */}
+                <div className="flex flex-col gap-2 pt-1 border-t border-[#c5cad1]/20">
                   {relatedErs.length === 0 ? (
-                    <span className="text-[11px] text-[#718096] italic">Sin ejercicios cargados</span>
+                    <div className="flex justify-between items-center py-2 px-3 rounded-lg bg-[#E0E5EC] shadow-neu-pressed">
+                      <span className="text-xs text-[#718096] italic">Sin ejercicios en esta sesión</span>
+                      <button
+                        onClick={() => {
+                          setQuickAddTargetRoutineId(rutina.id);
+                          setExercisePickerOpen(true);
+                        }}
+                        className="text-xs font-bold text-[#4D7CFE] flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Añadir Ejercicio
+                      </button>
+                    </div>
                   ) : (
                     relatedErs.map((er, idx) => {
                       const ej = ejercicios.find((e) => e.id === er.id_ejercicio);
                       return (
                         <div
                           key={er.id}
-                          className="flex justify-between items-center text-xs py-1 px-2.5 rounded-lg bg-[#E0E5EC] shadow-neu-pressed"
+                          className="flex flex-col gap-1.5 py-2 px-3 rounded-xl bg-[#E0E5EC] shadow-neu-pressed"
                         >
-                          <span className="font-medium text-[#2D3748] truncate max-w-[200px]">
-                            {idx + 1}. {ej?.nombre || "Ejercicio"}
-                          </span>
-                          <span className="text-[10px] font-bold text-[#718096]">
-                            {er.series_objetivo} × {er.reps_objetivo}
-                          </span>
+                          <div className="flex justify-between items-start">
+                            <div className="flex flex-col max-w-[210px]">
+                              <span className="font-bold text-xs text-[#2D3748]">
+                                {idx + 1}. {ej?.nombre || "Ejercicio"}
+                              </span>
+                              <span className="text-[9px] text-[#718096]">{ej?.grupo_muscular || "General"}</span>
+                            </div>
+
+                            {/* Quick buttons: edit params & remove exercise */}
+                            <div className="flex gap-1 items-center">
+                              <button
+                                onClick={() =>
+                                  setEditingExerciseParam({
+                                    id: er.id,
+                                    ejercicioNombre: ej?.nombre || "Ejercicio",
+                                    series: er.series_objetivo,
+                                    reps: er.reps_objetivo,
+                                    tempo: er.tempo,
+                                    descanso: er.descanso_segundos,
+                                    rpe: er.rpe_objetivo,
+                                  })
+                                }
+                                className="p-1 rounded-md text-[#4D7CFE] hover:bg-[#4D7CFE]/10"
+                                title="Editar parámetros"
+                              >
+                                <Sliders className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleDirectDeleteExerciseFromRoutine(er.id, ej?.nombre || "Ejercicio")
+                                }
+                                className="p-1 rounded-md text-red-500 hover:bg-red-500/10"
+                                title="Disminuir / Quitar ejercicio"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Parameters Badges */}
+                          <div className="flex items-center gap-2 text-[10px] text-[#718096] flex-wrap">
+                            <span className="font-bold text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-md shadow-neu-flat">
+                              {er.series_objetivo} series × {er.reps_objetivo}
+                            </span>
+                            <span className="bg-[#E0E5EC] px-1.5 py-0.5 rounded shadow-neu-flat">
+                              Descanso: {er.descanso_segundos}s
+                            </span>
+                            <span className="bg-[#E0E5EC] px-1.5 py-0.5 rounded shadow-neu-flat">
+                              RPE: {er.rpe_objetivo}
+                            </span>
+                            {er.tempo && er.tempo !== "-" && (
+                              <span className="bg-[#E0E5EC] px-1.5 py-0.5 rounded shadow-neu-flat">
+                                Tempo: {er.tempo}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })
@@ -751,8 +1059,290 @@ function RoutineManager() {
           })
         )}
       </div>
+
+      {/* Quick Exercise Parameters Editor Modal */}
+      <AnimatePresence>
+        {editingExerciseParam && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-base text-[#2D3748]">Editar Parámetros</h3>
+                  <span className="text-xs font-semibold text-[#4D7CFE]">{editingExerciseParam.ejercicioNombre}</span>
+                </div>
+                <NeuButton
+                  variant="circle"
+                  className="w-7 h-7 shadow-neu-flat"
+                  onClick={() => setEditingExerciseParam(null)}
+                >
+                  <X className="w-4 h-4 text-[#718096]" />
+                </NeuButton>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <NeuInput
+                  label="Series Objetivo"
+                  type="number"
+                  value={editingExerciseParam.series}
+                  onChange={(e) =>
+                    setEditingExerciseParam({
+                      ...editingExerciseParam,
+                      series: Number(e.target.value),
+                    })
+                  }
+                  required
+                />
+                <NeuInput
+                  label="Reps Objetivo"
+                  value={editingExerciseParam.reps}
+                  onChange={(e) =>
+                    setEditingExerciseParam({
+                      ...editingExerciseParam,
+                      reps: e.target.value,
+                    })
+                  }
+                  placeholder="ej. 10-12"
+                  required
+                />
+                <NeuInput
+                  label="Descanso (segundos)"
+                  type="number"
+                  value={editingExerciseParam.descanso}
+                  onChange={(e) =>
+                    setEditingExerciseParam({
+                      ...editingExerciseParam,
+                      descanso: Number(e.target.value),
+                    })
+                  }
+                  placeholder="90"
+                />
+                <NeuInput
+                  label="RPE / Intensidad (1-10)"
+                  type="number"
+                  value={editingExerciseParam.rpe}
+                  onChange={(e) =>
+                    setEditingExerciseParam({
+                      ...editingExerciseParam,
+                      rpe: Number(e.target.value),
+                    })
+                  }
+                  placeholder="8"
+                />
+              </div>
+
+              <NeuInput
+                label="Tempo de Ejecución"
+                value={editingExerciseParam.tempo}
+                onChange={(e) =>
+                  setEditingExerciseParam({
+                    ...editingExerciseParam,
+                    tempo: e.target.value,
+                  })
+                }
+                placeholder="ej. 3-0-1-0"
+              />
+
+              <div className="flex gap-2 mt-2">
+                <NeuButton
+                  className="flex-1 h-11 text-[#00C9A7] font-bold text-sm flex items-center justify-center gap-2"
+                  onClick={handleSaveQuickParamEdit}
+                >
+                  <Check className="w-4 h-4" />
+                  Guardar Cambios
+                </NeuButton>
+                <NeuButton
+                  className="px-4 h-11 text-[#718096] text-sm"
+                  onClick={() => setEditingExerciseParam(null)}
+                >
+                  Cancelar
+                </NeuButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Copy Routines From Another Athlete Modal */}
+      <AnimatePresence>
+        {isCopyModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-base text-[#2D3748]">Copiar Rutinas</h3>
+                <NeuButton
+                  variant="circle"
+                  className="w-7 h-7 shadow-neu-flat"
+                  onClick={() => setIsCopyModalOpen(false)}
+                >
+                  <X className="w-4 h-4 text-[#718096]" />
+                </NeuButton>
+              </div>
+
+              <p className="text-xs text-[#718096]">
+                Selecciona de qué atleta deseas replicar las rutinas hacia{" "}
+                <strong className="text-[#2D3748]">{currentAthlete?.nombre}</strong>:
+              </p>
+
+              <select
+                className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-2.5 text-sm text-[#2D3748] shadow-neu-pressed outline-none"
+                value={sourceAthleteIdForCopy}
+                onChange={(e) => setSourceAthleteIdForCopy(e.target.value)}
+              >
+                <option value="">-- Seleccionar atleta origen --</option>
+                {athletes
+                  .filter((a) => a.id !== effectiveAthleteId)
+                  .map((a) => {
+                    const count = rutinas.filter((r) => r.id_cliente === a.id).length;
+                    return (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre} ({count} rutinas)
+                      </option>
+                    );
+                  })}
+              </select>
+
+              <div className="flex gap-2 mt-2">
+                <NeuButton
+                  className="flex-1 h-11 text-[#4D7CFE] font-bold text-sm flex items-center justify-center gap-2"
+                  onClick={handleCopyFromAthlete}
+                  disabled={!sourceAthleteIdForCopy || isSyncing}
+                >
+                  <Copy className="w-4 h-4" />
+                  {isSyncing ? "Copiando..." : "Copiar Rutinas"}
+                </NeuButton>
+                <NeuButton
+                  className="px-4 h-11 text-[#718096] text-sm"
+                  onClick={() => setIsCopyModalOpen(false)}
+                >
+                  Cancelar
+                </NeuButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Reusable Exercise Picker Modal */}
+      {renderExercisePickerModal()}
     </div>
   );
+
+  // Helper render for Exercise Picker Modal
+  function renderExercisePickerModal() {
+    return (
+      <AnimatePresence>
+        {exercisePickerOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed inset-0 z-50 bg-[#E0E5EC]/95 backdrop-blur-sm flex flex-col p-4 max-w-md mx-auto"
+          >
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <h3 className="font-bold text-base text-[#2D3748]">Seleccionar Ejercicio</h3>
+                <span className="text-[10px] text-[#718096]">
+                  {quickAddTargetRoutineId ? "Añadir a sesión activa" : "Añadir a la rutina en edición"}
+                </span>
+              </div>
+              <NeuButton
+                variant="circle"
+                className="w-8 h-8 shadow-neu-flat"
+                onClick={() => {
+                  setExercisePickerOpen(false);
+                  setQuickAddTargetRoutineId(null);
+                }}
+              >
+                <ArrowLeft className="w-4 h-4 text-[#718096]" />
+              </NeuButton>
+            </div>
+
+            <NeuInput
+              placeholder="Buscar por ejercicio o grupo..."
+              value={exerciseSearch}
+              onChange={(e) => setExerciseSearch(e.target.value)}
+              className="mb-2"
+            />
+
+            {/* Muscle group filter pills */}
+            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 scrollbar-none">
+              <button
+                onClick={() => setSelectedMuscleFilter("todos")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
+                  selectedMuscleFilter === "todos"
+                    ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]"
+                    : "bg-[#E0E5EC] shadow-neu-flat text-[#718096]"
+                }`}
+              >
+                Todos
+              </button>
+              {muscleGroups.map((group) => (
+                <button
+                  key={group}
+                  onClick={() => setSelectedMuscleFilter(group)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
+                    selectedMuscleFilter === group
+                      ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]"
+                      : "bg-[#E0E5EC] shadow-neu-flat text-[#718096]"
+                  }`}
+                >
+                  {group}
+                </button>
+              ))}
+            </div>
+
+            {/* Exercises List */}
+            <div className="flex-1 overflow-y-auto flex flex-col gap-2 pb-6">
+              {filteredEjercicios.map((ej) => (
+                <NeuCard
+                  key={ej.id}
+                  className="p-3 flex justify-between items-center cursor-pointer active:shadow-neu-pressed"
+                  onClick={() => handleAddExerciseToRoutine(ej)}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xs text-[#2D3748]">{ej.nombre}</span>
+                    <span className="text-[10px] text-[#718096]">{ej.grupo_muscular}</span>
+                  </div>
+                  <NeuButton
+                    variant="circle"
+                    className="w-7 h-7 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </NeuButton>
+                </NeuCard>
+              ))}
+
+              {filteredEjercicios.length === 0 && (
+                <div className="text-center text-[#718096] py-8 text-xs">
+                  No se encontraron ejercicios con ese criterio.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
 }
 
 function ExercisesLibrary() {
@@ -810,7 +1400,7 @@ function ExercisesLibrary() {
 
   const handleDelete = async () => {
     if (isEditing && isEditing !== "new") {
-      if (window.confirm("¿Eliminar este ejercicio de la biblioteca?")) {
+      if (window.confirm("¿Eliminar este ejercicio de la biblioteca global?")) {
         await deleteEjercicio(isEditing);
         setIsEditing(null);
       }

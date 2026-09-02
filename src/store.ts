@@ -40,6 +40,8 @@ interface AppState {
   addFichaProgreso: (ficha: FichaProgreso) => Promise<void>;
   updateFichaProgreso: (ficha: FichaProgreso) => Promise<void>;
   deleteFichaProgreso: (id: string) => Promise<void>;
+  assignBasePlanToAthlete: (athleteId: string, trainerId: string) => Promise<void>;
+  copyRoutinesToAthlete: (sourceAthleteId: string, targetAthleteId: string, trainerId: string) => Promise<void>;
 }
 
 function cleanObject<T extends Record<string, any>>(obj: T): T {
@@ -254,9 +256,8 @@ export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | nul
 
 function mergeWithMock<T extends { id: string }>(stored: T[], mock: T[]): T[] {
   const map = new Map<string, T>();
-  stored.forEach((item) => map.set(item.id, item));
-  // Mock items take precedence for canonical definitions
   mock.forEach((item) => map.set(item.id, item));
+  stored.forEach((item) => map.set(item.id, item));
   return Array.from(map.values());
 }
 
@@ -495,6 +496,122 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Error deleting ficha progreso from Firestore:', err);
     }
   },
+
+  assignBasePlanToAthlete: async (athleteId: string, trainerId: string) => {
+    const baseRoutines = [
+      { idSuffix: 'd1', nombre: 'Día 1: Tren Superior (A) - Empuje y Tirón Vertical', dia: 1, baseId: 'r1' },
+      { idSuffix: 'd2', nombre: 'Día 2: Tren Inferior (A) - Cuádriceps y Glúteo', dia: 2, baseId: 'r2' },
+      { idSuffix: 'd3', nombre: 'Día 3: Full Body - Fuerza, Glúteos y Core', dia: 3, baseId: 'r3' },
+      { idSuffix: 'd4', nombre: 'Día 4: Tren Superior (B) - Tirón Horizontal y Hombros', dia: 4, baseId: 'r4' },
+      { idSuffix: 'd5', nombre: 'Día 5: Tren Inferior (B) - Cadena Posterior y Unilaterales', dia: 5, baseId: 'r5' },
+    ];
+
+    const newRoutines: Rutina[] = [];
+    const newErs: EjercicioRutina[] = [];
+    const currentErs = get().ejerciciosRutina.length > 0 ? get().ejerciciosRutina : mockEjerciciosRutina;
+
+    const batch = writeBatch(db);
+
+    for (const br of baseRoutines) {
+      const routineId = `r_${athleteId}_${br.idSuffix}_${Date.now()}`;
+      const rItem: Rutina = {
+        id: routineId,
+        id_cliente: athleteId,
+        id_entrenador: trainerId || 'entrenador1',
+        nombre_sesion: br.nombre,
+        dia_semana: br.dia,
+      };
+      newRoutines.push(rItem);
+      batch.set(doc(db, 'rutinas', routineId), cleanObject(rItem));
+
+      const sourceExercises = currentErs.filter((er) => er.id_rutina === br.baseId);
+      const fallbackExercises = mockEjerciciosRutina.filter((er) => er.id_rutina === br.baseId);
+      const exToCopy = sourceExercises.length > 0 ? sourceExercises : fallbackExercises;
+
+      exToCopy.forEach((er, idx) => {
+        const erId = `er_${routineId}_${idx + 1}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+        const erItem: EjercicioRutina = {
+          id: erId,
+          id_rutina: routineId,
+          id_ejercicio: er.id_ejercicio,
+          series_objetivo: er.series_objetivo || 3,
+          reps_objetivo: er.reps_objetivo || '10-12',
+          tempo: er.tempo || '3-0-1-0',
+          descanso_segundos: er.descanso_segundos || 90,
+          rpe_objetivo: er.rpe_objetivo || 8,
+        };
+        newErs.push(erItem);
+        batch.set(doc(db, 'ejerciciosRutina', erId), cleanObject(erItem));
+      });
+    }
+
+    const updatedRuts = [...get().rutinas, ...newRoutines];
+    const updatedErs = [...get().ejerciciosRutina, ...newErs];
+
+    set({ rutinas: updatedRuts, ejerciciosRutina: updatedErs });
+    setStoredItem(RUTINAS_STORAGE_KEY, updatedRuts);
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updatedErs);
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error('Error committing assigned routines to Firestore:', e);
+    }
+  },
+
+  copyRoutinesToAthlete: async (sourceAthleteId: string, targetAthleteId: string, trainerId: string) => {
+    const sourceRoutines = get().rutinas.filter((r) => r.id_cliente === sourceAthleteId);
+    if (sourceRoutines.length === 0) return;
+
+    const newRoutines: Rutina[] = [];
+    const newErs: EjercicioRutina[] = [];
+    const currentErs = get().ejerciciosRutina;
+
+    const batch = writeBatch(db);
+
+    for (const sr of sourceRoutines) {
+      const routineId = `r_${targetAthleteId}_${sr.dia_semana}_${Date.now()}`;
+      const rItem: Rutina = {
+        id: routineId,
+        id_cliente: targetAthleteId,
+        id_entrenador: trainerId || 'entrenador1',
+        nombre_sesion: sr.nombre_sesion,
+        dia_semana: sr.dia_semana,
+      };
+      newRoutines.push(rItem);
+      batch.set(doc(db, 'rutinas', routineId), cleanObject(rItem));
+
+      const sourceExercises = currentErs.filter((er) => er.id_rutina === sr.id);
+      sourceExercises.forEach((er, idx) => {
+        const erId = `er_${routineId}_${idx + 1}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+        const erItem: EjercicioRutina = {
+          id: erId,
+          id_rutina: routineId,
+          id_ejercicio: er.id_ejercicio,
+          series_objetivo: er.series_objetivo || 3,
+          reps_objetivo: er.reps_objetivo || '10-12',
+          tempo: er.tempo || '3-0-1-0',
+          descanso_segundos: er.descanso_segundos || 90,
+          rpe_objetivo: er.rpe_objetivo || 8,
+        };
+        newErs.push(erItem);
+        batch.set(doc(db, 'ejerciciosRutina', erId), cleanObject(erItem));
+      });
+    }
+
+    const updatedRuts = [...get().rutinas, ...newRoutines];
+    const updatedErs = [...get().ejerciciosRutina, ...newErs];
+
+    set({ rutinas: updatedRuts, ejerciciosRutina: updatedErs });
+    setStoredItem(RUTINAS_STORAGE_KEY, updatedRuts);
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updatedErs);
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error('Error copying routines to Firestore:', e);
+    }
+  },
 }));
 
 // Setup Firestore real-time synchronization
@@ -584,6 +701,18 @@ export function initFirestoreSync() {
       snapshot.forEach((docSnap) => {
         ruts.push({ id: docSnap.id, ...docSnap.data() } as Rutina);
       });
+    } else {
+      // If collection is completely empty in Firestore on first load, seed baseline 5-day templates
+      try {
+        const batch = writeBatch(db);
+        mockRutinas.forEach((r) => {
+          batch.set(doc(db, 'rutinas', r.id), cleanObject(r));
+        });
+        await batch.commit();
+      } catch (e) {
+        console.error('Error saving initial rutinas to Firestore:', e);
+      }
+      ruts = [...mockRutinas];
     }
 
     // Clean up any legacy _xb documents from Firestore if present
@@ -601,18 +730,6 @@ export function initFirestoreSync() {
       ruts = ruts.filter((r) => !r.id.endsWith('_xb'));
     }
 
-    // Always ensure the 5 canonical days are fully synchronized to Firestore
-    try {
-      const batch = writeBatch(db);
-      mockRutinas.forEach((r) => {
-        batch.set(doc(db, 'rutinas', r.id), cleanObject(r));
-      });
-      await batch.commit();
-    } catch (e) {
-      console.error('Error saving canonical rutinas to Firestore:', e);
-    }
-    ruts = mergeWithMock(ruts, mockRutinas);
-
     setStoredItem(RUTINAS_STORAGE_KEY, ruts);
     useStore.setState({ rutinas: ruts });
   }, (error) => {
@@ -626,6 +743,18 @@ export function initFirestoreSync() {
       snapshot.forEach((docSnap) => {
         ers.push({ id: docSnap.id, ...docSnap.data() } as EjercicioRutina);
       });
+    } else {
+      // If collection is completely empty on first load, seed baseline exercise mappings
+      try {
+        const batch = writeBatch(db);
+        mockEjerciciosRutina.forEach((er) => {
+          batch.set(doc(db, 'ejerciciosRutina', er.id), cleanObject(er));
+        });
+        await batch.commit();
+      } catch (e) {
+        console.error('Error saving initial ejerciciosRutina to Firestore:', e);
+      }
+      ers = [...mockEjerciciosRutina];
     }
 
     // Clean up any legacy _xb items
@@ -642,18 +771,6 @@ export function initFirestoreSync() {
       }
       ers = ers.filter((er) => !er.id.startsWith('er_xb_') && !er.id_rutina.endsWith('_xb'));
     }
-
-    // Always ensure all canonical exercises are linked to r1..r5 in Firestore
-    try {
-      const batch = writeBatch(db);
-      mockEjerciciosRutina.forEach((er) => {
-        batch.set(doc(db, 'ejerciciosRutina', er.id), cleanObject(er));
-      });
-      await batch.commit();
-    } catch (e) {
-      console.error('Error saving canonical ejerciciosRutina to Firestore:', e);
-    }
-    ers = mergeWithMock(ers, mockEjerciciosRutina);
 
     setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, ers);
     useStore.setState({ ejerciciosRutina: ers });
