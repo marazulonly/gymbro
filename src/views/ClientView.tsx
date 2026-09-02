@@ -77,8 +77,11 @@ function ClientHome() {
 
 function LiveWorkout() {
   const { rutinas, ejerciciosRutina, ejercicios } = useStore();
-  const todayRoutine = rutinas[0];
-  const routineExercises = ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id);
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string>(rutinas[0]?.id || '');
+
+  // Keep selectedRoutineId valid
+  const currentRoutine = rutinas.find(r => r.id === selectedRoutineId) || rutinas[0];
+  const routineExercises = ejerciciosRutina.filter(er => er.id_rutina === currentRoutine?.id);
   
   const [isWorkoutStarted, setIsWorkoutStarted] = useState(false);
   const [completedExercises, setCompletedExercises] = useState<Set<number>>(new Set());
@@ -94,6 +97,13 @@ function LiveWorkout() {
   const [reps, setReps] = useState(currentEr?.reps_objetivo.split('-')[0] || "10");
   const [weight, setWeight] = useState("12.5");
   const [rpe, setRpe] = useState(currentEr?.rpe_objetivo.toString() || "8");
+
+  // Reset exercise index when routine changes
+  useEffect(() => {
+    if (rutinas.length > 0 && !selectedRoutineId) {
+      setSelectedRoutineId(rutinas[0].id);
+    }
+  }, [rutinas, selectedRoutineId]);
 
   // Update inputs when exercise changes
   useEffect(() => {
@@ -157,11 +167,11 @@ function LiveWorkout() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (!todayRoutine || routineExercises.length === 0) {
+  if (!currentRoutine) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-[#718096]">
         <Dumbbell className="w-12 h-12 mb-2 opacity-50" />
-        <p>No hay rutina programada para hoy.</p>
+        <p>No hay rutina programada.</p>
       </div>
     );
   }
@@ -169,49 +179,91 @@ function LiveWorkout() {
   if (!isWorkoutStarted) {
     return (
       <div className="flex flex-col gap-3 h-full pb-2">
+        {/* Day Selector Pills */}
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-2 px-2 [&::-webkit-scrollbar]:hidden">
+          {rutinas.map((r, i) => (
+            <button
+              key={r.id}
+              onClick={() => {
+                setSelectedRoutineId(r.id);
+                setCompletedExercises(new Set());
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                r.id === currentRoutine.id
+                  ? 'bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]'
+                  : 'bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]'
+              }`}
+            >
+              Día {i + 1}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-col">
-          <span className="text-[#4D7CFE] font-bold text-sm tracking-widest uppercase">Plan de Hoy</span>
-          <h2 className="text-xl font-bold text-[#2D3748]">{todayRoutine.nombre_sesion}</h2>
+          <span className="text-[#4D7CFE] font-bold text-xs tracking-widest uppercase">Plan Semanal</span>
+          <h2 className="text-lg font-bold text-[#2D3748] leading-snug">{currentRoutine.nombre_sesion}</h2>
         </div>
         
-        {/* Full width container using -mx-4 */}
-        <div className="flex-1 flex flex-col gap-4 -mx-4 px-4 overflow-y-visible">
-          {routineExercises.map((er, idx) => {
-            const ex = ejercicios.find(e => e.id === er.id_ejercicio);
-            const isCompleted = completedExercises.has(idx);
-            
-            return (
-              <NeuCard 
-                key={er.id} 
-                className={`p-4 flex items-center justify-between cursor-pointer active:shadow-neu-pressed transition-all ${isCompleted ? 'opacity-60' : ''}`}
-                onClick={() => {
-                  setCurrentExerciseIdx(idx);
-                  setCurrentSet(1);
-                  setIsWorkoutStarted(true);
-                  setIsExerciseFinished(false);
-                  setIsResting(false);
-                }}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 min-w-[2.5rem] rounded-full shadow-neu-pressed flex items-center justify-center font-bold ${isCompleted ? 'text-[#718096]' : 'text-[#4D7CFE]'}`}>
-                    {idx + 1}
+        {routineExercises.length === 0 ? (
+          <NeuCard className="p-6 flex flex-col items-center justify-center gap-3 text-center my-auto">
+            <Droplets className="w-10 h-10 text-[#00C9A7]" />
+            <h3 className="font-bold text-[#2D3748] text-base">Día de Descanso Activo / LISS</h3>
+            <p className="text-xs text-[#718096] max-w-xs leading-relaxed">
+              30-45 min de caminata rápida, elíptica o bici suave con frecuencia cardíaca moderada (Zona 2).
+            </p>
+          </NeuCard>
+        ) : (
+          <div className="flex-1 flex flex-col gap-3 -mx-4 px-4 overflow-y-visible">
+            {routineExercises.map((er, idx) => {
+              const ex = ejercicios.find(e => e.id === er.id_ejercicio);
+              const isCompleted = completedExercises.has(idx);
+              
+              return (
+                <NeuCard 
+                  key={er.id} 
+                  className={`p-3.5 flex items-center justify-between cursor-pointer active:shadow-neu-pressed transition-all ${isCompleted ? 'opacity-60' : ''}`}
+                  onClick={() => {
+                    setCurrentExerciseIdx(idx);
+                    setCurrentSet(1);
+                    setIsWorkoutStarted(true);
+                    setIsExerciseFinished(false);
+                    setIsResting(false);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 min-w-[2.25rem] rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-sm ${isCompleted ? 'text-[#718096]' : 'text-[#4D7CFE]'}`}>
+                      {idx + 1}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-[#2D3748] text-sm leading-tight mb-0.5">{ex?.nombre}</span>
+                      <span className="text-xs font-medium text-[#718096]">
+                        {er.series_objetivo} series × {er.reps_objetivo} reps • {er.descanso_segundos}s desc.
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-[#2D3748] leading-tight mb-1">{ex?.nombre}</span>
-                    <span className="text-xs font-medium text-[#718096]">
-                      {er.series_objetivo} series × {er.reps_objetivo} reps
-                    </span>
-                  </div>
-                </div>
-                {isCompleted && (
-                  <div className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center">
-                    <Check className="w-4 h-4 text-[#718096]" />
-                  </div>
-                )}
-              </NeuCard>
-            );
-          })}
-        </div>
+                  {isCompleted && (
+                    <div className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5 text-[#00C9A7]" />
+                    </div>
+                  )}
+                </NeuCard>
+              );
+            })}
+
+            {/* Cardio Post-Sesión Info */}
+            <NeuCard inset className="p-3 mt-1">
+              <span className="text-[11px] font-bold text-[#4D7CFE] uppercase tracking-wider block mb-1">
+                Cardio Post-Sesión Opcional
+              </span>
+              <p className="text-xs text-[#718096] leading-snug mb-1">
+                <strong className="text-[#2D3748]">HIIT:</strong> 10-12 min (8 ciclos 20s sprint / 40s suave).
+              </p>
+              <p className="text-xs text-[#718096] leading-snug">
+                <strong className="text-[#2D3748]">LISS:</strong> 20-30 min caminando (5-6 km/h) inclinación 8-12%.
+              </p>
+            </NeuCard>
+          </div>
+        )}
       </div>
     );
   }

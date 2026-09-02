@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
-import { InputHTMLAttributes } from "react";
+import React from "react";
 
-interface NeuInputProps extends InputHTMLAttributes<HTMLInputElement> {
+export type NeuInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
-}
+};
 
 export function NeuInput({ className, label, ...props }: NeuInputProps) {
   return (
@@ -20,3 +20,5 @@ export function NeuInput({ className, label, ...props }: NeuInputProps) {
     </div>
   );
 }
+
+

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../store';
 import { NeuInput } from '../components/ui/NeuInput';
 import { NeuButton } from '../components/ui/NeuButton';
 import { NeuCard } from '../components/ui/NeuCard';
+
 
 export function LoginView() {
   const login = useStore((state) => state.login);
@@ -26,9 +27,9 @@ export function LoginView() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-8 px-6 -mt-20">
+    <div className="flex flex-col items-center justify-center h-full gap-8 px-6 -mt-10">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-20 h-20 rounded-full shadow-neu-flat flex items-center justify-center bg-[#E0E5EC] overflow-hidden p-3">
+        <div className="w-40 h-40 rounded-full shadow-neu-flat flex items-center justify-center bg-[#E0E5EC] overflow-hidden p-5">
           <img src="/gymbro.svg" alt="GymBro Logo" className="w-full h-full object-contain" />
         </div>
         <h1 className="text-3xl font-bold text-[#2D3748]">GymBro</h1>
@@ -58,10 +59,6 @@ export function LoginView() {
           </NeuButton>
         </form>
       </NeuCard>
-
-      <p className="text-xs text-[#718096] text-center px-4">
-        Por defecto, la contraseña para todos los usuarios de prueba es <span className="font-bold">0000</span>
-      </p>
     </div>
   );
 }

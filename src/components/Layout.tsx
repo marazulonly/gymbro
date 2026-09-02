@@ -1,12 +1,13 @@
+import React, { useState } from "react";
 import { useStore } from "@/store";
-import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database } from "lucide-react";
+import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Cloud } from "lucide-react";
 import { NeuButton } from "./ui/NeuButton";
-import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "./ProfileModal";
 
+
 export function Layout({ children }: { children: (activeTab: number) => React.ReactNode }) {
-  const { currentRole, logout, currentUser } = useStore();
+  const { currentRole, logout, currentUser, isCloudReady } = useStore();
   const [activeTab, setActiveTab] = useState(0);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -41,7 +42,13 @@ export function Layout({ children }: { children: (activeTab: number) => React.Re
     <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#E0E5EC] overflow-hidden relative">
       {/* Top Header */}
       <header className="z-10 px-4 pt-4 pb-2 flex justify-between items-center bg-[#E0E5EC]/80 backdrop-blur-md">
-        <h1 className="text-xl font-bold text-[#2D3748]">GymBro</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-[#2D3748]">GymBro</h1>
+          <div className="flex items-center gap-1 text-[10px] text-[#00C9A7] font-semibold bg-[#E0E5EC] px-2 py-0.5 rounded-full shadow-neu-flat">
+            <Cloud className="w-3 h-3 text-[#00C9A7]" />
+            <span>Nube</span>
+          </div>
+        </div>
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end">
             <span className="text-xs font-bold text-[#2D3748] leading-tight">{currentUser?.nombre}</span>
@@ -55,6 +62,7 @@ export function Layout({ children }: { children: (activeTab: number) => React.Re
           </NeuButton>
         </div>
       </header>
+
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto overscroll-contain px-4 pb-20 pt-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

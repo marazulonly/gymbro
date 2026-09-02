@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useStore } from "@/store";
 import { NeuCard } from "./ui/NeuCard";
 import { NeuInput } from "./ui/NeuInput";
 import { NeuButton } from "./ui/NeuButton";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
 
 export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onClose: () => void; userId?: string }) {
   const { currentUser, usuarios, updateUsuario, deleteUsuario } = useStore();

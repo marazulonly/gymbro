@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useStore } from "@/store";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
@@ -40,6 +40,7 @@ function AthletesList() {
       fecha_nacimiento: fecha,
       sexo,
       contrasena: '0000',
+      estado_suscripcion: 'activo',
       rol: 'cliente',
       id_entrenador: currentUser?.id
     });
@@ -48,6 +49,7 @@ function AthletesList() {
     setNombre('');
     setDni('');
     setWhatsapp('');
+
     setFecha('');
   };
 

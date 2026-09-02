@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
+import React from "react";
 
-interface NeuCardProps extends React.HTMLAttributes<HTMLDivElement> {
+export type NeuCardProps = React.HTMLAttributes<HTMLDivElement> & {
   inset?: boolean;
-}
+};
 
 export function NeuCard({ className, inset, children, ...props }: NeuCardProps) {
   return (
@@ -18,3 +19,5 @@ export function NeuCard({ className, inset, children, ...props }: NeuCardProps) 
     </div>
   );
 }
+
+
