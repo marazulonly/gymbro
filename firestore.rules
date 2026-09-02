@@ -17,6 +17,9 @@ service cloud.firestore {
     match /planesNutricion/{planId} {
       allow read, write: if true;
     }
+    match /fichasProgreso/{fichaId} {
+      allow read, write: if true;
+    }
     match /{document=**} {
       allow read, write: if true;
     }

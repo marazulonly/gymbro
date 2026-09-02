@@ -81,3 +81,27 @@ export interface RevisionSemanal {
   nivel_estres: number;
   feedback_entrenador?: string;
 }
+
+export interface FichaProgreso {
+  id: string;
+  id_cliente: string;
+  id_entrenador?: string;
+  fecha_inicio: string; // YYYY-MM-DD
+  fecha_chequeo: string; // YYYY-MM-DD
+  peso_kg: number;
+  altura_cm: number;
+  grasa_porcentaje?: number;
+  musculo_porcentaje?: number;
+  pecho_cm?: number;
+  cintura_cm?: number;
+  cadera_cm?: number;
+  brazo_cm?: number;
+  muslo_cm?: number;
+  pantorrilla_cm?: number;
+  objetivo_principal?: string;
+  nivel?: 'Principiante' | 'Intermedio' | 'Avanzado';
+  adherencia_porcentaje?: number;
+  notas_entrenador?: string;
+  fecha_actualizacion?: string;
+}
+

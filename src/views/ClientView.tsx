@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
-import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets } from "lucide-react";
+import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity } from "lucide-react";
 import { useStore } from "@/store";
 import { motion, AnimatePresence } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -16,13 +16,14 @@ export function ClientView({ tab }: { tab: number }) {
 
 function ClientHome() {
   const { currentUser, rutinas, planNutricion } = useStore();
-  const todayRoutine = rutinas[0];
+  const clientRoutines = rutinas.filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente);
+  const todayRoutine = clientRoutines[0] || rutinas[0];
   
   return (
     <div className="flex flex-col gap-4 h-full pb-2">
       <div>
         <h2 className="text-2xl font-light text-[#2D3748]">Hola,</h2>
-        <h3 className="text-3xl font-bold text-[#4D7CFE]">{currentUser.nombre}</h3>
+        <h3 className="text-3xl font-bold text-[#4D7CFE]">{currentUser?.nombre || 'Atleta'}</h3>
       </div>
 
       <NeuCard className="flex items-center justify-between py-3 px-4">
@@ -76,11 +77,15 @@ function ClientHome() {
 }
 
 function LiveWorkout() {
-  const { rutinas, ejerciciosRutina, ejercicios } = useStore();
-  const [selectedRoutineId, setSelectedRoutineId] = useState<string>(rutinas[0]?.id || '');
+  const { currentUser, rutinas, ejerciciosRutina, ejercicios } = useStore();
+  const clientRoutines = rutinas
+    .filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente)
+    .sort((a, b) => a.dia_semana - b.dia_semana);
+
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string>(clientRoutines[0]?.id || rutinas[0]?.id || '');
 
   // Keep selectedRoutineId valid
-  const currentRoutine = rutinas.find(r => r.id === selectedRoutineId) || rutinas[0];
+  const currentRoutine = clientRoutines.find(r => r.id === selectedRoutineId) || clientRoutines[0] || rutinas[0];
   const routineExercises = ejerciciosRutina.filter(er => er.id_rutina === currentRoutine?.id);
   
   const [isWorkoutStarted, setIsWorkoutStarted] = useState(false);
@@ -94,16 +99,16 @@ function LiveWorkout() {
   const [currentSet, setCurrentSet] = useState(1);
   const [timer, setTimer] = useState(0);
   const [isResting, setIsResting] = useState(false);
-  const [reps, setReps] = useState(currentEr?.reps_objetivo.split('-')[0] || "10");
+  const [reps, setReps] = useState(currentEr?.reps_objetivo?.split('-')[0] || "10");
   const [weight, setWeight] = useState("12.5");
-  const [rpe, setRpe] = useState(currentEr?.rpe_objetivo.toString() || "8");
+  const [rpe, setRpe] = useState(currentEr?.rpe_objetivo?.toString() || "8");
 
   // Reset exercise index when routine changes
   useEffect(() => {
-    if (rutinas.length > 0 && !selectedRoutineId) {
-      setSelectedRoutineId(rutinas[0].id);
+    if (clientRoutines.length > 0 && !clientRoutines.some(r => r.id === selectedRoutineId)) {
+      setSelectedRoutineId(clientRoutines[0].id);
     }
-  }, [rutinas, selectedRoutineId]);
+  }, [clientRoutines, selectedRoutineId]);
 
   // Update inputs when exercise changes
   useEffect(() => {
@@ -181,7 +186,7 @@ function LiveWorkout() {
       <div className="flex flex-col gap-3 h-full pb-2">
         {/* Day Selector Pills */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-2 px-2 [&::-webkit-scrollbar]:hidden">
-          {rutinas.map((r, i) => (
+          {clientRoutines.map((r, i) => (
             <button
               key={r.id}
               onClick={() => {
@@ -189,12 +194,12 @@ function LiveWorkout() {
                 setCompletedExercises(new Set());
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                r.id === currentRoutine.id
+                r.id === currentRoutine?.id
                   ? 'bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]'
                   : 'bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]'
               }`}
             >
-              Día {i + 1}
+              Día {r.dia_semana || i + 1}
             </button>
           ))}
         </div>
@@ -400,33 +405,168 @@ const mockData = [
 ];
 
 function ClientProgress() {
+  const { currentUser, fichasProgreso } = useStore();
+  const ficha = fichasProgreso.find((f) => f.id_cliente === currentUser?.id);
+
+  let diasRestantes: number | null = null;
+  if (ficha?.fecha_chequeo) {
+    const target = new Date(ficha.fecha_chequeo).getTime();
+    const today = new Date().setHours(0, 0, 0, 0);
+    diasRestantes = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+  }
+
   return (
-    <div className="flex flex-col gap-4 h-full pb-2">
-      <h2 className="text-2xl font-bold text-[#2D3748] mb-1">Mi Progreso</h2>
-      
+    <div className="flex flex-col gap-4 h-full pb-10">
+      <div>
+        <h2 className="text-2xl font-bold text-[#2D3748]">Mi Progreso</h2>
+        <span className="text-xs text-[#718096]">Evaluaciones físicas y control de avances</span>
+      </div>
+
+      {/* Ficha de Evaluación del Entrenador */}
+      {ficha && (
+        <NeuCard className="p-4 flex flex-col gap-3">
+          <div className="flex justify-between items-center border-b border-[#c5cad1]/30 pb-2">
+            <div className="flex items-center gap-2 text-[#4D7CFE] font-bold text-xs uppercase tracking-wider">
+              <Activity className="w-4 h-4" />
+              <span>Control Físico & Chequeos</span>
+            </div>
+            {diasRestantes !== null && (
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                  diasRestantes < 0
+                    ? "bg-red-100 text-red-600"
+                    : diasRestantes <= 3
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                {diasRestantes < 0
+                  ? `Chequeo vencido (${Math.abs(diasRestantes)}d)`
+                  : diasRestantes === 0
+                  ? "¡Chequeo Hoy!"
+                  : `Próx. Chequeo en ${diasRestantes} días`}
+              </span>
+            )}
+          </div>
+
+          {/* Dates row */}
+          <div className="flex justify-between text-xs text-[#718096] bg-[#E0E5EC] px-3 py-2 rounded-xl shadow-neu-pressed">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#4D7CFE]" />
+              <span>Inicio: <strong className="text-[#2D3748]">{ficha.fecha_inicio}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-[#00C9A7]" />
+              <span>Revisión: <strong className="text-[#2D3748]">{ficha.fecha_chequeo}</strong></span>
+            </div>
+          </div>
+
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-4 gap-2 text-center pt-1">
+            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[#718096]">Peso</span>
+              <span className="font-bold text-[#2D3748] text-xs">{ficha.peso_kg} kg</span>
+            </div>
+            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[#718096]">Grasa</span>
+              <span className="font-bold text-[#2D3748] text-xs">
+                {ficha.grasa_porcentaje ? `${ficha.grasa_porcentaje}%` : "--"}
+              </span>
+            </div>
+            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[#718096]">Músculo</span>
+              <span className="font-bold text-[#2D3748] text-xs">
+                {ficha.musculo_porcentaje ? `${ficha.musculo_porcentaje}%` : "--"}
+              </span>
+            </div>
+            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[#718096]">Cintura</span>
+              <span className="font-bold text-[#2D3748] text-xs">
+                {ficha.cintura_cm ? `${ficha.cintura_cm} cm` : "--"}
+              </span>
+            </div>
+          </div>
+
+          {/* Anthropometrics Detail */}
+          {(ficha.cadera_cm || ficha.pecho_cm || ficha.brazo_cm || ficha.muslo_cm) && (
+            <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+              {ficha.cadera_cm && (
+                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
+                  Cadera: <strong className="text-[#2D3748]">{ficha.cadera_cm}cm</strong>
+                </div>
+              )}
+              {ficha.pecho_cm && (
+                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
+                  Pecho: <strong className="text-[#2D3748]">{ficha.pecho_cm}cm</strong>
+                </div>
+              )}
+              {ficha.brazo_cm && (
+                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
+                  Brazo: <strong className="text-[#2D3748]">{ficha.brazo_cm}cm</strong>
+                </div>
+              )}
+              {ficha.muslo_cm && (
+                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
+                  Muslo: <strong className="text-[#2D3748]">{ficha.muslo_cm}cm</strong>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Coach Notes */}
+          {ficha.notas_entrenador && (
+            <div className="bg-[#E0E5EC] p-3 rounded-xl shadow-neu-pressed text-xs">
+              <span className="font-bold text-[#4D7CFE] block mb-1 text-[11px] uppercase tracking-wider">
+                Pauta del Entrenador:
+              </span>
+              <p className="text-[#2D3748] leading-relaxed">{ficha.notas_entrenador}</p>
+            </div>
+          )}
+        </NeuCard>
+      )}
+
+      {/* Fuerza y Rendimiento */}
       <NeuCard className="p-4">
-        <h3 className="text-[#718096] font-medium mb-4">1RM Estimado - Sentadilla (kg)</h3>
+        <h3 className="text-[#718096] font-medium mb-4 text-sm">Progresión de Cargas Estimada (kg)</h3>
         <div className="h-40 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={mockData}>
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#718096', fontSize: 12}} />
-              <YAxis domain={['auto', 'auto']} axisLine={false} tickLine={false} tick={{fill: '#718096', fontSize: 12}} width={30} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: '#E0E5EC', boxShadow: '8px 8px 16px #c5cad1, -8px -8px 16px #ffffff' }}
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#718096", fontSize: 12 }} />
+              <YAxis
+                domain={["auto", "auto"]}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "#718096", fontSize: 12 }}
+                width={30}
               />
-              <Line type="monotone" dataKey="rm" stroke="#4D7CFE" strokeWidth={4} dot={{r: 6, fill: '#E0E5EC', strokeWidth: 3}} activeDot={{r: 8}} />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: "16px",
+                  border: "none",
+                  backgroundColor: "#E0E5EC",
+                  boxShadow: "8px 8px 16px #c5cad1, -8px -8px 16px #ffffff",
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="rm"
+                stroke="#4D7CFE"
+                strokeWidth={4}
+                dot={{ r: 6, fill: "#E0E5EC", strokeWidth: 3 }}
+                activeDot={{ r: 8 }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </NeuCard>
 
-      <h3 className="font-bold text-[#2D3748] ml-2 mt-4">Bienestar Diario</h3>
-      <div className="flex flex-col gap-4">
-        {['Nivel de Fatiga', 'Calidad de Sueño', 'Estrés'].map((item, i) => (
-          <NeuCard inset key={i} className="flex justify-between items-center py-3 px-5 !rounded-2xl">
-            <span className="text-[#718096] font-medium">{item}</span>
+      <h3 className="font-bold text-[#2D3748] ml-1 mt-1 text-sm">Bienestar y Adherencia</h3>
+      <div className="flex flex-col gap-3">
+        {["Nivel de Fatiga", "Calidad de Sueño", "Estrés"].map((item, i) => (
+          <NeuCard inset key={i} className="flex justify-between items-center py-2.5 px-4 !rounded-2xl">
+            <span className="text-[#718096] text-xs font-medium">{item}</span>
             <div className="flex gap-2">
-              <div className="w-8 h-8 rounded-full shadow-neu-flat flex items-center justify-center text-sm font-bold text-[#2D3748]">
+              <div className="w-7 h-7 rounded-full shadow-neu-flat flex items-center justify-center text-xs font-bold text-[#2D3748]">
                 {8 - i}
               </div>
             </div>

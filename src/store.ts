@@ -8,7 +8,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Role, Usuario, Ejercicio, Rutina, EjercicioRutina, PlanNutricion } from './types';
+import { Role, Usuario, Ejercicio, Rutina, EjercicioRutina, PlanNutricion, FichaProgreso } from './types';
 
 interface AppState {
   isCloudReady: boolean;
@@ -36,6 +36,10 @@ interface AppState {
   addEjercicioRutina: (item: EjercicioRutina) => Promise<void>;
   updateEjercicioRutina: (item: EjercicioRutina) => Promise<void>;
   deleteEjercicioRutina: (id: string) => Promise<void>;
+  fichasProgreso: FichaProgreso[];
+  addFichaProgreso: (ficha: FichaProgreso) => Promise<void>;
+  updateFichaProgreso: (ficha: FichaProgreso) => Promise<void>;
+  deleteFichaProgreso: (id: string) => Promise<void>;
 }
 
 function cleanObject<T extends Record<string, any>>(obj: T): T {
@@ -137,6 +141,31 @@ const mockPlanNutricion: PlanNutricion = {
   pasos_meta: 10000
 };
 
+const mockFichasProgreso: FichaProgreso[] = [
+  {
+    id: 'fp_xb_1',
+    id_cliente: 'xb-9988-fit',
+    id_entrenador: 'entrenador1',
+    fecha_inicio: '2026-09-01',
+    fecha_chequeo: '2026-09-15',
+    peso_kg: 62.5,
+    altura_cm: 165,
+    grasa_porcentaje: 22.5,
+    musculo_porcentaje: 31.0,
+    pecho_cm: 88,
+    cintura_cm: 68,
+    cadera_cm: 96,
+    brazo_cm: 28,
+    muslo_cm: 54,
+    pantorrilla_cm: 34,
+    objetivo_principal: 'Pérdida de grasa y tonificación (Déficit moderado)',
+    nivel: 'Intermedio',
+    adherencia_porcentaje: 95,
+    notas_entrenador: 'Excelente técnica y adherencia al plan. Próximo chequeo con medidas y fotos de control.',
+    fecha_actualizacion: '2026-09-01'
+  }
+];
+
 // Local storage keys
 const USERS_STORAGE_KEY = 'gymbro_usuarios_data';
 const CURRENT_USER_KEY = 'gymbro_current_user_data';
@@ -145,6 +174,7 @@ const EJERCICIOS_STORAGE_KEY = 'gymbro_ejercicios_data';
 const RUTINAS_STORAGE_KEY = 'gymbro_rutinas_data';
 const EJERCICIOS_RUTINA_STORAGE_KEY = 'gymbro_ejercicios_rutina_data';
 const PLAN_NUTRICION_STORAGE_KEY = 'gymbro_plan_nutricion_data';
+const FICHAS_PROGRESO_STORAGE_KEY = 'gymbro_fichas_progreso_data';
 
 function getStoredItem<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
@@ -175,6 +205,7 @@ const initialEjercicios = getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, moc
 const initialRutinas = getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas);
 const initialEjerciciosRutina = getStoredItem<EjercicioRutina[]>(EJERCICIOS_RUTINA_STORAGE_KEY, mockEjerciciosRutina);
 const initialPlanNutricion = getStoredItem<PlanNutricion>(PLAN_NUTRICION_STORAGE_KEY, mockPlanNutricion);
+const initialFichasProgreso = getStoredItem<FichaProgreso[]>(FICHAS_PROGRESO_STORAGE_KEY, mockFichasProgreso);
 
 export const useStore = create<AppState>((set, get) => ({
   isCloudReady: false,
@@ -187,6 +218,7 @@ export const useStore = create<AppState>((set, get) => ({
   rutinas: initialRutinas,
   ejerciciosRutina: initialEjerciciosRutina,
   planNutricion: initialPlanNutricion,
+  fichasProgreso: initialFichasProgreso,
 
   login: (dni, contrasena) => {
     const user = get().usuarios.find(u => u.dni.trim() === dni.trim() && u.contrasena === contrasena);
@@ -318,11 +350,19 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteRutina: async (id) => {
-    const updated = get().rutinas.filter(r => r.id !== id);
-    set({ rutinas: updated });
-    setStoredItem(RUTINAS_STORAGE_KEY, updated);
+    const updatedRutinas = get().rutinas.filter(r => r.id !== id);
+    const relatedEjercicios = get().ejerciciosRutina.filter(er => er.id_rutina === id);
+    const updatedErs = get().ejerciciosRutina.filter(er => er.id_rutina !== id);
+    
+    set({ rutinas: updatedRutinas, ejerciciosRutina: updatedErs });
+    setStoredItem(RUTINAS_STORAGE_KEY, updatedRutinas);
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updatedErs);
+    
     try {
       await deleteDoc(doc(db, 'rutinas', id));
+      for (const er of relatedEjercicios) {
+        await deleteDoc(doc(db, 'ejerciciosRutina', er.id));
+      }
     } catch (err) {
       console.error('Error deleting rutina from Firestore:', err);
     }
@@ -358,6 +398,39 @@ export const useStore = create<AppState>((set, get) => ({
       await deleteDoc(doc(db, 'ejerciciosRutina', id));
     } catch (err) {
       console.error('Error deleting ejercicio rutina from Firestore:', err);
+    }
+  },
+
+  addFichaProgreso: async (ficha) => {
+    const updated = [...get().fichasProgreso.filter(f => f.id !== ficha.id), ficha];
+    set({ fichasProgreso: updated });
+    setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, updated);
+    try {
+      await setDoc(doc(db, 'fichasProgreso', ficha.id), cleanObject(ficha));
+    } catch (err) {
+      console.error('Error adding ficha progreso to Firestore:', err);
+    }
+  },
+
+  updateFichaProgreso: async (ficha) => {
+    const updated = get().fichasProgreso.map(f => f.id === ficha.id ? ficha : f);
+    set({ fichasProgreso: updated });
+    setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, updated);
+    try {
+      await setDoc(doc(db, 'fichasProgreso', ficha.id), cleanObject(ficha), { merge: true });
+    } catch (err) {
+      console.error('Error updating ficha progreso in Firestore:', err);
+    }
+  },
+
+  deleteFichaProgreso: async (id) => {
+    const updated = get().fichasProgreso.filter(f => f.id !== id);
+    set({ fichasProgreso: updated });
+    setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, updated);
+    try {
+      await deleteDoc(doc(db, 'fichasProgreso', id));
+    } catch (err) {
+      console.error('Error deleting ficha progreso from Firestore:', err);
     }
   },
 }));
@@ -502,5 +575,30 @@ export function initFirestoreSync() {
   }, (error) => {
     console.error('Firestore planesNutricion subscription error:', error);
   });
+
+  // 6. FichasProgreso listener
+  onSnapshot(collection(db, 'fichasProgreso'), async (snapshot) => {
+    if (!snapshot.empty) {
+      const fps: FichaProgreso[] = [];
+      snapshot.forEach((docSnap) => {
+        fps.push({ id: docSnap.id, ...docSnap.data() } as FichaProgreso);
+      });
+      setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, fps);
+      useStore.setState({ fichasProgreso: fps });
+    } else {
+      try {
+        const batch = writeBatch(db);
+        mockFichasProgreso.forEach((fp) => {
+          batch.set(doc(db, 'fichasProgreso', fp.id), cleanObject(fp));
+        });
+        await batch.commit();
+      } catch (e) {
+        console.error('Error saving initial fichasProgreso:', e);
+      }
+    }
+  }, (error) => {
+    console.error('Firestore fichasProgreso subscription error:', error);
+  });
 }
+
 
