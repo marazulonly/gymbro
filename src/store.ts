@@ -60,74 +60,92 @@ const mockUsuarios: Usuario[] = [
 
 const mockEjercicios: Ejercicio[] = [
   // Día 1: Tren Superior (A)
-  { id: 'e_jalon_pecho', nombre: 'Jalón al Pecho (Polea)', grupo_muscular: 'Espalda', instrucciones: 'Sentada, espalda recta, barra al pecho.' },
-  { id: 'e_press_banca_manc', nombre: 'Press de Banca con Mancuernas', grupo_muscular: 'Pecho', instrucciones: 'Banco plano, empuje sobre el pecho.' },
-  { id: 'e_remo_manc_1mano', nombre: 'Remo con Mancuerna a una Mano', grupo_muscular: 'Espalda', instrucciones: 'Apoyo en banco, mancuerna a la cadera.' },
-  { id: 'e_press_militar_sent', nombre: 'Press Militar Sentada (Mancuernas)', grupo_muscular: 'Hombros', instrucciones: 'Respaldo, empuje hacia arriba.' },
-  { id: 'e_ext_triceps_pol', nombre: 'Extensiones de Tríceps en Polea', grupo_muscular: 'Brazos / Tríceps', instrucciones: 'Cuerda hacia abajo, extender codos.' },
-  { id: 'e_plancha_frontal', nombre: 'Plancha Frontal (Abdomen)', grupo_muscular: 'Core / Abdomen', instrucciones: 'Cuerpo recto, antebrazos.' },
+  { id: 'e_jalon_pecho', nombre: 'Jalón al Pecho (Polea)', grupo_muscular: 'Espalda', instrucciones: 'Sentada, espalda recta con ligera inclinación, barra al pecho contrayendo dorsales.' },
+  { id: 'e_press_banca_manc', nombre: 'Press de Banca con Mancuernas', grupo_muscular: 'Pecho', instrucciones: 'Banco plano, retracción escapular y empuje vertical controlado.' },
+  { id: 'e_remo_manc_1mano', nombre: 'Remo con Mancuerna a una Mano', grupo_muscular: 'Espalda', instrucciones: 'Apoyo en banco, traccionar mancuerna hacia la cadera apretando dorsal.' },
+  { id: 'e_press_militar_sent', nombre: 'Press Militar Sentada (Mancuernas)', grupo_muscular: 'Hombros', instrucciones: 'Respaldo a 80°, empuje vertical sin arquear la zona lumbar.' },
+  { id: 'e_ext_triceps_pol', nombre: 'Extensiones de Tríceps en Polea', grupo_muscular: 'Tríceps', instrucciones: 'Cuerda o barra recta, mantener codos fijos pegados al torso.' },
+  { id: 'e_plancha_frontal', nombre: 'Plancha Frontal (Abdomen)', grupo_muscular: 'Core / Abdomen', instrucciones: 'Apoyo en antebrazos, cuerpo en línea recta y abdomen activo.' },
 
   // Día 2: Tren Inferior (A)
-  { id: 'e_sentadilla_goblet', nombre: 'Sentadilla Goblet (con Mancuerna)', grupo_muscular: 'Piernas / Cuádriceps', instrucciones: 'Mancuerna al pecho, baja la cadera.' },
-  { id: 'e_prensa_piernas', nombre: 'Prensa de Piernas', grupo_muscular: 'Piernas / Cuádriceps', instrucciones: 'Pies ancho de hombros, no bloquear rodillas.' },
-  { id: 'e_peso_muerto_rumano', nombre: 'Peso Muerto Rumano (Mancuernas)', grupo_muscular: 'Piernas / Isquios', instrucciones: 'Mancuernas deslizando, cadera atrás.' },
-  { id: 'e_ext_cuadriceps_maq', nombre: 'Extensiones de Cuádriceps en Máquina', grupo_muscular: 'Piernas / Cuádriceps', instrucciones: 'Sentada, extiende y controla bajada.' },
-  { id: 'e_puente_gluteo', nombre: 'Puente de Glúteo (con Disco/Barra)', grupo_muscular: 'Glúteos', instrucciones: 'Boca arriba, eleva y aprieta glúteos.' },
+  { id: 'e_sentadilla_goblet', nombre: 'Sentadilla Goblet (con Mancuerna)', grupo_muscular: 'Piernas / Cuádriceps', instrucciones: 'Mancuerna al pecho, baja la cadera manteniendo el torso firme.' },
+  { id: 'e_prensa_piernas', nombre: 'Prensa de Piernas', grupo_muscular: 'Piernas / Cuádriceps', instrucciones: 'Pies al ancho de hombros, bajar controlado sin despegar la espalda baja.' },
+  { id: 'e_peso_muerto_rumano', nombre: 'Peso Muerto Rumano (Mancuernas)', grupo_muscular: 'Piernas / Isquios', instrucciones: 'Mancuernas deslizando por las piernas, empujar la cadera atrás.' },
+  { id: 'e_ext_cuadriceps_maq', nombre: 'Extensiones de Cuádriceps en Máquina', grupo_muscular: 'Piernas / Cuádriceps', instrucciones: 'Sentada, extender rodillas pausando 1s arriba y bajando en 3s.' },
+  { id: 'e_puente_gluteo', nombre: 'Puente de Glúteo (con Disco/Barra)', grupo_muscular: 'Glúteos', instrucciones: 'Boca arriba, apoyar talones, elevar cadera y contraer glúteos arriba.' },
+  { id: 'e_elev_talones_pie', nombre: 'Elevación de Talones de Pie', grupo_muscular: 'Piernas / Gemelos', instrucciones: 'Elevar talones sobre un escalón pausando arriba y estirando abajo.' },
+
+  // Día 3: Full Body - Fuerza, Glúteos y Core
+  { id: 'e_hip_thrust_d3', nombre: 'Hip Thrust con Barra en Banco', grupo_muscular: 'Glúteos', instrucciones: 'Espalda en banco a la altura de escápulas, empuje explosivo de talones y bloqueo arriba.' },
+  { id: 'e_jalon_neutro', nombre: 'Jalón al Pecho (Agarre Neutro)', grupo_muscular: 'Espalda', instrucciones: 'Agarre neutro estrecho, tracción al pecho enfocando el dorsal medio y bajo.' },
+  { id: 'e_prensa_pies_altos', nombre: 'Prensa de Piernas (Pies Altos)', grupo_muscular: 'Piernas / Glúteo e Isquios', instrucciones: 'Pies en la parte superior de la plataforma para mayor activación de glúteos e isquiotibiales.' },
+  { id: 'e_elev_laterales_hombro', nombre: 'Elevaciones Laterales de Hombro', grupo_muscular: 'Hombros', instrucciones: 'Mancuernas a los lados con codos ligeramente flexionados a la altura de hombros.' },
+  { id: 'e_abductores_maq', nombre: 'Abductores en Máquina', grupo_muscular: 'Glúteos / Cadera', instrucciones: 'Torso ligeramente inclinado al frente, apertura amplia y control en la vuelta.' },
+  { id: 'e_crunch_abdominal_pol', nombre: 'Crunch Abdominal en Polea', grupo_muscular: 'Core / Abdomen', instrucciones: 'De rodillas, sujetar la cuerda junto a las orejas y flexionar la columna.' },
 
   // Día 4: Tren Superior (B)
-  { id: 'e_remo_polea_baja', nombre: 'Remo en Polea Baja (Agarre Gironda)', grupo_muscular: 'Espalda', instrucciones: 'Tracción al abdomen bajo, aprieta escápulas.' },
-  { id: 'e_press_inclinado_manc', nombre: 'Press Inclinado con Mancuernas', grupo_muscular: 'Pecho', instrucciones: 'Banco 30-45°, empuje parte alta pecho.' },
-  { id: 'e_elev_laterales_hombro', nombre: 'Elevaciones Laterales de Hombro', grupo_muscular: 'Hombros', instrucciones: 'Mancuernas a los lados, altura hombros.' },
-  { id: 'e_pullover_polea_alta', nombre: 'Pull-over en Polea Alta (Brazos Rectos)', grupo_muscular: 'Espalda', instrucciones: 'Brazos estirados, barra a los muslos.' },
-  { id: 'e_curl_biceps_ez', nombre: 'Curl de Bíceps con Barra EZ', grupo_muscular: 'Brazos / Bíceps', instrucciones: 'Levanta flexionando codos, sin balanceo.' },
-  { id: 'e_crunch_abdominal_pol', nombre: 'Crunch Abdominal en Polea', grupo_muscular: 'Core / Abdomen', instrucciones: 'De rodillas, encoge hacia rodillas.' },
+  { id: 'e_remo_polea_baja', nombre: 'Remo en Polea Baja (Agarre Gironda)', grupo_muscular: 'Espalda', instrucciones: 'Tracción al abdomen bajo, apretar escápulas sin balancear el torso.' },
+  { id: 'e_press_inclinado_manc', nombre: 'Press Inclinado con Mancuernas', grupo_muscular: 'Pecho', instrucciones: 'Banco a 30-45°, empuje enfocado en la porción clavicular del pectoral.' },
+  { id: 'e_pullover_polea_alta', nombre: 'Pull-over en Polea Alta (Brazos Rectos)', grupo_muscular: 'Espalda', instrucciones: 'Brazos casi rectos, llevar la barra hacia los muslos sintiendo el dorsal.' },
+  { id: 'e_face_pulls', nombre: 'Face Pulls en Polea', grupo_muscular: 'Hombros / Postural', instrucciones: 'Cuerda a la altura de la cara, abrir codos hacia afuera y atrás rotando externamente.' },
+  { id: 'e_curl_biceps_ez', nombre: 'Curl de Bíceps con Barra EZ', grupo_muscular: 'Brazos / Bíceps', instrucciones: 'Flexionar codos manteniendo la tensión constante, sin usar impulso.' },
+  { id: 'e_elev_piernas', nombre: 'Elevaciones de Piernas (Abdomen)', grupo_muscular: 'Core / Abdomen', instrucciones: 'Elevar piernas manteniendo la pelvis retrovertida para máxima tensión abdominal.' },
 
   // Día 5: Tren Inferior (B)
-  { id: 'e_hip_thrust_barra', nombre: 'Hip Thrust con Barra', grupo_muscular: 'Glúteos', instrucciones: 'Espalda en banco, eleva explosivo, baja lento.' },
-  { id: 'e_lunges_caminando', nombre: 'Zancadas (Lunges) Caminando', grupo_muscular: 'Piernas / Glúteos', instrucciones: 'Paso largo, rodilla trasera cerca del suelo.' },
-  { id: 'e_curl_femoral', nombre: 'Curl Femoral Tumbada o Sentada', grupo_muscular: 'Piernas / Isquios', instrucciones: 'Flexiona llevando rodillo al glúteo.' },
-  { id: 'e_prensa_pies_altos', nombre: 'Prensa de Piernas (Pies Altos)', grupo_muscular: 'Piernas / Glúteo e Isquios', instrucciones: 'Foco en glúteo e isquios.' },
-  { id: 'e_elev_talones_pie', nombre: 'Elevación de Talones de Pie', grupo_muscular: 'Piernas / Gemelos', instrucciones: 'Eleva talones en escalón.' },
+  { id: 'e_hip_thrust_barra', nombre: 'Hip Thrust con Barra', grupo_muscular: 'Glúteos', instrucciones: 'Espalda apoyada en banco a la altura de escápulas, empuje explosivo de talones.' },
+  { id: 'e_lunges_caminando', nombre: 'Zancadas (Lunges) Caminando', grupo_muscular: 'Piernas / Glúteos', instrucciones: 'Paso largo, flexionar rodilla trasera a 90° sin tocar el piso.' },
+  { id: 'e_curl_femoral', nombre: 'Curl Femoral Tumbada o Sentada', grupo_muscular: 'Piernas / Isquios', instrucciones: 'Flexionar rodillas llevando los talones al glúteo, descender en 3 segundos.' },
+  { id: 'e_sentadilla_bulgara', nombre: 'Sentadilla Búlgara con Mancuernas', grupo_muscular: 'Piernas / Glúteos', instrucciones: 'Pie trasero apoyado en banco, descenso vertical controlando la rodilla delantera.' },
+  { id: 'e_plancha_lateral', nombre: 'Plancha Lateral con Elevación de Pierna', grupo_muscular: 'Core / Oblicuos', instrucciones: 'Cuerpo alineado sobre antebrazo, cadera arriba y pierna superior extendida.' },
 ];
 
 const mockRutinas: Rutina[] = [
-  { id: 'r1_xb', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 1: Tren Superior (A) - Empuje y Tirón Vertical', dia_semana: 1 },
-  { id: 'r2_xb', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 2: Tren Inferior (A) - Cuádriceps y Glúteo', dia_semana: 2 },
-  { id: 'r3_xb', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 3: Descanso Activo / Cardio LISS', dia_semana: 3 },
-  { id: 'r4_xb', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 4: Tren Superior (B) - Tirón Horizontal y Tonificación', dia_semana: 4 },
-  { id: 'r5_xb', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 5: Tren Inferior (B) - Cadena Posterior y Unilaterales', dia_semana: 5 },
+  { id: 'r1', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 1: Tren Superior (A) - Empuje y Tirón Vertical', dia_semana: 1 },
+  { id: 'r2', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 2: Tren Inferior (A) - Cuádriceps y Glúteo', dia_semana: 2 },
+  { id: 'r3', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 3: Full Body - Fuerza, Glúteos y Core', dia_semana: 3 },
+  { id: 'r4', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 4: Tren Superior (B) - Tirón Horizontal y Hombros', dia_semana: 4 },
+  { id: 'r5', id_cliente: 'xb-9988-fit', id_entrenador: 'entrenador1', nombre_sesion: 'Día 5: Tren Inferior (B) - Cadena Posterior y Unilaterales', dia_semana: 5 },
 ];
 
 const mockEjerciciosRutina: EjercicioRutina[] = [
-  // Día 1
-  { id: 'er_xb_1', id_rutina: 'r1_xb', id_ejercicio: 'e_jalon_pecho', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_2', id_rutina: 'r1_xb', id_ejercicio: 'e_press_banca_manc', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_3', id_rutina: 'r1_xb', id_ejercicio: 'e_remo_manc_1mano', series_objetivo: 3, reps_objetivo: '12', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
-  { id: 'er_xb_4', id_rutina: 'r1_xb', id_ejercicio: 'e_press_militar_sent', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
-  { id: 'er_xb_5', id_rutina: 'r1_xb', id_ejercicio: 'e_ext_triceps_pol', series_objetivo: 2, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
-  { id: 'er_xb_6', id_rutina: 'r1_xb', id_ejercicio: 'e_plancha_frontal', series_objetivo: 3, reps_objetivo: 'Al fallo técnico', tempo: '-', descanso_segundos: 45, rpe_objetivo: 10 },
+  // Día 1 (r1)
+  { id: 'er_d1_1', id_rutina: 'r1', id_ejercicio: 'e_jalon_pecho', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d1_2', id_rutina: 'r1', id_ejercicio: 'e_press_banca_manc', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d1_3', id_rutina: 'r1', id_ejercicio: 'e_remo_manc_1mano', series_objetivo: 3, reps_objetivo: '12', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d1_4', id_rutina: 'r1', id_ejercicio: 'e_press_militar_sent', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d1_5', id_rutina: 'r1', id_ejercicio: 'e_ext_triceps_pol', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
+  { id: 'er_d1_6', id_rutina: 'r1', id_ejercicio: 'e_plancha_frontal', series_objetivo: 3, reps_objetivo: 'Al fallo técnico', tempo: '-', descanso_segundos: 45, rpe_objetivo: 10 },
 
-  // Día 2
-  { id: 'er_xb_7', id_rutina: 'r2_xb', id_ejercicio: 'e_sentadilla_goblet', series_objetivo: 4, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 120, rpe_objetivo: 8 },
-  { id: 'er_xb_8', id_rutina: 'r2_xb', id_ejercicio: 'e_prensa_piernas', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_9', id_rutina: 'r2_xb', id_ejercicio: 'e_peso_muerto_rumano', series_objetivo: 3, reps_objetivo: '12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_10', id_rutina: 'r2_xb', id_ejercicio: 'e_ext_cuadriceps_maq', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
-  { id: 'er_xb_11', id_rutina: 'r2_xb', id_ejercicio: 'e_puente_gluteo', series_objetivo: 3, reps_objetivo: '15-20', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  // Día 2 (r2)
+  { id: 'er_d2_1', id_rutina: 'r2', id_ejercicio: 'e_sentadilla_goblet', series_objetivo: 4, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 120, rpe_objetivo: 8 },
+  { id: 'er_d2_2', id_rutina: 'r2', id_ejercicio: 'e_prensa_piernas', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d2_3', id_rutina: 'r2', id_ejercicio: 'e_peso_muerto_rumano', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d2_4', id_rutina: 'r2', id_ejercicio: 'e_ext_cuadriceps_maq', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d2_5', id_rutina: 'r2', id_ejercicio: 'e_puente_gluteo', series_objetivo: 3, reps_objetivo: '15-20', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d2_6', id_rutina: 'r2', id_ejercicio: 'e_elev_talones_pie', series_objetivo: 3, reps_objetivo: '15-20', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
 
-  // Día 4
-  { id: 'er_xb_12', id_rutina: 'r4_xb', id_ejercicio: 'e_remo_polea_baja', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_13', id_rutina: 'r4_xb', id_ejercicio: 'e_press_inclinado_manc', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_14', id_rutina: 'r4_xb', id_ejercicio: 'e_elev_laterales_hombro', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
-  { id: 'er_xb_15', id_rutina: 'r4_xb', id_ejercicio: 'e_pullover_polea_alta', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
-  { id: 'er_xb_16', id_rutina: 'r4_xb', id_ejercicio: 'e_curl_biceps_ez', series_objetivo: 2, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
-  { id: 'er_xb_17', id_rutina: 'r4_xb', id_ejercicio: 'e_crunch_abdominal_pol', series_objetivo: 3, reps_objetivo: '15-20', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
+  // Día 3 (r3) - Full Body activo
+  { id: 'er_d3_1', id_rutina: 'r3', id_ejercicio: 'e_hip_thrust_d3', series_objetivo: 4, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 120, rpe_objetivo: 8 },
+  { id: 'er_d3_2', id_rutina: 'r3', id_ejercicio: 'e_jalon_neutro', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d3_3', id_rutina: 'r3', id_ejercicio: 'e_prensa_pies_altos', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d3_4', id_rutina: 'r3', id_ejercicio: 'e_elev_laterales_hombro', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d3_5', id_rutina: 'r3', id_ejercicio: 'e_abductores_maq', series_objetivo: 3, reps_objetivo: '15-20', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
+  { id: 'er_d3_6', id_rutina: 'r3', id_ejercicio: 'e_crunch_abdominal_pol', series_objetivo: 3, reps_objetivo: '15-20', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
 
-  // Día 5
-  { id: 'er_xb_18', id_rutina: 'r5_xb', id_ejercicio: 'e_hip_thrust_barra', series_objetivo: 4, reps_objetivo: '10', tempo: '3-0-1-0', descanso_segundos: 120, rpe_objetivo: 8 },
-  { id: 'er_xb_19', id_rutina: 'r5_xb', id_ejercicio: 'e_lunges_caminando', series_objetivo: 3, reps_objetivo: '12/pierna', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_20', id_rutina: 'r5_xb', id_ejercicio: 'e_curl_femoral', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
-  { id: 'er_xb_21', id_rutina: 'r5_xb', id_ejercicio: 'e_prensa_pies_altos', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
-  { id: 'er_xb_22', id_rutina: 'r5_xb', id_ejercicio: 'e_elev_talones_pie', series_objetivo: 3, reps_objetivo: '20', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
+  // Día 4 (r4)
+  { id: 'er_d4_1', id_rutina: 'r4', id_ejercicio: 'e_remo_polea_baja', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d4_2', id_rutina: 'r4', id_ejercicio: 'e_press_inclinado_manc', series_objetivo: 3, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d4_3', id_rutina: 'r4', id_ejercicio: 'e_pullover_polea_alta', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d4_4', id_rutina: 'r4', id_ejercicio: 'e_face_pulls', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d4_5', id_rutina: 'r4', id_ejercicio: 'e_curl_biceps_ez', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
+  { id: 'er_d4_6', id_rutina: 'r4', id_ejercicio: 'e_elev_piernas', series_objetivo: 3, reps_objetivo: '15', tempo: '3-0-1-0', descanso_segundos: 45, rpe_objetivo: 8 },
+
+  // Día 5 (r5)
+  { id: 'er_d5_1', id_rutina: 'r5', id_ejercicio: 'e_hip_thrust_barra', series_objetivo: 4, reps_objetivo: '10-12', tempo: '3-0-1-0', descanso_segundos: 120, rpe_objetivo: 8 },
+  { id: 'er_d5_2', id_rutina: 'r5', id_ejercicio: 'e_lunges_caminando', series_objetivo: 3, reps_objetivo: '12/pierna', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d5_3', id_rutina: 'r5', id_ejercicio: 'e_curl_femoral', series_objetivo: 3, reps_objetivo: '12-15', tempo: '3-0-1-0', descanso_segundos: 60, rpe_objetivo: 8 },
+  { id: 'er_d5_4', id_rutina: 'r5', id_ejercicio: 'e_sentadilla_bulgara', series_objetivo: 3, reps_objetivo: '10-12/pierna', tempo: '3-0-1-0', descanso_segundos: 90, rpe_objetivo: 8 },
+  { id: 'er_d5_5', id_rutina: 'r5', id_ejercicio: 'e_plancha_lateral', series_objetivo: 3, reps_objetivo: '30-45s/lado', tempo: '-', descanso_segundos: 45, rpe_objetivo: 8 },
 ];
 
 const mockPlanNutricion: PlanNutricion = {
@@ -198,14 +216,22 @@ function setStoredItem<T>(key: string, value: T): void {
   }
 }
 
+function mergeWithMock<T extends { id: string }>(stored: T[], mock: T[]): T[] {
+  const map = new Map<string, T>();
+  stored.forEach((item) => map.set(item.id, item));
+  // Mock items take precedence for canonical definitions
+  mock.forEach((item) => map.set(item.id, item));
+  return Array.from(map.values());
+}
+
 // Initial state loaded from LocalStorage (or default baseline if first time ever)
-const initialUsuarios = getStoredItem<Usuario[]>(USERS_STORAGE_KEY, mockUsuarios);
+const initialUsuarios = mergeWithMock(getStoredItem<Usuario[]>(USERS_STORAGE_KEY, mockUsuarios), mockUsuarios);
 const initialCurrentUser = getStoredItem<Usuario | null>(CURRENT_USER_KEY, null);
-const initialEjercicios = getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, mockEjercicios);
-const initialRutinas = getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas);
-const initialEjerciciosRutina = getStoredItem<EjercicioRutina[]>(EJERCICIOS_RUTINA_STORAGE_KEY, mockEjerciciosRutina);
+const initialEjercicios = mergeWithMock(getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, mockEjercicios), mockEjercicios);
+const initialRutinas = mergeWithMock(getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas), mockRutinas);
+const initialEjerciciosRutina = mergeWithMock(getStoredItem<EjercicioRutina[]>(EJERCICIOS_RUTINA_STORAGE_KEY, mockEjerciciosRutina), mockEjerciciosRutina);
 const initialPlanNutricion = getStoredItem<PlanNutricion>(PLAN_NUTRICION_STORAGE_KEY, mockPlanNutricion);
-const initialFichasProgreso = getStoredItem<FichaProgreso[]>(FICHAS_PROGRESO_STORAGE_KEY, mockFichasProgreso);
+const initialFichasProgreso = mergeWithMock(getStoredItem<FichaProgreso[]>(FICHAS_PROGRESO_STORAGE_KEY, mockFichasProgreso), mockFichasProgreso);
 
 export const useStore = create<AppState>((set, get) => ({
   isCloudReady: false,
@@ -487,72 +513,114 @@ export function initFirestoreSync() {
 
   // 2. Ejercicios listener
   onSnapshot(collection(db, 'ejercicios'), async (snapshot) => {
+    let ejs: Ejercicio[] = [];
     if (!snapshot.empty) {
-      const ejs: Ejercicio[] = [];
       snapshot.forEach((docSnap) => {
         ejs.push({ id: docSnap.id, ...docSnap.data() } as Ejercicio);
       });
-      setStoredItem(EJERCICIOS_STORAGE_KEY, ejs);
-      useStore.setState({ ejercicios: ejs });
-    } else {
+    }
+    
+    // Merge any missing mock exercises and backfill to Firestore
+    const missingEjs = mockEjercicios.filter((me) => !ejs.some((e) => e.id === me.id));
+    if (missingEjs.length > 0) {
       try {
         const batch = writeBatch(db);
-        mockEjercicios.forEach((ej) => {
+        missingEjs.forEach((ej) => {
           batch.set(doc(db, 'ejercicios', ej.id), cleanObject(ej));
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving initial ejercicios:', e);
+        console.error('Error saving missing ejercicios to Firestore:', e);
       }
+      ejs = mergeWithMock(ejs, mockEjercicios);
     }
+
+    setStoredItem(EJERCICIOS_STORAGE_KEY, ejs);
+    useStore.setState({ ejercicios: ejs });
   }, (error) => {
     console.error('Firestore ejercicios subscription error:', error);
   });
 
   // 3. Rutinas listener
   onSnapshot(collection(db, 'rutinas'), async (snapshot) => {
+    let ruts: Rutina[] = [];
     if (!snapshot.empty) {
-      const ruts: Rutina[] = [];
       snapshot.forEach((docSnap) => {
         ruts.push({ id: docSnap.id, ...docSnap.data() } as Rutina);
       });
-      setStoredItem(RUTINAS_STORAGE_KEY, ruts);
-      useStore.setState({ rutinas: ruts });
-    } else {
+    }
+
+    // Clean up any legacy _xb documents from Firestore if present
+    const legacyRuts = ruts.filter((r) => r.id.endsWith('_xb'));
+    if (legacyRuts.length > 0) {
       try {
         const batch = writeBatch(db);
-        mockRutinas.forEach((r) => {
-          batch.set(doc(db, 'rutinas', r.id), cleanObject(r));
+        legacyRuts.forEach((lr) => {
+          batch.delete(doc(db, 'rutinas', lr.id));
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving initial rutinas:', e);
+        console.warn('Cleaned legacy rutinas:', e);
       }
+      ruts = ruts.filter((r) => !r.id.endsWith('_xb'));
     }
+
+    // Always ensure the 5 canonical days are fully synchronized to Firestore
+    try {
+      const batch = writeBatch(db);
+      mockRutinas.forEach((r) => {
+        batch.set(doc(db, 'rutinas', r.id), cleanObject(r));
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error('Error saving canonical rutinas to Firestore:', e);
+    }
+    ruts = mergeWithMock(ruts, mockRutinas);
+
+    setStoredItem(RUTINAS_STORAGE_KEY, ruts);
+    useStore.setState({ rutinas: ruts });
   }, (error) => {
     console.error('Firestore rutinas subscription error:', error);
   });
 
   // 4. EjerciciosRutina listener
   onSnapshot(collection(db, 'ejerciciosRutina'), async (snapshot) => {
+    let ers: EjercicioRutina[] = [];
     if (!snapshot.empty) {
-      const ers: EjercicioRutina[] = [];
       snapshot.forEach((docSnap) => {
         ers.push({ id: docSnap.id, ...docSnap.data() } as EjercicioRutina);
       });
-      setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, ers);
-      useStore.setState({ ejerciciosRutina: ers });
-    } else {
+    }
+
+    // Clean up any legacy _xb items
+    const legacyErs = ers.filter((er) => er.id.startsWith('er_xb_') || er.id_rutina.endsWith('_xb'));
+    if (legacyErs.length > 0) {
       try {
         const batch = writeBatch(db);
-        mockEjerciciosRutina.forEach((er) => {
-          batch.set(doc(db, 'ejerciciosRutina', er.id), cleanObject(er));
+        legacyErs.forEach((ler) => {
+          batch.delete(doc(db, 'ejerciciosRutina', ler.id));
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving initial ejerciciosRutina:', e);
+        console.warn('Cleaned legacy ejerciciosRutina:', e);
       }
+      ers = ers.filter((er) => !er.id.startsWith('er_xb_') && !er.id_rutina.endsWith('_xb'));
     }
+
+    // Always ensure all canonical exercises are linked to r1..r5 in Firestore
+    try {
+      const batch = writeBatch(db);
+      mockEjerciciosRutina.forEach((er) => {
+        batch.set(doc(db, 'ejerciciosRutina', er.id), cleanObject(er));
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error('Error saving canonical ejerciciosRutina to Firestore:', e);
+    }
+    ers = mergeWithMock(ers, mockEjerciciosRutina);
+
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, ers);
+    useStore.setState({ ejerciciosRutina: ers });
   }, (error) => {
     console.error('Firestore ejerciciosRutina subscription error:', error);
   });
@@ -578,24 +646,29 @@ export function initFirestoreSync() {
 
   // 6. FichasProgreso listener
   onSnapshot(collection(db, 'fichasProgreso'), async (snapshot) => {
+    let fps: FichaProgreso[] = [];
     if (!snapshot.empty) {
-      const fps: FichaProgreso[] = [];
       snapshot.forEach((docSnap) => {
         fps.push({ id: docSnap.id, ...docSnap.data() } as FichaProgreso);
       });
-      setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, fps);
-      useStore.setState({ fichasProgreso: fps });
-    } else {
+    }
+
+    const missingFps = mockFichasProgreso.filter((mfp) => !fps.some((fp) => fp.id === mfp.id));
+    if (missingFps.length > 0) {
       try {
         const batch = writeBatch(db);
-        mockFichasProgreso.forEach((fp) => {
+        missingFps.forEach((fp) => {
           batch.set(doc(db, 'fichasProgreso', fp.id), cleanObject(fp));
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving initial fichasProgreso:', e);
+        console.error('Error saving missing fichasProgreso:', e);
       }
+      fps = mergeWithMock(fps, mockFichasProgreso);
     }
+
+    setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, fps);
+    useStore.setState({ fichasProgreso: fps });
   }, (error) => {
     console.error('Firestore fichasProgreso subscription error:', error);
   });

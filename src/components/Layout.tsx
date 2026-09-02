@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "./ProfileModal";
 
 
-export function Layout({ children }: { children: (activeTab: number) => React.ReactNode }) {
+export function Layout({ children }: { children: (activeTab: number, setActiveTab: (tab: number) => void) => React.ReactNode }) {
   const { currentRole, logout, currentUser, isCloudReady } = useStore();
   const [activeTab, setActiveTab] = useState(0);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -74,7 +74,7 @@ export function Layout({ children }: { children: (activeTab: number) => React.Re
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-             {children(activeTab)}
+             {children(activeTab, setActiveTab)}
           </motion.div>
         </AnimatePresence>
       </main>

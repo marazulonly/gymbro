@@ -7,82 +7,186 @@ import { useStore } from "@/store";
 import { motion, AnimatePresence } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-export function ClientView({ tab }: { tab: number }) {
-  if (tab === 0) return <ClientHome />;
-  if (tab === 1) return <LiveWorkout />;
+export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
+  const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
+
+  const handleStartWorkout = (routineId: string) => {
+    setSelectedDayRoutineId(routineId);
+    if (onNavigateTab) {
+      onNavigateTab(1); // switch to LiveWorkout tab
+    }
+  };
+
+  if (tab === 0) return <ClientHome onStartWorkout={handleStartWorkout} />;
+  if (tab === 1) return <LiveWorkout initialRoutineId={selectedDayRoutineId} onClearInitialRoutine={() => setSelectedDayRoutineId(null)} />;
   if (tab === 2) return <ClientProgress />;
   return null;
 }
 
-function ClientHome() {
-  const { currentUser, rutinas, planNutricion } = useStore();
-  const clientRoutines = rutinas.filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente);
+function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) => void }) {
+  const { currentUser, rutinas, planNutricion, ejerciciosRutina, ejercicios } = useStore();
+  const clientRoutines = Array.from(
+    new Map(
+      rutinas
+        .filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente)
+        .sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0))
+        .map(r => [r.dia_semana, r])
+    ).values()
+  ).sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
   const todayRoutine = clientRoutines[0] || rutinas[0];
   
   return (
-    <div className="flex flex-col gap-4 h-full pb-2">
+    <div className="flex flex-col gap-4 h-full pb-6">
       <div>
         <h2 className="text-2xl font-light text-[#2D3748]">Hola,</h2>
         <h3 className="text-3xl font-bold text-[#4D7CFE]">{currentUser?.nombre || 'Atleta'}</h3>
+        <p className="text-xs text-[#718096] mt-0.5 font-medium">Plan personalizado de 5 días activo</p>
       </div>
 
-      <NeuCard className="flex items-center justify-between py-3 px-4">
-        <div className="flex flex-col">
-          <span className="text-[#718096] text-sm font-medium">Rutina de hoy</span>
-          <span className="text-[#2D3748] text-xl font-bold">{todayRoutine?.nombre_sesion || 'Descanso'}</span>
-        </div>
-        <NeuButton variant="circle" className="w-12 h-12">
-          <Play className="w-5 h-5 ml-1" />
-        </NeuButton>
-      </NeuCard>
+      {todayRoutine && (
+        <NeuCard className="flex items-center justify-between py-3 px-4">
+          <div className="flex flex-col max-w-[75%]">
+            <span className="text-[#4D7CFE] text-xs font-bold uppercase tracking-wider">Rutina de hoy</span>
+            <span className="text-[#2D3748] text-lg font-bold truncate">{todayRoutine.nombre_sesion}</span>
+            <span className="text-[11px] text-[#718096]">
+              {ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id).length} ejercicios programados
+            </span>
+          </div>
+          <NeuButton 
+            variant="circle" 
+            className="w-12 h-12 text-[#4D7CFE] shrink-0"
+            onClick={() => onStartWorkout(todayRoutine.id)}
+          >
+            <Play className="w-5 h-5 ml-1" />
+          </NeuButton>
+        </NeuCard>
+      )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <NeuCard className="flex flex-col items-center justify-center gap-2 py-6">
-          <Droplets className="w-8 h-8 text-[#00C9A7]" />
+      <div className="grid grid-cols-2 gap-3">
+        <NeuCard className="flex flex-col items-center justify-center gap-1.5 py-4">
+          <Droplets className="w-7 h-7 text-[#00C9A7]" />
           <div className="text-center">
-            <div className="text-2xl font-bold text-[#2D3748]">1.5 L</div>
-            <div className="text-xs text-[#718096]">de {planNutricion?.agua_litros || 3.0} L</div>
+            <div className="text-xl font-bold text-[#2D3748]">{planNutricion?.agua_litros || 2.5} L</div>
+            <div className="text-[11px] text-[#718096]">de {planNutricion?.agua_litros || 2.5} L agua</div>
           </div>
         </NeuCard>
         
-        <NeuCard className="flex flex-col items-center justify-center gap-2 py-6">
-          <div className="relative w-14 h-14 flex items-center justify-center rounded-full shadow-neu-pressed">
-            <span className="text-lg font-bold text-[#2D3748]">85%</span>
+        <NeuCard className="flex flex-col items-center justify-center gap-1.5 py-4">
+          <div className="w-12 h-12 flex items-center justify-center rounded-full shadow-neu-pressed">
+            <span className="text-base font-bold text-[#4D7CFE]">5/5</span>
           </div>
-          <div className="text-xs text-[#718096] text-center mt-2">
-            Adherencia<br/>Semanal
+          <div className="text-[11px] text-[#718096] text-center">
+            Días del Plan<br/>Registrados
           </div>
         </NeuCard>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <h4 className="font-bold text-[#2D3748] ml-2">Macros Diarios</h4>
-        <NeuCard inset className="p-4">
-          <div className="flex justify-between items-center text-sm mb-2">
-            <span className="text-[#718096]">Calorías</span>
-            <span className="font-bold text-[#2D3748]">1250 / {planNutricion?.calorias_meta || 2200} kcal</span>
+      <div className="flex flex-col gap-2">
+        <h4 className="font-bold text-[#2D3748] text-sm ml-1">Macros Diarios</h4>
+        <NeuCard inset className="p-3.5">
+          <div className="flex justify-between items-center text-xs mb-1.5">
+            <span className="text-[#718096] font-medium">Calorías</span>
+            <span className="font-bold text-[#2D3748]">1250 / {planNutricion?.calorias_meta || 1600} kcal</span>
           </div>
-          <div className="h-3 w-full bg-[#E0E5EC] rounded-full shadow-neu-pressed overflow-hidden">
+          <div className="h-2.5 w-full bg-[#E0E5EC] rounded-full shadow-neu-pressed overflow-hidden">
             <div className="h-full bg-[#4D7CFE] rounded-full w-[78%]"></div>
           </div>
-          <div className="flex justify-between mt-3 text-xs font-medium text-[#718096]">
+          <div className="flex justify-between mt-2.5 text-[11px] font-semibold text-[#718096]">
             <span>Pro: {planNutricion?.proteinas_g || 120}g</span>
-            <span>Car: {planNutricion?.carbohidratos_g || 180}g</span>
-            <span>Gra: {planNutricion?.grasas_g || 55}g</span>
+            <span>Car: {planNutricion?.carbohidratos_g || 160}g</span>
+            <span>Gra: {planNutricion?.grasas_g || 53}g</span>
           </div>
         </NeuCard>
+      </div>
+
+      {/* 5-Day Weekly Routine Roadmap */}
+      <div className="flex flex-col gap-2.5 mt-1">
+        <div className="flex justify-between items-center ml-1">
+          <h4 className="font-bold text-[#2D3748] text-sm">Plan Semanal Completo (5 Días)</h4>
+          <span className="text-[10px] font-bold text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-full shadow-neu-flat">
+            {clientRoutines.length} Días
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          {clientRoutines.map((routine, idx) => {
+            const routineErs = ejerciciosRutina.filter(er => er.id_rutina === routine.id);
+            return (
+              <NeuCard 
+                key={routine.id} 
+                className="p-3.5 flex flex-col gap-2 cursor-pointer hover:shadow-neu-pressed transition-all"
+                onClick={() => onStartWorkout(routine.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center text-xs font-bold text-[#4D7CFE]">
+                      {routine.dia_semana || idx + 1}
+                    </span>
+                    <span className="font-bold text-xs text-[#2D3748]">{routine.nombre_sesion}</span>
+                  </div>
+                  <NeuButton 
+                    className="px-2.5 py-1 text-[11px] font-bold text-[#4D7CFE] h-7 flex items-center gap-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStartWorkout(routine.id);
+                    }}
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Ver</span>
+                  </NeuButton>
+                </div>
+
+                {routineErs.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {routineErs.map((er) => {
+                      const ex = ejercicios.find(e => e.id === er.id_ejercicio);
+                      return (
+                        <span 
+                          key={er.id} 
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-[#E0E5EC] shadow-neu-flat text-[#718096] font-medium"
+                        >
+                          {ex?.nombre || 'Ejercicio'} ({er.series_objetivo}x{er.reps_objetivo})
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </NeuCard>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-function LiveWorkout() {
+function LiveWorkout({ 
+  initialRoutineId, 
+  onClearInitialRoutine 
+}: { 
+  initialRoutineId?: string | null; 
+  onClearInitialRoutine?: () => void; 
+}) {
   const { currentUser, rutinas, ejerciciosRutina, ejercicios } = useStore();
-  const clientRoutines = rutinas
-    .filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente)
-    .sort((a, b) => a.dia_semana - b.dia_semana);
+  const clientRoutines = Array.from(
+    new Map(
+      rutinas
+        .filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente)
+        .sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0))
+        .map(r => [r.dia_semana, r])
+    ).values()
+  ).sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
 
-  const [selectedRoutineId, setSelectedRoutineId] = useState<string>(clientRoutines[0]?.id || rutinas[0]?.id || '');
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string>(
+    initialRoutineId || clientRoutines[0]?.id || rutinas[0]?.id || ''
+  );
+
+  useEffect(() => {
+    if (initialRoutineId) {
+      setSelectedRoutineId(initialRoutineId);
+      if (onClearInitialRoutine) onClearInitialRoutine();
+    }
+  }, [initialRoutineId, onClearInitialRoutine]);
 
   // Keep selectedRoutineId valid
   const currentRoutine = clientRoutines.find(r => r.id === selectedRoutineId) || clientRoutines[0] || rutinas[0];
@@ -183,25 +287,32 @@ function LiveWorkout() {
 
   if (!isWorkoutStarted) {
     return (
-      <div className="flex flex-col gap-3 h-full pb-2">
+      <div className="flex flex-col gap-3 h-full pb-4">
         {/* Day Selector Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-2 px-2 [&::-webkit-scrollbar]:hidden">
-          {clientRoutines.map((r, i) => (
-            <button
-              key={r.id}
-              onClick={() => {
-                setSelectedRoutineId(r.id);
-                setCompletedExercises(new Set());
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                r.id === currentRoutine?.id
-                  ? 'bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]'
-                  : 'bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]'
-              }`}
-            >
-              Día {r.dia_semana || i + 1}
-            </button>
-          ))}
+        <div className="flex gap-2 overflow-x-auto pb-1.5 -mx-2 px-2 [&::-webkit-scrollbar]:hidden">
+          {clientRoutines.map((r, i) => {
+            const isSelected = r.id === currentRoutine?.id;
+            const exercisesCount = ejerciciosRutina.filter(er => er.id_rutina === r.id).length;
+            return (
+              <button
+                key={r.id}
+                onClick={() => {
+                  setSelectedRoutineId(r.id);
+                  setCompletedExercises(new Set());
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]'
+                    : 'bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]'
+                }`}
+              >
+                <span>Día {r.dia_semana || i + 1}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-[#4D7CFE]/20 text-[#4D7CFE]' : 'bg-[#c5cad1]/30 text-[#718096]'}`}>
+                  {exercisesCount}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex flex-col">
@@ -211,14 +322,14 @@ function LiveWorkout() {
         
         {routineExercises.length === 0 ? (
           <NeuCard className="p-6 flex flex-col items-center justify-center gap-3 text-center my-auto">
-            <Droplets className="w-10 h-10 text-[#00C9A7]" />
-            <h3 className="font-bold text-[#2D3748] text-base">Día de Descanso Activo / LISS</h3>
+            <Dumbbell className="w-10 h-10 text-[#4D7CFE] opacity-60" />
+            <h3 className="font-bold text-[#2D3748] text-base">Cargando ejercicios de la sesión...</h3>
             <p className="text-xs text-[#718096] max-w-xs leading-relaxed">
-              30-45 min de caminata rápida, elíptica o bici suave con frecuencia cardíaca moderada (Zona 2).
+              Sincronizando los ejercicios recomendados para este día de entrenamiento.
             </p>
           </NeuCard>
         ) : (
-          <div className="flex-1 flex flex-col gap-3 -mx-4 px-4 overflow-y-visible">
+          <div className="flex-1 flex flex-col gap-2.5 -mx-4 px-4 overflow-y-visible">
             {routineExercises.map((er, idx) => {
               const ex = ejercicios.find(e => e.id === er.id_ejercicio);
               const isCompleted = completedExercises.has(idx);
@@ -240,14 +351,26 @@ function LiveWorkout() {
                       {idx + 1}
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-bold text-[#2D3748] text-sm leading-tight mb-0.5">{ex?.nombre}</span>
-                      <span className="text-xs font-medium text-[#718096]">
-                        {er.series_objetivo} series × {er.reps_objetivo} reps • {er.descanso_segundos}s desc.
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[#2D3748] text-sm leading-tight">{ex?.nombre}</span>
+                        {ex?.grupo_muscular && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#E0E5EC] shadow-neu-pressed text-[#718096] font-medium">
+                            {ex.grupo_muscular}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-[#718096] mt-0.5">
+                        {er.series_objetivo} series × {er.reps_objetivo} reps • {er.descanso_segundos}s desc. • RPE {er.rpe_objetivo}
                       </span>
+                      {ex?.instrucciones && (
+                        <span className="text-[11px] text-[#4D7CFE] italic line-clamp-1 mt-0.5">
+                          {ex.instrucciones}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {isCompleted && (
-                    <div className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center shrink-0">
                       <Check className="w-3.5 h-3.5 text-[#00C9A7]" />
                     </div>
                   )}

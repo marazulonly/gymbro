@@ -23,9 +23,9 @@ export default function App() {
 
   return (
     <Layout>
-      {(activeTab) => (
+      {(activeTab, setActiveTab) => (
         <>
-          {currentRole === 'cliente' && <ClientView tab={activeTab} />}
+          {currentRole === 'cliente' && <ClientView tab={activeTab} onNavigateTab={setActiveTab} />}
           {currentRole === 'entrenador' && <TrainerView tab={activeTab} />}
           {currentRole === 'admin' && <AdminView tab={activeTab} />}
         </>
