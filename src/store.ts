@@ -12,6 +12,10 @@ import { Role, Usuario, Ejercicio, Rutina, EjercicioRutina, PlanNutricion, Ficha
 
 interface AppState {
   isCloudReady: boolean;
+  themeMode: 'light' | 'dark';
+  setThemeMode: (mode: 'light' | 'dark') => void;
+  accentColor: string;
+  setAccentColor: (color: string) => void;
   currentRole: Role;
   setCurrentRole: (role: Role) => void;
   isLoggedIn: boolean;
@@ -195,6 +199,22 @@ const RUTINAS_STORAGE_KEY = 'gymbro_rutinas_data';
 const EJERCICIOS_RUTINA_STORAGE_KEY = 'gymbro_ejercicios_rutina_data';
 const PLAN_NUTRICION_STORAGE_KEY = 'gymbro_plan_nutricion_data';
 const FICHAS_PROGRESO_STORAGE_KEY = 'gymbro_fichas_progreso_data';
+const THEME_MODE_STORAGE_KEY = 'gymbro_theme_mode';
+const ACCENT_COLOR_STORAGE_KEY = 'gymbro_accent_color';
+
+export function applyThemeToDocument(theme: 'light' | 'dark', accent: string) {
+  if (typeof window === 'undefined') return;
+  const root = document.documentElement;
+  if (theme === 'dark') {
+    root.classList.add('dark');
+    document.body.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+    document.body.classList.remove('dark');
+  }
+  root.style.setProperty('--color-accent-blue', accent);
+  root.style.setProperty('--user-accent-color', accent);
+}
 
 function getStoredItem<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
@@ -262,6 +282,12 @@ function mergeWithMock<T extends { id: string }>(stored: T[], mock: T[]): T[] {
 }
 
 // Initial state loaded from LocalStorage (or default baseline if first time ever)
+const initialThemeMode = getStoredItem<'light' | 'dark'>(THEME_MODE_STORAGE_KEY, 'light');
+const initialAccentColor = getStoredItem<string>(ACCENT_COLOR_STORAGE_KEY, '#4D7CFE');
+
+// Apply immediately on module load
+applyThemeToDocument(initialThemeMode, initialAccentColor);
+
 const initialUsuarios = mergeWithMock(getStoredItem<Usuario[]>(USERS_STORAGE_KEY, mockUsuarios), mockUsuarios);
 const initialCurrentUser = getStoredItem<Usuario | null>(CURRENT_USER_KEY, null);
 const initialEjercicios = mergeWithMock(getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, mockEjercicios), mockEjercicios);
@@ -272,6 +298,18 @@ const initialFichasProgreso = mergeWithMock(getStoredItem<FichaProgreso[]>(FICHA
 
 export const useStore = create<AppState>((set, get) => ({
   isCloudReady: false,
+  themeMode: initialThemeMode,
+  accentColor: initialAccentColor,
+  setThemeMode: (mode) => {
+    setStoredItem(THEME_MODE_STORAGE_KEY, mode);
+    applyThemeToDocument(mode, get().accentColor);
+    set({ themeMode: mode });
+  },
+  setAccentColor: (color) => {
+    setStoredItem(ACCENT_COLOR_STORAGE_KEY, color);
+    applyThemeToDocument(get().themeMode, color);
+    set({ accentColor: color });
+  },
   currentRole: initialCurrentUser?.rol || 'cliente',
   setCurrentRole: (role) => set({ currentRole: role }),
   isLoggedIn: !!initialCurrentUser,

@@ -3,12 +3,33 @@ import { useStore } from "@/store";
 import { NeuCard } from "./ui/NeuCard";
 import { NeuInput } from "./ui/NeuInput";
 import { NeuButton } from "./ui/NeuButton";
-import { X } from "lucide-react";
+import { X, Sun, Moon, Palette, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
+const ACCENT_PRESETS = [
+  { name: "Azul Clásico", value: "#4D7CFE" },
+  { name: "Morado Eléctrico", value: "#8B5CF6" },
+  { name: "Verde Esmeralda", value: "#10B981" },
+  { name: "Rosa Vibrante", value: "#F43F5E" },
+  { name: "Fucsia Neón", value: "#EC4899" },
+  { name: "Naranja Atardecer", value: "#F97316" },
+  { name: "Ámbar Dorado", value: "#F59E0B" },
+  { name: "Cyan Océano", value: "#06B6D4" },
+  { name: "Índigo Real", value: "#6366F1" },
+  { name: "Rojo Pasión", value: "#EF4444" },
+];
 
 export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onClose: () => void; userId?: string }) {
-  const { currentUser, usuarios, updateUsuario, deleteUsuario } = useStore();
+  const { 
+    currentUser, 
+    usuarios, 
+    updateUsuario, 
+    deleteUsuario,
+    themeMode,
+    setThemeMode,
+    accentColor,
+    setAccentColor
+  } = useStore();
   
   const targetUser = userId ? usuarios.find(u => u.id === userId) : currentUser;
   const isEditingOther = !!userId && userId !== currentUser?.id;
@@ -65,16 +86,113 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 50 }}
-          className="absolute inset-0 z-50 bg-[#E0E5EC] flex flex-col p-4 overflow-y-auto"
+          className="absolute inset-0 z-50 bg-[var(--color-bg-base)] flex flex-col p-4 overflow-y-auto"
         >
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-[#2D3748]">{isEditingOther ? 'Editar Usuario' : 'Mi Perfil'}</h2>
+            <h2 className="text-2xl font-bold text-[var(--color-text-main)]">{isEditingOther ? 'Editar Usuario' : 'Ajustes & Personalización'}</h2>
             <NeuButton variant="circle" className="w-10 h-10 shadow-neu-flat" onClick={onClose}>
-              <X className="w-5 h-5 text-[#718096]" />
+              <X className="w-5 h-5 text-[var(--color-text-muted)]" />
             </NeuButton>
           </div>
 
+          {/* Theme & Color Settings Section */}
+          {!isEditingOther && (
+            <NeuCard className="p-4 mb-4 flex flex-col gap-4">
+              {/* Day / Night Theme */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sun className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                  <h3 className="font-bold text-sm text-[var(--color-text-main)]">Tema de Pantalla</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('light')}
+                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold transition-all ${
+                      themeMode === 'light'
+                        ? 'shadow-neu-pressed text-[var(--color-accent-blue)] ring-1 ring-[var(--color-accent-blue)]/30'
+                        : 'shadow-neu-flat text-[var(--color-text-muted)]'
+                    }`}
+                  >
+                    <Sun className="w-4 h-4" />
+                    <span>Modo Día</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('dark')}
+                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold transition-all ${
+                      themeMode === 'dark'
+                        ? 'shadow-neu-pressed text-[var(--color-accent-blue)] ring-1 ring-[var(--color-accent-blue)]/30'
+                        : 'shadow-neu-flat text-[var(--color-text-muted)]'
+                    }`}
+                  >
+                    <Moon className="w-4 h-4" />
+                    <span>Modo Noche</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Accent Color Picker */}
+              <div className="pt-2 border-t border-[var(--color-text-muted)]/15">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                    <h3 className="font-bold text-sm text-[var(--color-text-main)]">Color de Acento</h3>
+                  </div>
+                  <span className="text-[10px] text-[var(--color-text-muted)] font-medium">
+                    (Solo afecta elementos azules)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-5 gap-2.5 my-2">
+                  {ACCENT_PRESETS.map((color) => {
+                    const isSelected = accentColor.toLowerCase() === color.value.toLowerCase();
+                    return (
+                      <button
+                        key={color.value}
+                        type="button"
+                        onClick={() => setAccentColor(color.value)}
+                        title={color.name}
+                        className={`group flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
+                          isSelected ? 'shadow-neu-pressed' : 'shadow-neu-flat'
+                        }`}
+                      >
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-transform group-hover:scale-105"
+                          style={{ backgroundColor: color.value }}
+                        >
+                          {isSelected && <Check className="w-4 h-4 text-white stroke-[3]" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between mt-2 pt-2 text-xs text-[var(--color-text-muted)]">
+                  <label htmlFor="custom-color-input" className="cursor-pointer font-medium hover:text-[var(--color-text-main)]">
+                    Color Personalizado:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="custom-color-input"
+                      type="color"
+                      value={accentColor}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      className="w-7 h-7 rounded-lg border-0 cursor-pointer bg-transparent shadow-neu-flat"
+                    />
+                    <span className="font-mono text-[11px] font-bold text-[var(--color-text-main)] uppercase">
+                      {accentColor}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </NeuCard>
+          )}
+
+          {/* User Profile Form */}
           <NeuCard className="p-4 mb-8">
+            <h3 className="font-bold text-sm text-[var(--color-text-main)] mb-3">Datos del Perfil</h3>
             <form onSubmit={handleSave} className="flex flex-col gap-4">
               <NeuInput label="DNI" value={dni} onChange={(e) => setDni(e.target.value)} required />
               <NeuInput label="Nombre Completo" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
@@ -82,9 +200,9 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
               <NeuInput label="Fecha de Nacimiento" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
               
               <div className="flex flex-col gap-1 w-full">
-                <span className="text-sm font-medium text-[#718096] pl-2">Sexo</span>
+                <span className="text-sm font-medium text-[var(--color-text-muted)] pl-2">Sexo</span>
                 <select 
-                  className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-2 text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20"
+                  className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-2 text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20"
                   value={sexo}
                   onChange={(e) => setSexo(e.target.value as any)}
                 >
@@ -96,9 +214,9 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
 
               {(isEditingOther || currentUser?.rol === 'admin') && (
                 <div className="flex flex-col gap-1 w-full">
-                  <span className="text-sm font-medium text-[#718096] pl-2">Suscripción</span>
+                  <span className="text-sm font-medium text-[var(--color-text-muted)] pl-2">Suscripción</span>
                   <select 
-                    className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-2 text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20"
+                    className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-2 text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20"
                     value={estado_suscripcion}
                     onChange={(e) => setEstadoSuscripcion(e.target.value as any)}
                   >
@@ -110,7 +228,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
 
               <NeuInput label="Contraseña" type="text" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required />
               
-              <NeuButton type="submit" className="mt-4 h-12 text-[#4D7CFE] font-bold">
+              <NeuButton type="submit" className="mt-4 h-12 text-[var(--color-accent-blue)] font-bold">
                 Guardar Cambios
               </NeuButton>
 

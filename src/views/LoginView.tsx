@@ -29,11 +29,11 @@ export function LoginView() {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-8 px-6 -mt-10">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-40 h-40 rounded-full shadow-neu-flat flex items-center justify-center bg-[#E0E5EC] overflow-hidden p-5">
+        <div className="w-40 h-40 rounded-full shadow-neu-flat flex items-center justify-center bg-[var(--color-bg-base)] overflow-hidden p-5">
           <img src="/gymbro.svg" alt="GymBro Logo" className="w-full h-full object-contain" />
         </div>
-        <h1 className="text-3xl font-bold text-[#2D3748]">GymBro</h1>
-        <p className="text-[#718096] text-sm">Tu compañero de entrenamiento</p>
+        <h1 className="text-3xl font-bold text-[var(--color-text-main)]">GymBro</h1>
+        <p className="text-[var(--color-text-muted)] text-sm">Tu compañero de entrenamiento</p>
       </div>
 
       <NeuCard className="w-full p-6">
@@ -54,7 +54,7 @@ export function LoginView() {
           
           {error && <p className="text-red-400 text-sm font-medium text-center">{error}</p>}
           
-          <NeuButton type="submit" className="w-full h-12 text-[#4D7CFE] font-bold mt-2">
+          <NeuButton type="submit" className="w-full h-12 text-[var(--color-accent-blue)] font-bold mt-2">
             Ingresar
           </NeuButton>
         </form>

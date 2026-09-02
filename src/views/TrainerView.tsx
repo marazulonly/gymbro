@@ -39,7 +39,10 @@ export function TrainerView({
   onNavigateTab?: (tab: number) => void;
 }) {
   const { usuarios } = useStore();
-  const athletes = usuarios.filter((u) => u.rol === "cliente");
+  const athletes = usuarios
+    .filter((u) => u.rol === "cliente")
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>(athletes[0]?.id || "xb-9988-fit");
 
   const handleSelectAthleteForRoutines = (athleteId: string) => {
@@ -87,7 +90,10 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [fecha, setFecha] = useState("");
   const [sexo, setSexo] = useState<"masculino" | "femenino" | "otro">("masculino");
 
-  const athletes = usuarios.filter((u) => u.rol === "cliente");
+  // Alphabetically sorted athletes list
+  const athletes = usuarios
+    .filter((u) => u.rol === "cliente")
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,7 +332,9 @@ function RoutineManager({
     copyRoutinesToAthlete
   } = useStore();
 
-  const athletes = usuarios.filter((u) => u.rol === "cliente");
+  const athletes = usuarios
+    .filter((u) => u.rol === "cliente")
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
   const currentAthlete = athletes.find((a) => a.id === selectedAthleteId) || athletes[0];
 
   // If no athlete selected or ID invalid, fallback
@@ -568,14 +576,16 @@ function RoutineManager({
     }
   };
 
-  // Filtered exercises for picker modal
-  const filteredEjercicios = ejercicios.filter((e) => {
-    const matchesSearch = 
-      e.nombre.toLowerCase().includes(exerciseSearch.toLowerCase()) ||
-      e.grupo_muscular.toLowerCase().includes(exerciseSearch.toLowerCase());
-    const matchesGroup = selectedMuscleFilter === "todos" || e.grupo_muscular === selectedMuscleFilter;
-    return matchesSearch && matchesGroup;
-  });
+  // Filtered exercises for picker modal, sorted alphabetically
+  const filteredEjercicios = ejercicios
+    .filter((e) => {
+      const matchesSearch = 
+        e.nombre.toLowerCase().includes(exerciseSearch.toLowerCase()) ||
+        e.grupo_muscular.toLowerCase().includes(exerciseSearch.toLowerCase());
+      const matchesGroup = selectedMuscleFilter === "todos" || e.grupo_muscular === selectedMuscleFilter;
+      return matchesSearch && matchesGroup;
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
   // If currently in Full Edit / Create Mode
   if (isCreatingNew || editingRoutineId) {
@@ -1355,11 +1365,13 @@ function ExercisesLibrary() {
   const [grupo, setGrupo] = useState("");
   const [instrucciones, setInstrucciones] = useState("");
 
-  const filtered = ejercicios.filter(
-    (e) =>
-      e.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.grupo_muscular.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = ejercicios
+    .filter(
+      (e) =>
+        e.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.grupo_muscular.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
   const handleEdit = (id: string) => {
     const ej = ejercicios.find((e) => e.id === id);
@@ -1510,7 +1522,9 @@ function ExercisesLibrary() {
 
 function CheckinsDashboard() {
   const { usuarios, fichasProgreso } = useStore();
-  const athletes = usuarios.filter((u) => u.rol === "cliente");
+  const athletes = usuarios
+    .filter((u) => u.rol === "cliente")
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
   const [selectedProgressAthlete, setSelectedProgressAthlete] = useState<Usuario | null>(null);
 
   return (

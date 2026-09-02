@@ -153,28 +153,28 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 50 }}
-          className="fixed inset-0 z-50 bg-[#E0E5EC] flex flex-col p-4 overflow-y-auto max-w-md mx-auto"
+          className="fixed inset-0 z-50 bg-[var(--color-bg-base)] flex flex-col p-4 overflow-y-auto max-w-md mx-auto"
         >
           {/* Header */}
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[#4D7CFE]">
+              <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[var(--color-accent-blue)]">
                 {athlete.nombre.charAt(0)}
               </div>
               <div>
-                <h2 className="text-lg font-bold text-[#2D3748] leading-tight">{athlete.nombre}</h2>
-                <span className="text-[11px] text-[#718096]">Ficha de Progreso & Chequeos</span>
+                <h2 className="text-lg font-bold text-[var(--color-text-main)] leading-tight">{athlete.nombre}</h2>
+                <span className="text-[11px] text-[var(--color-text-muted)]">Ficha de Progreso & Chequeos</span>
               </div>
             </div>
             <NeuButton variant="circle" className="w-9 h-9 shadow-neu-flat" onClick={onClose}>
-              <X className="w-4 h-4 text-[#718096]" />
+              <X className="w-4 h-4 text-[var(--color-text-muted)]" />
             </NeuButton>
           </div>
 
           <form onSubmit={handleSave} className="flex flex-col gap-4 pb-12">
             {/* Status & Fechas Clave */}
             <NeuCard className="p-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-[#4D7CFE] font-bold text-xs uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-[var(--color-accent-blue)] font-bold text-xs uppercase tracking-wider">
                 <Calendar className="w-4 h-4" />
                 <span>Control de Fechas & Revisiones</span>
               </div>
@@ -198,9 +198,9 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
 
               {/* Countdown badge */}
               {diasRestantes !== null && (
-                <div className="flex items-center justify-between px-3 py-2 bg-[#E0E5EC] rounded-xl shadow-neu-pressed text-xs">
-                  <div className="flex items-center gap-2 text-[#718096]">
-                    <Clock className="w-3.5 h-3.5 text-[#4D7CFE]" />
+                <div className="flex items-center justify-between px-3 py-2 bg-[var(--color-bg-base)] rounded-xl shadow-neu-pressed text-xs">
+                  <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                    <Clock className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
                     <span>Plazo de evaluación:</span>
                   </div>
                   <span

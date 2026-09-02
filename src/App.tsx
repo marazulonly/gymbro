@@ -15,7 +15,7 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#E0E5EC] overflow-hidden relative">
+      <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[var(--color-bg-base)] overflow-hidden relative">
         <LoginView />
       </div>
     );

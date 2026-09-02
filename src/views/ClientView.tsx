@@ -31,23 +31,23 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
   return (
     <div className="flex flex-col gap-4 h-full pb-6">
       <div>
-        <h2 className="text-2xl font-light text-[#2D3748]">Hola,</h2>
-        <h3 className="text-3xl font-bold text-[#4D7CFE]">{currentUser?.nombre || 'Atleta'}</h3>
-        <p className="text-xs text-[#718096] mt-0.5 font-medium">Plan personalizado de 5 días activo</p>
+        <h2 className="text-2xl font-light text-[var(--color-text-main)]">Hola,</h2>
+        <h3 className="text-3xl font-bold text-[var(--color-accent-blue)]">{currentUser?.nombre || 'Atleta'}</h3>
+        <p className="text-xs text-[var(--color-text-muted)] mt-0.5 font-medium">Plan personalizado de 5 días activo</p>
       </div>
 
       {todayRoutine && (
         <NeuCard className="flex items-center justify-between py-3 px-4">
           <div className="flex flex-col max-w-[75%]">
-            <span className="text-[#4D7CFE] text-xs font-bold uppercase tracking-wider">Rutina de hoy</span>
-            <span className="text-[#2D3748] text-lg font-bold truncate">{todayRoutine.nombre_sesion}</span>
-            <span className="text-[11px] text-[#718096]">
+            <span className="text-[var(--color-accent-blue)] text-xs font-bold uppercase tracking-wider">Rutina de hoy</span>
+            <span className="text-[var(--color-text-main)] text-lg font-bold truncate">{todayRoutine.nombre_sesion}</span>
+            <span className="text-[11px] text-[var(--color-text-muted)]">
               {ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id).length} ejercicios programados
             </span>
           </div>
           <NeuButton 
             variant="circle" 
-            className="w-12 h-12 text-[#4D7CFE] shrink-0"
+            className="w-12 h-12 text-[var(--color-accent-blue)] shrink-0" 
             onClick={() => onStartWorkout(todayRoutine.id)}
           >
             <Play className="w-5 h-5 ml-1" />
@@ -59,32 +59,32 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         <NeuCard className="flex flex-col items-center justify-center gap-1.5 py-4">
           <Droplets className="w-7 h-7 text-[#00C9A7]" />
           <div className="text-center">
-            <div className="text-xl font-bold text-[#2D3748]">{planNutricion?.agua_litros || 2.5} L</div>
-            <div className="text-[11px] text-[#718096]">de {planNutricion?.agua_litros || 2.5} L agua</div>
+            <div className="text-xl font-bold text-[var(--color-text-main)]">{planNutricion?.agua_litros || 2.5} L</div>
+            <div className="text-[11px] text-[var(--color-text-muted)]">de {planNutricion?.agua_litros || 2.5} L agua</div>
           </div>
         </NeuCard>
         
         <NeuCard className="flex flex-col items-center justify-center gap-1.5 py-4">
           <div className="w-12 h-12 flex items-center justify-center rounded-full shadow-neu-pressed">
-            <span className="text-base font-bold text-[#4D7CFE]">5/5</span>
+            <span className="text-base font-bold text-[var(--color-accent-blue)]">5/5</span>
           </div>
-          <div className="text-[11px] text-[#718096] text-center">
+          <div className="text-[11px] text-[var(--color-text-muted)] text-center">
             Días del Plan<br/>Registrados
           </div>
         </NeuCard>
       </div>
 
       <div className="flex flex-col gap-2">
-        <h4 className="font-bold text-[#2D3748] text-sm ml-1">Macros Diarios</h4>
+        <h4 className="font-bold text-[var(--color-text-main)] text-sm ml-1">Macros Diarios</h4>
         <NeuCard inset className="p-3.5">
           <div className="flex justify-between items-center text-xs mb-1.5">
-            <span className="text-[#718096] font-medium">Calorías</span>
-            <span className="font-bold text-[#2D3748]">1250 / {planNutricion?.calorias_meta || 1600} kcal</span>
+            <span className="text-[var(--color-text-muted)] font-medium">Calorías</span>
+            <span className="font-bold text-[var(--color-text-main)]">1250 / {planNutricion?.calorias_meta || 1600} kcal</span>
           </div>
-          <div className="h-2.5 w-full bg-[#E0E5EC] rounded-full shadow-neu-pressed overflow-hidden">
-            <div className="h-full bg-[#4D7CFE] rounded-full w-[78%]"></div>
+          <div className="h-2.5 w-full bg-[var(--color-bg-base)] rounded-full shadow-neu-pressed overflow-hidden">
+            <div className="h-full bg-[var(--color-accent-blue)] rounded-full w-[78%]"></div>
           </div>
-          <div className="flex justify-between mt-2.5 text-[11px] font-semibold text-[#718096]">
+          <div className="flex justify-between mt-2.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
             <span>Pro: {planNutricion?.proteinas_g || 120}g</span>
             <span>Car: {planNutricion?.carbohidratos_g || 160}g</span>
             <span>Gra: {planNutricion?.grasas_g || 53}g</span>
@@ -95,8 +95,8 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
       {/* 5-Day Weekly Routine Roadmap */}
       <div className="flex flex-col gap-2.5 mt-1">
         <div className="flex justify-between items-center ml-1">
-          <h4 className="font-bold text-[#2D3748] text-sm">Plan Semanal Completo (5 Días)</h4>
-          <span className="text-[10px] font-bold text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-full shadow-neu-flat">
+          <h4 className="font-bold text-[var(--color-text-main)] text-sm">Plan Semanal Completo (5 Días)</h4>
+          <span className="text-[10px] font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-full shadow-neu-flat">
             {clientRoutines.length} Días
           </span>
         </div>
@@ -112,13 +112,13 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center text-xs font-bold text-[#4D7CFE]">
+                    <span className="w-6 h-6 rounded-full shadow-neu-pressed flex items-center justify-center text-xs font-bold text-[var(--color-accent-blue)]">
                       {routine.dia_semana || idx + 1}
                     </span>
-                    <span className="font-bold text-xs text-[#2D3748]">{routine.nombre_sesion}</span>
+                    <span className="font-bold text-xs text-[var(--color-text-main)]">{routine.nombre_sesion}</span>
                   </div>
                   <NeuButton 
-                    className="px-2.5 py-1 text-[11px] font-bold text-[#4D7CFE] h-7 flex items-center gap-1"
+                    className="px-2.5 py-1 text-[11px] font-bold text-[var(--color-accent-blue)] h-7 flex items-center gap-1"
                     onClick={(e) => {
                       e.stopPropagation();
                       onStartWorkout(routine.id);
@@ -136,7 +136,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                       return (
                         <span 
                           key={er.id} 
-                          className="text-[10px] px-2 py-0.5 rounded-md bg-[#E0E5EC] shadow-neu-flat text-[#718096] font-medium"
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] font-medium"
                         >
                           {ex?.nombre || 'Ejercicio'} ({er.series_objetivo}x{er.reps_objetivo})
                         </span>
@@ -277,10 +277,10 @@ function LiveWorkout({
         {/* Day Selector Navigation Bar (5 Days) */}
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between items-center px-1">
-            <span className="text-[11px] font-bold text-[#718096] uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">
               Seleccionar Día de Entrenamiento
             </span>
-            <span className="text-[10px] font-bold text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-full shadow-neu-pressed">
+            <span className="text-[10px] font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-full shadow-neu-pressed">
               5 Sesiones
             </span>
           </div>
@@ -299,12 +299,12 @@ function LiveWorkout({
                   }}
                   className={`py-2 px-1 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
                     isSelected
-                      ? 'bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE] ring-2 ring-[#4D7CFE]/30 font-bold'
-                      : 'bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748] font-medium active:shadow-neu-pressed'
+                      ? 'bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)] ring-2 ring-[var(--color-accent-blue)]/30 font-bold'
+                      : 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] font-medium active:shadow-neu-pressed'
                   }`}
                 >
                   <span className="text-xs leading-none">Día {r.dia_semana || i + 1}</span>
-                  <span className={`text-[9px] px-1.5 py-0.2 rounded-md mt-0.5 font-bold ${isSelected ? 'bg-[#4D7CFE] text-white shadow-sm' : 'bg-[#c5cad1]/40 text-[#718096]'}`}>
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded-md mt-0.5 font-bold ${isSelected ? 'bg-[var(--color-accent-blue)] text-white shadow-sm' : 'bg-[#c5cad1]/40 text-[var(--color-text-muted)]'}`}>
                     {exercisesCount > 0 ? `${exercisesCount} ej.` : 'Sesión'}
                   </span>
                 </button>
@@ -314,15 +314,15 @@ function LiveWorkout({
         </div>
 
         <div className="flex flex-col mt-1">
-          <span className="text-[#4D7CFE] font-bold text-xs tracking-widest uppercase">Plan Semanal Activo</span>
-          <h2 className="text-lg font-bold text-[#2D3748] leading-snug">{currentRoutine.nombre_sesion}</h2>
+          <span className="text-[var(--color-accent-blue)] font-bold text-xs tracking-widest uppercase">Plan Semanal Activo</span>
+          <h2 className="text-lg font-bold text-[var(--color-text-main)] leading-snug">{currentRoutine.nombre_sesion}</h2>
         </div>
         
         {routineExercises.length === 0 ? (
           <NeuCard className="p-6 flex flex-col items-center justify-center gap-3 text-center my-auto">
-            <Dumbbell className="w-10 h-10 text-[#4D7CFE] opacity-60" />
-            <h3 className="font-bold text-[#2D3748] text-base">Cargando ejercicios de la sesión...</h3>
-            <p className="text-xs text-[#718096] max-w-xs leading-relaxed">
+            <Dumbbell className="w-10 h-10 text-[var(--color-accent-blue)] opacity-60" />
+            <h3 className="font-bold text-[var(--color-text-main)] text-base">Cargando ejercicios de la sesión...</h3>
+            <p className="text-xs text-[var(--color-text-muted)] max-w-xs leading-relaxed">
               Sincronizando los ejercicios recomendados para este día de entrenamiento.
             </p>
           </NeuCard>
@@ -345,23 +345,23 @@ function LiveWorkout({
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 min-w-[2.25rem] rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-sm ${isCompleted ? 'text-[#718096]' : 'text-[#4D7CFE]'}`}>
+                    <div className={`w-9 h-9 min-w-[2.25rem] rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-sm ${isCompleted ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-accent-blue)]'}`}>
                       {idx + 1}
                     </div>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-[#2D3748] text-sm leading-tight">{ex?.nombre}</span>
+                        <span className="font-bold text-[var(--color-text-main)] text-sm leading-tight">{ex?.nombre}</span>
                         {ex?.grupo_muscular && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#E0E5EC] shadow-neu-pressed text-[#718096] font-medium">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-text-muted)] font-medium">
                             {ex.grupo_muscular}
                           </span>
                         )}
                       </div>
-                      <span className="text-xs font-medium text-[#718096] mt-0.5">
+                      <span className="text-xs font-medium text-[var(--color-text-muted)] mt-0.5">
                         {er.series_objetivo} series × {er.reps_objetivo} reps • {er.descanso_segundos}s desc. • RPE {er.rpe_objetivo}
                       </span>
                       {ex?.instrucciones && (
-                        <span className="text-[11px] text-[#4D7CFE] italic line-clamp-1 mt-0.5">
+                        <span className="text-[11px] text-[var(--color-accent-blue)] italic line-clamp-1 mt-0.5">
                           {ex.instrucciones}
                         </span>
                       )}
@@ -378,14 +378,14 @@ function LiveWorkout({
 
             {/* Cardio Post-Sesión Info */}
             <NeuCard inset className="p-3 mt-1">
-              <span className="text-[11px] font-bold text-[#4D7CFE] uppercase tracking-wider block mb-1">
+              <span className="text-[11px] font-bold text-[var(--color-accent-blue)] uppercase tracking-wider block mb-1">
                 Cardio Post-Sesión Opcional
               </span>
-              <p className="text-xs text-[#718096] leading-snug mb-1">
-                <strong className="text-[#2D3748]">HIIT:</strong> 10-12 min (8 ciclos 20s sprint / 40s suave).
+              <p className="text-xs text-[var(--color-text-muted)] leading-snug mb-1">
+                <strong className="text-[var(--color-text-main)]">HIIT:</strong> 10-12 min (8 ciclos 20s sprint / 40s suave).
               </p>
-              <p className="text-xs text-[#718096] leading-snug">
-                <strong className="text-[#2D3748]">LISS:</strong> 20-30 min caminando (5-6 km/h) inclinación 8-12%.
+              <p className="text-xs text-[var(--color-text-muted)] leading-snug">
+                <strong className="text-[var(--color-text-main)]">LISS:</strong> 20-30 min caminando (5-6 km/h) inclinación 8-12%.
               </p>
             </NeuCard>
           </div>

@@ -1,22 +1,42 @@
 @import "tailwindcss";
 
-@theme {
+:root {
   --color-bg-base: #E0E5EC;
   --color-text-main: #2D3748;
   --color-text-muted: #718096;
   --color-accent-blue: #4D7CFE;
   --color-accent-green: #00C9A7;
+  --neu-flat: 8px 8px 16px #c5cad1, -8px -8px 16px #ffffff;
+  --neu-pressed: inset 5px 5px 10px #c5cad1, inset -5px -5px 10px #ffffff;
+  --neu-circle: 6px 6px 12px #c5cad1, -6px -6px 12px #ffffff;
+}
+
+html.dark, :root.dark, body.dark {
+  --color-bg-base: #1b2028;
+  --color-text-main: #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --neu-flat: 7px 7px 15px #12151b, -7px -7px 15px #242b35;
+  --neu-pressed: inset 5px 5px 9px #12151b, inset -5px -5px 9px #242b35;
+  --neu-circle: 6px 6px 12px #12151b, -6px -6px 12px #242b35;
+}
+
+@theme {
+  --color-bg-base: var(--color-bg-base);
+  --color-text-main: var(--color-text-main);
+  --color-text-muted: var(--color-text-muted);
+  --color-accent-blue: var(--color-accent-blue);
+  --color-accent-green: #00C9A7;
 }
 
 @layer utilities {
   .shadow-neu-flat {
-    box-shadow: 8px 8px 16px #c5cad1, -8px -8px 16px #ffffff;
+    box-shadow: var(--neu-flat);
   }
   .shadow-neu-pressed {
-    box-shadow: inset 5px 5px 10px #c5cad1, inset -5px -5px 10px #ffffff;
+    box-shadow: var(--neu-pressed);
   }
   .shadow-neu-circle {
-    box-shadow: 6px 6px 12px #c5cad1, -6px -6px 12px #ffffff;
+    box-shadow: var(--neu-circle);
   }
 }
 
@@ -24,4 +44,6 @@ body {
   background-color: var(--color-bg-base);
   color: var(--color-text-main);
   overscroll-behavior: contain;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
+
