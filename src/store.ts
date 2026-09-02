@@ -216,6 +216,42 @@ function setStoredItem<T>(key: string, value: T): void {
   }
 }
 
+export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | null): Rutina[] {
+  if (!rutinas || rutinas.length === 0) return mockRutinas;
+
+  // Filter for matching client
+  let matched = rutinas.filter((r) => {
+    if (!currentUser) return true;
+    if (r.id_cliente === currentUser.id) return true;
+    // Match common athlete IDs for demo and migration
+    if (
+      (currentUser.id === 'xb-9988-fit' || currentUser.id === 'cliente1' || currentUser.dni === '11111111') &&
+      (r.id_cliente === 'xb-9988-fit' || r.id_cliente === 'cliente1' || !r.id_cliente)
+    ) {
+      return true;
+    }
+    if (!r.id_cliente) return true;
+    return false;
+  });
+
+  // If nothing matched, use all rutinas
+  if (matched.length === 0) {
+    matched = rutinas;
+  }
+
+  // Deduplicate by dia_semana (1 to 5)
+  const map = new Map<number, Rutina>();
+  matched.forEach((r, idx) => {
+    const day = r.dia_semana || (idx % 7) + 1;
+    if (!map.has(day)) {
+      map.set(day, r);
+    }
+  });
+
+  const sorted = Array.from(map.values()).sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
+  return sorted.length > 0 ? sorted : mockRutinas;
+}
+
 function mergeWithMock<T extends { id: string }>(stored: T[], mock: T[]): T[] {
   const map = new Map<string, T>();
   stored.forEach((item) => map.set(item.id, item));

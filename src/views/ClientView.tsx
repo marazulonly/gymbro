@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
-import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity } from "lucide-react";
-import { useStore } from "@/store";
+import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight } from "lucide-react";
+import { useStore, getClientRoutines } from "@/store";
 import { motion, AnimatePresence } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -25,14 +25,7 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
 
 function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) => void }) {
   const { currentUser, rutinas, planNutricion, ejerciciosRutina, ejercicios } = useStore();
-  const clientRoutines = Array.from(
-    new Map(
-      rutinas
-        .filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente)
-        .sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0))
-        .map(r => [r.dia_semana, r])
-    ).values()
-  ).sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
+  const clientRoutines = getClientRoutines(rutinas, currentUser);
   const todayRoutine = clientRoutines[0] || rutinas[0];
   
   return (
@@ -168,17 +161,10 @@ function LiveWorkout({
   onClearInitialRoutine?: () => void; 
 }) {
   const { currentUser, rutinas, ejerciciosRutina, ejercicios } = useStore();
-  const clientRoutines = Array.from(
-    new Map(
-      rutinas
-        .filter(r => !currentUser?.id || r.id_cliente === currentUser.id || !r.id_cliente)
-        .sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0))
-        .map(r => [r.dia_semana, r])
-    ).values()
-  ).sort((a, b) => (a.dia_semana || 0) - (b.dia_semana || 0));
+  const clientRoutines = getClientRoutines(rutinas, currentUser);
 
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>(
-    initialRoutineId || clientRoutines[0]?.id || rutinas[0]?.id || ''
+    initialRoutineId || clientRoutines[0]?.id || rutinas[0]?.id || 'r1'
   );
 
   useEffect(() => {
@@ -288,35 +274,47 @@ function LiveWorkout({
   if (!isWorkoutStarted) {
     return (
       <div className="flex flex-col gap-3 h-full pb-4">
-        {/* Day Selector Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1.5 -mx-2 px-2 [&::-webkit-scrollbar]:hidden">
-          {clientRoutines.map((r, i) => {
-            const isSelected = r.id === currentRoutine?.id;
-            const exercisesCount = ejerciciosRutina.filter(er => er.id_rutina === r.id).length;
-            return (
-              <button
-                key={r.id}
-                onClick={() => {
-                  setSelectedRoutineId(r.id);
-                  setCompletedExercises(new Set());
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]'
-                    : 'bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]'
-                }`}
-              >
-                <span>Día {r.dia_semana || i + 1}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-[#4D7CFE]/20 text-[#4D7CFE]' : 'bg-[#c5cad1]/30 text-[#718096]'}`}>
-                  {exercisesCount}
-                </span>
-              </button>
-            );
-          })}
+        {/* Day Selector Navigation Bar (5 Days) */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-between items-center px-1">
+            <span className="text-[11px] font-bold text-[#718096] uppercase tracking-wider">
+              Seleccionar Día de Entrenamiento
+            </span>
+            <span className="text-[10px] font-bold text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-full shadow-neu-pressed">
+              5 Sesiones
+            </span>
+          </div>
+
+          <div className="grid grid-cols-5 gap-1.5">
+            {clientRoutines.map((r, i) => {
+              const isSelected = r.id === currentRoutine?.id;
+              const exercisesCount = ejerciciosRutina.filter(er => er.id_rutina === r.id).length;
+              return (
+                <button
+                  key={r.id}
+                  id={`btn-day-${r.dia_semana || i + 1}`}
+                  onClick={() => {
+                    setSelectedRoutineId(r.id);
+                    setCompletedExercises(new Set());
+                  }}
+                  className={`py-2 px-1 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
+                    isSelected
+                      ? 'bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE] ring-2 ring-[#4D7CFE]/30 font-bold'
+                      : 'bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748] font-medium active:shadow-neu-pressed'
+                  }`}
+                >
+                  <span className="text-xs leading-none">Día {r.dia_semana || i + 1}</span>
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded-md mt-0.5 font-bold ${isSelected ? 'bg-[#4D7CFE] text-white shadow-sm' : 'bg-[#c5cad1]/40 text-[#718096]'}`}>
+                    {exercisesCount > 0 ? `${exercisesCount} ej.` : 'Sesión'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[#4D7CFE] font-bold text-xs tracking-widest uppercase">Plan Semanal</span>
+        <div className="flex flex-col mt-1">
+          <span className="text-[#4D7CFE] font-bold text-xs tracking-widest uppercase">Plan Semanal Activo</span>
           <h2 className="text-lg font-bold text-[#2D3748] leading-snug">{currentRoutine.nombre_sesion}</h2>
         </div>
         
