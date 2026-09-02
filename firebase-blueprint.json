@@ -13,7 +13,9 @@
         "estado_suscripcion": { "type": "string", "enum": ["activo", "inactivo"] },
         "rol": { "type": "string", "enum": ["admin", "entrenador", "cliente"] },
         "id_entrenador": { "type": "string", "maxLength": 128 },
-        "avatar_url": { "type": "string", "maxLength": 500 }
+        "avatar_url": { "type": "string", "maxLength": 500 },
+        "color_acento": { "type": "string", "maxLength": 30 },
+        "modo_tema": { "type": "string", "enum": ["light", "dark"] }
       },
       "required": ["nombre", "dni", "rol", "estado_suscripcion", "sexo", "fecha_nacimiento"]
     },

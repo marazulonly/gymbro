@@ -12,6 +12,8 @@ export interface Usuario {
   rol: Role;
   id_entrenador?: string;
   avatar_url?: string;
+  color_acento?: string;
+  modo_tema?: 'light' | 'dark';
 }
 
 export interface Ejercicio {
