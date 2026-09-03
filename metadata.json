@@ -1,6 +1,6 @@
 {
-  "name": "gymbro",
-  "description": "GymBro - Aplicación de Fitness, Rutinas y Nutrición con diseño Neumórfico",
+  "name": "GymBro - Tu guía de entrenamiento",
+  "description": "GymBro - Tu guía de entrenamiento",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

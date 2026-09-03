@@ -49,6 +49,42 @@ interface AppState {
   deleteFichaProgreso: (id: string) => Promise<void>;
   assignBasePlanToAthlete: (athleteId: string, trainerId: string) => Promise<void>;
   copyRoutinesToAthlete: (sourceAthleteId: string, targetAthleteId: string, trainerId: string) => Promise<void>;
+  ejerciciosRealizados: EjercicioRealizadoLog[];
+  progresosParciales: Record<string, ProgresoParcialEjercicio>;
+  guardarProgresoParcial: (id_ejercicio_rutina: string, series: SerieLograda[]) => void;
+  registrarEjercicioCompleto: (log: EjercicioRealizadoLog) => void;
+  reabrirEjercicioRealizado: (id_ejercicio_rutina: string) => void;
+  limpiarProgresoEjercicio: (id_ejercicio_rutina: string) => void;
+}
+
+export interface SerieLograda {
+  numero_serie: number;
+  peso_kg: number;
+  reps: number;
+  rpe: number;
+  timestamp: string;
+}
+
+export interface EjercicioRealizadoLog {
+  id: string;
+  id_cliente: string;
+  id_rutina: string;
+  id_ejercicio_rutina: string;
+  id_ejercicio: string;
+  nombre_ejercicio: string;
+  grupo_muscular?: string;
+  fecha: string;
+  series: SerieLograda[];
+  total_series_objetivo: number;
+  completado: boolean;
+  completado_at: string;
+}
+
+export interface ProgresoParcialEjercicio {
+  id_ejercicio_rutina: string;
+  series: SerieLograda[];
+  proxima_serie: number;
+  ultima_actualizacion: string;
 }
 
 function cleanObject<T extends Record<string, any>>(obj: T): T {
@@ -204,6 +240,8 @@ const PLAN_NUTRICION_STORAGE_KEY = 'gymbro_plan_nutricion_data';
 const FICHAS_PROGRESO_STORAGE_KEY = 'gymbro_fichas_progreso_data';
 const THEME_MODE_STORAGE_KEY = 'gymbro_theme_mode';
 const ACCENT_COLOR_STORAGE_KEY = 'gymbro_accent_color';
+const EJERCICIOS_REALIZADOS_KEY = 'gymbro_ejercicios_realizados_v1';
+const PROGRESOS_PARCIALES_KEY = 'gymbro_progresos_parciales_v1';
 
 export const getUserAccentKey = (userId: string) => `gymbro_user_accent_${userId}`;
 export const getUserThemeKey = (userId: string) => `gymbro_user_theme_${userId}`;
@@ -335,21 +373,29 @@ export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | nul
     matched = rutinas;
   }
 
-  // Deduplicate by routine ID to preserve all configured sessions
-  const map = new Map<string, Rutina>();
+  // Deduplicate strictly by day of week: at most ONE routine per day, max 7 days, no repeating days
+  const dayMap = new Map<number, Rutina>();
   matched.forEach((r) => {
-    if (r && r.id) {
-      map.set(r.id, r);
+    if (r && typeof r.dia_semana === 'number') {
+      if (!dayMap.has(r.dia_semana)) {
+        dayMap.set(r.dia_semana, r);
+      } else {
+        const existing = dayMap.get(r.dia_semana);
+        // If current routine explicitly belongs to client and existing doesn't, prefer it
+        if (r.id_cliente && !existing?.id_cliente) {
+          dayMap.set(r.dia_semana, r);
+        }
+      }
     }
   });
 
   const dayOrderMap: { [key: number]: number } = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7 };
-  const sorted = Array.from(map.values()).sort((a, b) => {
+  const sorted = Array.from(dayMap.values()).sort((a, b) => {
     const orderA = dayOrderMap[a.dia_semana] ?? 99;
     const orderB = dayOrderMap[b.dia_semana] ?? 99;
     if (orderA !== orderB) return orderA - orderB;
     return (a.nombre_sesion || '').localeCompare(b.nombre_sesion || '');
-  });
+  }).slice(0, 7);
   return sorted.length > 0 ? sorted : mockRutinas;
 }
 
@@ -435,6 +481,8 @@ export const useStore = create<AppState>((set, get) => ({
   ejerciciosRutina: initialEjerciciosRutina,
   planNutricion: initialPlanNutricion,
   fichasProgreso: initialFichasProgreso,
+  ejerciciosRealizados: getStoredItem<EjercicioRealizadoLog[]>(EJERCICIOS_REALIZADOS_KEY, []),
+  progresosParciales: getStoredItem<Record<string, ProgresoParcialEjercicio>>(PROGRESOS_PARCIALES_KEY, {}),
 
   login: (dni, contrasena) => {
     const trimmedDni = dni.trim();
@@ -891,6 +939,47 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error('Error copying routines to Firestore:', e);
     }
+  },
+
+  guardarProgresoParcial: (id_ejercicio_rutina, series) => {
+    const nextSet = series.length + 1;
+    const updated = {
+      ...get().progresosParciales,
+      [id_ejercicio_rutina]: {
+        id_ejercicio_rutina,
+        series,
+        proxima_serie: nextSet,
+        ultima_actualizacion: new Date().toISOString(),
+      },
+    };
+    set({ progresosParciales: updated });
+    setStoredItem(PROGRESOS_PARCIALES_KEY, updated);
+  },
+
+  registrarEjercicioCompleto: (log) => {
+    const existing = get().ejerciciosRealizados.filter(
+      (e) => e.id !== log.id && e.id_ejercicio_rutina !== log.id_ejercicio_rutina
+    );
+    const updated = [log, ...existing];
+    const nextParciales = { ...get().progresosParciales };
+    delete nextParciales[log.id_ejercicio_rutina];
+
+    set({ ejerciciosRealizados: updated, progresosParciales: nextParciales });
+    setStoredItem(EJERCICIOS_REALIZADOS_KEY, updated);
+    setStoredItem(PROGRESOS_PARCIALES_KEY, nextParciales);
+  },
+
+  reabrirEjercicioRealizado: (id_ejercicio_rutina) => {
+    const updated = get().ejerciciosRealizados.filter((e) => e.id_ejercicio_rutina !== id_ejercicio_rutina);
+    set({ ejerciciosRealizados: updated });
+    setStoredItem(EJERCICIOS_REALIZADOS_KEY, updated);
+  },
+
+  limpiarProgresoEjercicio: (id_ejercicio_rutina) => {
+    const nextParciales = { ...get().progresosParciales };
+    delete nextParciales[id_ejercicio_rutina];
+    set({ progresosParciales: nextParciales });
+    setStoredItem(PROGRESOS_PARCIALES_KEY, nextParciales);
   },
 }));
 

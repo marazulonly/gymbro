@@ -510,14 +510,29 @@ function RoutineManager({
   };
 
   const startCreateRoutine = (suggestedDay?: number) => {
+    if (athleteRoutines.length >= 7) {
+      const msg = "⚠️ Límite alcanzado: Solo pueden aparecer como máximo 7 días de rutinas. El atleta ya tiene los 7 días de la semana programados (ningún día se puede repetir).";
+      setDuplicateWarning(msg);
+      try {
+        window.alert(msg);
+      } catch (_) {}
+      return;
+    }
     setEditingRoutineId(null);
     setIsCreatingNew(true);
-    const validDay = typeof suggestedDay === "number" ? suggestedDay : undefined;
+
+    // Find available days not yet occupied
+    const occupiedDays = new Set(athleteRoutines.map((r) => r.dia_semana));
+    const allDays = [1, 2, 3, 4, 5, 6, 0];
+    const availableDay = allDays.find((d) => !occupiedDays.has(d)) ?? 1;
+
+    const validDay = typeof suggestedDay === "number" && !occupiedDays.has(suggestedDay) ? suggestedDay : undefined;
     const targetDay = validDay !== undefined 
       ? validDay 
-      : typeof selectedDayFilter === "number" 
+      : typeof selectedDayFilter === "number" && !occupiedDays.has(selectedDayFilter)
       ? selectedDayFilter 
-      : ((athleteRoutines.length % 7) + 1);
+      : availableDay;
+
     setFormNombreSesion(`${getDiaSemanaNombre(targetDay)}: Sesión Principal`);
     setFormDiaSemana(targetDay);
     setFormEsDescanso(false);
@@ -675,6 +690,35 @@ function RoutineManager({
       return;
     }
 
+    // Enforce maximum 7 routine days and no repeating days
+    if (isCreatingNew) {
+      if (athleteRoutines.length >= 7) {
+        const msg = "⚠️ Advertencia: Solo pueden aparecer como máximo 7 días de rutinas. El atleta ya tiene los 7 días asignados.";
+        setDuplicateWarning(msg);
+        try { window.alert(msg); } catch (_) {}
+        return;
+      }
+      const dayAlreadyExists = athleteRoutines.some((r) => r.dia_semana === formDiaSemana);
+      if (dayAlreadyExists) {
+        const dayName = getDiaSemanaNombre(formDiaSemana);
+        const msg = `⚠️ Advertencia: El día ${dayName} ya tiene una rutina asignada. Solo pueden aparecer como máximo 7 días de rutinas y ningún día se puede repetir.`;
+        setDuplicateWarning(msg);
+        try { window.alert(msg); } catch (_) {}
+        return;
+      }
+    } else if (editingRoutineId) {
+      const dayAlreadyExists = athleteRoutines.some(
+        (r) => r.dia_semana === formDiaSemana && r.id !== editingRoutineId
+      );
+      if (dayAlreadyExists) {
+        const dayName = getDiaSemanaNombre(formDiaSemana);
+        const msg = `⚠️ Advertencia: El día ${dayName} ya tiene una rutina asignada. Solo pueden aparecer como máximo 7 días de rutinas y ningún día se puede repetir.`;
+        setDuplicateWarning(msg);
+        try { window.alert(msg); } catch (_) {}
+        return;
+      }
+    }
+
     setIsSyncing(true);
     try {
       if (isCreatingNew) {
@@ -798,11 +842,16 @@ function RoutineManager({
                 value={formDiaSemana}
                 onChange={(e) => setFormDiaSemana(Number(e.target.value))}
               >
-                {DIAS_SEMANA.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.label}
-                  </option>
-                ))}
+                {DIAS_SEMANA.map((d) => {
+                  const isOccupied = athleteRoutines.some(
+                    (r) => r.dia_semana === d.id && r.id !== editingRoutineId
+                  );
+                  return (
+                    <option key={d.id} value={d.id} disabled={isOccupied}>
+                      {d.label} {isOccupied ? '(Ocupado - No repetir día)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
