@@ -58,6 +58,46 @@
         "rpe_objetivo": { "type": "number", "minimum": 1, "maximum": 10 }
       },
       "required": ["id_rutina", "id_ejercicio", "series_objetivo", "reps_objetivo", "descanso_segundos"]
+    },
+    "EjercicioRealizado": {
+      "title": "EjercicioRealizado",
+      "description": "Log of completed exercises with execution times, dates, and series performed.",
+      "type": "object",
+      "properties": {
+        "id_cliente": { "type": "string", "maxLength": 128 },
+        "nombre_cliente": { "type": "string", "maxLength": 100 },
+        "id_rutina": { "type": "string", "maxLength": 128 },
+        "id_ejercicio_rutina": { "type": "string", "maxLength": 128 },
+        "id_ejercicio": { "type": "string", "maxLength": 128 },
+        "nombre_ejercicio": { "type": "string", "maxLength": 100 },
+        "grupo_muscular": { "type": "string", "maxLength": 100 },
+        "fecha": { "type": "string", "maxLength": 20 },
+        "hora_inicio": { "type": "string", "maxLength": 30 },
+        "hora_fin": { "type": "string", "maxLength": 30 },
+        "duracion_segundos": { "type": "number", "minimum": 0 },
+        "total_series_objetivo": { "type": "number", "minimum": 1 },
+        "completado": { "type": "boolean" },
+        "completado_at": { "type": "string", "maxLength": 30 }
+      },
+      "required": ["id_cliente", "id_ejercicio", "nombre_ejercicio", "fecha", "completado"]
+    },
+    "SesionUso": {
+      "title": "SesionUso",
+      "description": "Record of web usage dates, times, and duration for athletes and trainers.",
+      "type": "object",
+      "properties": {
+        "id_usuario": { "type": "string", "maxLength": 128 },
+        "nombre_usuario": { "type": "string", "maxLength": 100 },
+        "rol": { "type": "string", "enum": ["admin", "entrenador", "cliente"] },
+        "fecha": { "type": "string", "maxLength": 20 },
+        "hora_inicio": { "type": "string", "maxLength": 30 },
+        "hora_fin": { "type": "string", "maxLength": 30 },
+        "duracion_segundos": { "type": "number", "minimum": 0 },
+        "inicio_timestamp": { "type": "number" },
+        "ultima_actividad_timestamp": { "type": "number" },
+        "dispositivo": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id_usuario", "nombre_usuario", "rol", "fecha", "hora_inicio"]
     }
   },
   "firestore": {
@@ -76,6 +116,14 @@
     "ejerciciosRutina/{ejercicioRutinaId}": {
       "schema": { "$ref": "EjercicioRutina" },
       "description": "Exercises for routines. Same access as Rutinas."
+    },
+    "ejerciciosRealizados/{logId}": {
+      "schema": { "$ref": "EjercicioRealizado" },
+      "description": "Completed exercises log visible to the athlete and trainers."
+    },
+    "sesionesUso/{sesionId}": {
+      "schema": { "$ref": "SesionUso" },
+      "description": "Web usage timestamps and statistics for athletes and trainers."
     }
   }
 }

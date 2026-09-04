@@ -8,7 +8,21 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Role, Usuario, Ejercicio, Rutina, EjercicioRutina, PlanNutricion, FichaProgreso } from './types';
+import { 
+  Role, 
+  Usuario, 
+  Ejercicio, 
+  Rutina, 
+  EjercicioRutina, 
+  PlanNutricion, 
+  FichaProgreso, 
+  SerieLograda, 
+  EjercicioRealizadoLog, 
+  ProgresoParcialEjercicio, 
+  SesionUsoWeb 
+} from './types';
+
+export type { SerieLograda, EjercicioRealizadoLog, ProgresoParcialEjercicio, SesionUsoWeb };
 
 interface AppState {
   isCloudReady: boolean;
@@ -51,40 +65,13 @@ interface AppState {
   copyRoutinesToAthlete: (sourceAthleteId: string, targetAthleteId: string, trainerId: string) => Promise<void>;
   ejerciciosRealizados: EjercicioRealizadoLog[];
   progresosParciales: Record<string, ProgresoParcialEjercicio>;
-  guardarProgresoParcial: (id_ejercicio_rutina: string, series: SerieLograda[]) => void;
-  registrarEjercicioCompleto: (log: EjercicioRealizadoLog) => void;
-  reabrirEjercicioRealizado: (id_ejercicio_rutina: string) => void;
+  guardarProgresoParcial: (id_ejercicio_rutina: string, series: SerieLograda[], hora_inicio?: string, inicio_timestamp?: number) => void;
+  registrarEjercicioCompleto: (log: EjercicioRealizadoLog) => Promise<void>;
+  reabrirEjercicioRealizado: (id_ejercicio_rutina: string) => Promise<void>;
   limpiarProgresoEjercicio: (id_ejercicio_rutina: string) => void;
-}
-
-export interface SerieLograda {
-  numero_serie: number;
-  peso_kg: number;
-  reps: number;
-  rpe: number;
-  timestamp: string;
-}
-
-export interface EjercicioRealizadoLog {
-  id: string;
-  id_cliente: string;
-  id_rutina: string;
-  id_ejercicio_rutina: string;
-  id_ejercicio: string;
-  nombre_ejercicio: string;
-  grupo_muscular?: string;
-  fecha: string;
-  series: SerieLograda[];
-  total_series_objetivo: number;
-  completado: boolean;
-  completado_at: string;
-}
-
-export interface ProgresoParcialEjercicio {
-  id_ejercicio_rutina: string;
-  series: SerieLograda[];
-  proxima_serie: number;
-  ultima_actualizacion: string;
+  sesionesUso: SesionUsoWeb[];
+  registrarSesionUso: (sesion: SesionUsoWeb) => Promise<void>;
+  actualizarSesionUso: (id: string, updates: Partial<SesionUsoWeb>) => Promise<void>;
 }
 
 function cleanObject<T extends Record<string, any>>(obj: T): T {
@@ -242,6 +229,7 @@ const THEME_MODE_STORAGE_KEY = 'gymbro_theme_mode';
 const ACCENT_COLOR_STORAGE_KEY = 'gymbro_accent_color';
 const EJERCICIOS_REALIZADOS_KEY = 'gymbro_ejercicios_realizados_v1';
 const PROGRESOS_PARCIALES_KEY = 'gymbro_progresos_parciales_v1';
+export const SESIONES_USO_STORAGE_KEY = 'gymbro_sesiones_uso_v1';
 
 export const getUserAccentKey = (userId: string) => `gymbro_user_accent_${userId}`;
 export const getUserThemeKey = (userId: string) => `gymbro_user_theme_${userId}`;
@@ -483,6 +471,7 @@ export const useStore = create<AppState>((set, get) => ({
   fichasProgreso: initialFichasProgreso,
   ejerciciosRealizados: getStoredItem<EjercicioRealizadoLog[]>(EJERCICIOS_REALIZADOS_KEY, []),
   progresosParciales: getStoredItem<Record<string, ProgresoParcialEjercicio>>(PROGRESOS_PARCIALES_KEY, {}),
+  sesionesUso: getStoredItem<SesionUsoWeb[]>(SESIONES_USO_STORAGE_KEY, []),
 
   login: (dni, contrasena) => {
     const trimmedDni = dni.trim();
@@ -491,9 +480,24 @@ export const useStore = create<AppState>((set, get) => ({
         u.dni.trim() === trimmedDni ||
         (trimmedDni === '11111111' && isXiomaraBallon(u)) ||
         (trimmedDni === '10101010' && isXiomaraBallon(u));
-      return isDniMatch && u.contrasena === contrasena;
+      return isDniMatch;
     });
+
     if (user) {
+      // Trainer password requirement: "La Contraseña para los entrenadores es '0000'"
+      const isPasswordValid = user.rol === 'entrenador'
+        ? (contrasena === '0000' || user.contrasena === contrasena)
+        : (user.contrasena === contrasena);
+
+      if (!isPasswordValid) {
+        return { 
+          success: false, 
+          error: user.rol === 'entrenador' 
+            ? 'Contraseña incorrecta. La contraseña para entrenadores es 0000.' 
+            : 'Credenciales incorrectas.' 
+        };
+      }
+
       if (user.estado_suscripcion === 'inactivo' && user.rol === 'cliente') {
         return { success: false, error: 'Cuenta inactiva por falta de pago.' };
       }
@@ -516,12 +520,17 @@ export const useStore = create<AppState>((set, get) => ({
         accentColor: userAccent,
         themeMode: userTheme
       });
+
+      // Start tracking web usage for athlete or trainer
+      startWebUsageTracker(user);
+
       return { success: true };
     }
     return { success: false, error: 'Credenciales incorrectas.' };
   },
 
   logout: () => {
+    stopWebUsageTracker();
     if (typeof window !== 'undefined') {
       localStorage.removeItem(SAVED_USER_ID_KEY);
       localStorage.removeItem(CURRENT_USER_KEY);
@@ -540,6 +549,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addUsuario: async (usuario) => {
+    if (usuario.rol === 'entrenador') {
+      usuario.contrasena = '0000';
+    }
     const updated = [...get().usuarios.filter(u => u.id !== usuario.id), usuario];
     set({ usuarios: updated });
     setStoredItem(USERS_STORAGE_KEY, updated);
@@ -551,6 +563,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateUsuario: async (updatedUsuario) => {
+    if (updatedUsuario.rol === 'entrenador') {
+      updatedUsuario.contrasena = '0000';
+    }
     const updatedList = get().usuarios.map(u => u.id === updatedUsuario.id ? updatedUsuario : u);
     const isCurrent = get().currentUser?.id === updatedUsuario.id;
     const updatedCurrent = isCurrent ? updatedUsuario : get().currentUser;
@@ -582,8 +597,9 @@ export const useStore = create<AppState>((set, get) => ({
     if (updatedCurrent) {
       setStoredItem(CURRENT_USER_KEY, updatedCurrent);
     }
+
     try {
-      await setDoc(doc(db, 'usuarios', updatedUsuario.id), cleanObject(updatedUsuario), { merge: true });
+      await setDoc(doc(db, 'usuarios', updatedUsuario.id), cleanObject(updatedUsuario));
     } catch (err) {
       console.error('Error updating user in Firestore:', err);
     }
@@ -941,8 +957,9 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  guardarProgresoParcial: (id_ejercicio_rutina, series) => {
+  guardarProgresoParcial: (id_ejercicio_rutina, series, hora_inicio, inicio_timestamp) => {
     const nextSet = series.length + 1;
+    const existing = get().progresosParciales[id_ejercicio_rutina];
     const updated = {
       ...get().progresosParciales,
       [id_ejercicio_rutina]: {
@@ -950,13 +967,15 @@ export const useStore = create<AppState>((set, get) => ({
         series,
         proxima_serie: nextSet,
         ultima_actualizacion: new Date().toISOString(),
+        hora_inicio: hora_inicio || existing?.hora_inicio || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        inicio_timestamp: inicio_timestamp || existing?.inicio_timestamp || Date.now(),
       },
     };
     set({ progresosParciales: updated });
     setStoredItem(PROGRESOS_PARCIALES_KEY, updated);
   },
 
-  registrarEjercicioCompleto: (log) => {
+  registrarEjercicioCompleto: async (log) => {
     const existing = get().ejerciciosRealizados.filter(
       (e) => e.id !== log.id && e.id_ejercicio_rutina !== log.id_ejercicio_rutina
     );
@@ -967,12 +986,27 @@ export const useStore = create<AppState>((set, get) => ({
     set({ ejerciciosRealizados: updated, progresosParciales: nextParciales });
     setStoredItem(EJERCICIOS_REALIZADOS_KEY, updated);
     setStoredItem(PROGRESOS_PARCIALES_KEY, nextParciales);
+
+    try {
+      await setDoc(doc(db, 'ejerciciosRealizados', log.id), cleanObject(log));
+    } catch (err) {
+      console.error('Error saving ejercicio realizado to Firestore:', err);
+    }
   },
 
-  reabrirEjercicioRealizado: (id_ejercicio_rutina) => {
+  reabrirEjercicioRealizado: async (id_ejercicio_rutina) => {
+    const toDelete = get().ejerciciosRealizados.find((e) => e.id_ejercicio_rutina === id_ejercicio_rutina);
     const updated = get().ejerciciosRealizados.filter((e) => e.id_ejercicio_rutina !== id_ejercicio_rutina);
     set({ ejerciciosRealizados: updated });
     setStoredItem(EJERCICIOS_REALIZADOS_KEY, updated);
+
+    if (toDelete) {
+      try {
+        await deleteDoc(doc(db, 'ejerciciosRealizados', toDelete.id));
+      } catch (err) {
+        console.error('Error deleting ejercicio realizado from Firestore:', err);
+      }
+    }
   },
 
   limpiarProgresoEjercicio: (id_ejercicio_rutina) => {
@@ -981,7 +1015,31 @@ export const useStore = create<AppState>((set, get) => ({
     set({ progresosParciales: nextParciales });
     setStoredItem(PROGRESOS_PARCIALES_KEY, nextParciales);
   },
+
+  registrarSesionUso: async (sesion) => {
+    const existing = get().sesionesUso.filter((s) => s.id !== sesion.id);
+    const updated = [sesion, ...existing];
+    set({ sesionesUso: updated });
+    setStoredItem(SESIONES_USO_STORAGE_KEY, updated);
+    try {
+      await setDoc(doc(db, 'sesionesUso', sesion.id), cleanObject(sesion));
+    } catch (e) {
+      console.error('Error saving sesion de uso to Firestore:', e);
+    }
+  },
+
+  actualizarSesionUso: async (id, updates) => {
+    const updated = get().sesionesUso.map((s) => (s.id === id ? { ...s, ...updates } : s));
+    set({ sesionesUso: updated });
+    setStoredItem(SESIONES_USO_STORAGE_KEY, updated);
+    try {
+      await setDoc(doc(db, 'sesionesUso', id), cleanObject(updates), { merge: true });
+    } catch (e) {
+      console.error('Error updating sesion de uso in Firestore:', e);
+    }
+  },
 }));
+
 
 // Setup Firestore real-time synchronization
 // Strictly respects user changes in the cloud and keeps local storage updated
@@ -1234,6 +1292,158 @@ export function initFirestoreSync() {
     useStore.setState({ fichasProgreso: fps });
   }, (error) => {
     console.error('Firestore fichasProgreso subscription error:', error);
+  });
+
+  // 7. EjerciciosRealizados listener - real-time sync for athlete and trainer
+  onSnapshot(collection(db, 'ejerciciosRealizados'), async (snapshot) => {
+    let logs: EjercicioRealizadoLog[] = [];
+    if (!snapshot.empty) {
+      snapshot.forEach((docSnap) => {
+        logs.push({ id: docSnap.id, ...docSnap.data() } as EjercicioRealizadoLog);
+      });
+      // Sort most recent first
+      logs.sort((a, b) => {
+        const timeA = new Date(`${a.fecha}T${a.hora_fin || a.completado_at || '00:00'}`).getTime();
+        const timeB = new Date(`${b.fecha}T${b.hora_fin || b.completado_at || '00:00'}`).getTime();
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
+      setStoredItem(EJERCICIOS_REALIZADOS_KEY, logs);
+      useStore.setState({ ejerciciosRealizados: logs });
+    }
+  }, (error) => {
+    console.error('Firestore ejerciciosRealizados subscription error:', error);
+  });
+
+  // 8. SesionesUso listener - real-time web usage dates and duration sync
+  onSnapshot(collection(db, 'sesionesUso'), async (snapshot) => {
+    let sessions: SesionUsoWeb[] = [];
+    if (!snapshot.empty) {
+      snapshot.forEach((docSnap) => {
+        sessions.push({ id: docSnap.id, ...docSnap.data() } as SesionUsoWeb);
+      });
+      // Sort newest session first
+      sessions.sort((a, b) => (b.inicio_timestamp || 0) - (a.inicio_timestamp || 0));
+      setStoredItem(SESIONES_USO_STORAGE_KEY, sessions);
+      useStore.setState({ sesionesUso: sessions });
+    }
+  }, (error) => {
+    console.error('Firestore sesionesUso subscription error:', error);
+  });
+
+  // Automatically begin web usage session if a user is already authenticated
+  const current = useStore.getState().currentUser;
+  if (current) {
+    startWebUsageTracker(current);
+  }
+}
+
+// =========================================================================
+// Web Usage Tracking Engine (Fechas, Horas y Tiempos de Uso en la Web)
+// =========================================================================
+let activeUsageSessionId: string | null = null;
+let usageHeartbeatInterval: any = null;
+
+export function startWebUsageTracker(user: Usuario) {
+  if (typeof window === 'undefined') return;
+
+  // If already tracking this exact session, don't duplicate
+  if (activeUsageSessionId) {
+    const existing = useStore.getState().sesionesUso.find((s) => s.id === activeUsageSessionId);
+    if (existing && existing.id_usuario === user.id) {
+      return;
+    }
+    stopWebUsageTracker();
+  }
+
+  // Prevent duplicate sessions on quick browser reloads by caching session ID in sessionStorage
+  let sessionId = sessionStorage.getItem('gymbro_active_session_id');
+  let startTime = Date.now();
+  let startHour = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const existingSession = sessionId ? useStore.getState().sesionesUso.find((s) => s.id === sessionId) : null;
+  if (existingSession) {
+    startTime = existingSession.inicio_timestamp || startTime;
+    startHour = existingSession.hora_inicio || startHour;
+  } else {
+    sessionId = `ses_${user.id}_${Date.now()}`;
+    sessionStorage.setItem('gymbro_active_session_id', sessionId);
+  }
+
+  activeUsageSessionId = sessionId;
+
+  const initialSession: SesionUsoWeb = {
+    id: sessionId,
+    id_usuario: user.id,
+    nombre_usuario: user.nombre,
+    rol: user.rol,
+    fecha: new Date().toISOString().split('T')[0],
+    hora_inicio: startHour,
+    hora_fin: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    duracion_segundos: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
+    inicio_timestamp: startTime,
+    ultima_actividad_timestamp: Date.now(),
+    dispositivo: /Mobi|Android/i.test(navigator.userAgent) ? 'Móvil' : 'Escritorio',
+  };
+
+  useStore.getState().registrarSesionUso(initialSession);
+
+  // Periodic heartbeat every 20 seconds
+  if (usageHeartbeatInterval) clearInterval(usageHeartbeatInterval);
+  usageHeartbeatInterval = setInterval(() => {
+    if (!activeUsageSessionId) return;
+    const now = Date.now();
+    const elapsed = Math.max(1, Math.round((now - startTime) / 1000));
+    const nowHour = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    useStore.getState().actualizarSesionUso(activeUsageSessionId, {
+      hora_fin: nowHour,
+      duracion_segundos: elapsed,
+      ultima_actividad_timestamp: now,
+    });
+  }, 20000);
+}
+
+export function stopWebUsageTracker() {
+  if (typeof window === 'undefined') return;
+  if (usageHeartbeatInterval) {
+    clearInterval(usageHeartbeatInterval);
+    usageHeartbeatInterval = null;
+  }
+  if (activeUsageSessionId) {
+    const session = useStore.getState().sesionesUso.find((s) => s.id === activeUsageSessionId);
+    if (session) {
+      const now = Date.now();
+      const elapsed = Math.max(1, Math.round((now - session.inicio_timestamp) / 1000));
+      const nowHour = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      useStore.getState().actualizarSesionUso(activeUsageSessionId, {
+        hora_fin: nowHour,
+        duracion_segundos: elapsed,
+        ultima_actividad_timestamp: now,
+      });
+    }
+    sessionStorage.removeItem('gymbro_active_session_id');
+    activeUsageSessionId = null;
+  }
+}
+
+// Flush usage metrics when closing or switching tabs
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    stopWebUsageTracker();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && activeUsageSessionId) {
+      const session = useStore.getState().sesionesUso.find((s) => s.id === activeUsageSessionId);
+      if (session) {
+        const now = Date.now();
+        const elapsed = Math.max(1, Math.round((now - session.inicio_timestamp) / 1000));
+        const nowHour = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        useStore.getState().actualizarSesionUso(activeUsageSessionId, {
+          hora_fin: nowHour,
+          duracion_segundos: elapsed,
+          ultima_actividad_timestamp: now,
+        });
+      }
+    }
   });
 }
 

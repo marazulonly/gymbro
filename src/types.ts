@@ -108,3 +108,56 @@ export interface FichaProgreso {
   fecha_actualizacion?: string;
 }
 
+export interface SerieLograda {
+  numero_serie: number;
+  peso_kg: number;
+  reps: number;
+  rpe: number;
+  timestamp: string;
+  tiempo_serie_segundos?: number;
+}
+
+export interface EjercicioRealizadoLog {
+  id: string;
+  id_cliente: string;
+  nombre_cliente?: string;
+  id_rutina: string;
+  id_ejercicio_rutina: string;
+  id_ejercicio: string;
+  nombre_ejercicio: string;
+  grupo_muscular?: string;
+  fecha: string; // YYYY-MM-DD
+  hora_inicio?: string; // HH:mm:ss
+  hora_fin?: string; // HH:mm:ss
+  duracion_segundos?: number;
+  inicio_timestamp?: number;
+  fin_timestamp?: number;
+  series: SerieLograda[];
+  total_series_objetivo: number;
+  completado: boolean;
+  completado_at: string;
+}
+
+export interface ProgresoParcialEjercicio {
+  id_ejercicio_rutina: string;
+  series: SerieLograda[];
+  proxima_serie: number;
+  ultima_actualizacion: string;
+  inicio_timestamp?: number;
+  hora_inicio?: string;
+}
+
+export interface SesionUsoWeb {
+  id: string;
+  id_usuario: string;
+  nombre_usuario: string;
+  rol: Role;
+  fecha: string; // YYYY-MM-DD
+  hora_inicio: string; // HH:mm:ss
+  hora_fin: string; // HH:mm:ss
+  duracion_segundos: number;
+  inicio_timestamp: number;
+  ultima_actividad_timestamp: number;
+  dispositivo?: string;
+}
+

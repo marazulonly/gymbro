@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
-import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft } from "lucide-react";
+import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft, BarChart2 } from "lucide-react";
 import { useStore, getClientRoutines, getClientActiveRoutines, getDiaSemanaNombre, getDiaSemanaCorto, SerieLograda, EjercicioRealizadoLog } from "@/store";
 import { playLogradoSound } from "@/utils/audio";
 import { motion, AnimatePresence } from "motion/react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AthleteProgressView } from "@/components/AthleteProgressView";
+import { FichaEstadisticasUsoModal } from "@/components/FichaEstadisticasUsoModal";
+import { RegistroEjerciciosRealizadosModal } from "@/components/RegistroEjerciciosRealizadosModal";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
   const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
@@ -25,20 +27,82 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
   return null;
 }
 
+
 function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) => void }) {
   const { currentUser, rutinas, planNutricion, ejerciciosRutina, ejercicios } = useStore();
   const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
   const todayDay = new Date().getDay();
   const todayRoutine = activeRoutines.find((r) => r.dia_semana === todayDay);
   
+  const [homeUsageModalOpen, setHomeUsageModalOpen] = useState(false);
+  const [homeLogModalOpen, setHomeLogModalOpen] = useState(false);
+
   return (
     <div className="flex flex-col gap-4 h-full pb-6">
-      <div>
-        <h2 className="text-2xl font-light text-[var(--color-text-main)]">Hola,</h2>
-        <h3 className="text-3xl font-bold text-[var(--color-accent-blue)]">{currentUser?.nombre || 'Atleta'}</h3>
-        <p className="text-xs text-[var(--color-text-muted)] mt-0.5 font-medium">
-          {activeRoutines.length} días de entrenamiento programados por tu entrenador
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-light text-[var(--color-text-main)]">Hola,</h2>
+          <h3 className="text-3xl font-bold text-[var(--color-accent-blue)]">{currentUser?.nombre || 'Atleta'}</h3>
+          <p className="text-xs text-[var(--color-text-muted)] mt-0.5 font-medium">
+            {activeRoutines.length} días de entrenamiento programados por tu entrenador
+          </p>
+        </div>
+
+        <div className="flex gap-1.5 pt-1">
+          <NeuButton
+            variant="circle"
+            className="w-9 h-9 text-[var(--color-accent-blue)]"
+            onClick={() => setHomeUsageModalOpen(true)}
+            title="Ver tu ficha de estadísticas de uso web"
+          >
+            <Clock className="w-4 h-4" />
+          </NeuButton>
+          <NeuButton
+            variant="circle"
+            className="w-9 h-9 text-[#00C9A7]"
+            onClick={() => setHomeLogModalOpen(true)}
+            title="Ver registro de ejercicios realizados"
+          >
+            <Check className="w-4 h-4 stroke-[3]" />
+          </NeuButton>
+        </div>
+      </div>
+
+      {/* Quick Action Cards: Ficha de Uso Web & Ejercicios Realizados */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <button
+          onClick={() => setHomeUsageModalOpen(true)}
+          className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center gap-2.5 text-left"
+        >
+          <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)] shrink-0">
+            <Clock className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-[var(--color-text-main)] block leading-tight">
+              Ficha de Uso Web
+            </span>
+            <span className="text-[10px] text-[var(--color-text-muted)]">
+              Tiempos y estadísticas
+            </span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setHomeLogModalOpen(true)}
+          className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center gap-2.5 text-left"
+        >
+          <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[#00C9A7] shrink-0">
+            <Check className="w-4 h-4 stroke-[3]" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-[var(--color-text-main)] block leading-tight">
+              Realizados
+            </span>
+            <span className="text-[10px] text-[var(--color-text-muted)]">
+              Historial de series
+            </span>
+          </div>
+        </button>
       </div>
 
       {todayRoutine ? (
@@ -202,6 +266,16 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
           })}
         </div>
       </div>
+
+      <FichaEstadisticasUsoModal
+        isOpen={homeUsageModalOpen}
+        onClose={() => setHomeUsageModalOpen(false)}
+      />
+
+      <RegistroEjerciciosRealizadosModal
+        isOpen={homeLogModalOpen}
+        onClose={() => setHomeLogModalOpen(false)}
+      />
     </div>
   );
 }
@@ -278,6 +352,14 @@ function LiveWorkout({
   const [currentErId, setCurrentErId] = useState<string | null>(null);
   const [isExerciseFinished, setIsExerciseFinished] = useState(false);
   
+  // Exercise duration & timing states
+  const [exerciseStartTime, setExerciseStartTime] = useState<string>('');
+  const [exerciseStartTimestamp, setExerciseStartTimestamp] = useState<number>(0);
+
+  // Modals for statistics and performed exercise logs
+  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  const [isExerciseLogModalOpen, setIsExerciseLogModalOpen] = useState(false);
+
   const currentEr = routineExercises.find((er) => er.id === currentErId) || pendingExercises[0];
   const currentEx = ejercicios.find((e) => e.id === currentEr?.id_ejercicio);
 
@@ -306,6 +388,9 @@ function LiveWorkout({
   const handleStartExercise = (er: typeof routineExercises[0]) => {
     setCurrentErId(er.id);
     const partial = getPartialProgress(er.id);
+    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const nowTs = Date.now();
+
     if (partial && partial.series.length > 0) {
       // Resume from partial progress
       setLoggedSeries([...partial.series]);
@@ -315,6 +400,8 @@ function LiveWorkout({
       setWeight(last.peso_kg > 0 ? String(last.peso_kg) : "");
       setReps(String(last.reps || er.reps_objetivo.split('-')[0] || 10));
       setRpe(String(last.rpe || er.rpe_objetivo || 8));
+      setExerciseStartTime(partial.hora_inicio || nowTimeStr);
+      setExerciseStartTimestamp(partial.inicio_timestamp || nowTs);
     } else {
       // Fresh start
       setLoggedSeries([]);
@@ -322,6 +409,8 @@ function LiveWorkout({
       setWeight("");
       setReps(er.reps_objetivo?.split('-')[0] || "10");
       setRpe(er.rpe_objetivo?.toString() || "8");
+      setExerciseStartTime(nowTimeStr);
+      setExerciseStartTimestamp(nowTs);
     }
     setIsWorkoutStarted(true);
     setIsExerciseFinished(false);
@@ -332,6 +421,7 @@ function LiveWorkout({
   const handleLogradoClick = () => {
     if (!currentEr || !currentEx || !currentRoutine) return;
 
+    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const parsedWeight = Number(weight) || 0;
     const parsedReps = Number(reps) || Number(currentEr.reps_objetivo?.split('-')[0]) || 10;
     const parsedRpe = Number(rpe) || currentEr.rpe_objetivo || 8;
@@ -341,7 +431,7 @@ function LiveWorkout({
       peso_kg: parsedWeight,
       reps: parsedReps,
       rpe: parsedRpe,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: nowTimeStr,
     };
 
     const updatedSeries = [...loggedSeries, newSerie];
@@ -352,6 +442,10 @@ function LiveWorkout({
     if (isLastSet) {
       // Final set completed! Emit celebratory sound and mark exercise as completed
       playLogradoSound(true);
+
+      const finishTimestamp = Date.now();
+      const startTs = exerciseStartTimestamp || finishTimestamp;
+      const durSecs = Math.max(1, Math.round((finishTimestamp - startTs) / 1000));
 
       const completedLog: EjercicioRealizadoLog = {
         id: `log_${currentEr.id}_${Date.now()}`,
@@ -365,7 +459,12 @@ function LiveWorkout({
         series: updatedSeries,
         total_series_objetivo: currentEr.series_objetivo,
         completado: true,
-        completado_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        completado_at: nowTimeStr,
+        hora_inicio: exerciseStartTime || nowTimeStr,
+        hora_fin: nowTimeStr,
+        duracion_segundos: durSecs,
+        inicio_timestamp: startTs,
+        fin_timestamp: finishTimestamp,
       };
 
       registrarEjercicioCompleto(completedLog);
@@ -374,7 +473,7 @@ function LiveWorkout({
     } else {
       // Intermediate set completed! Emit pleasant sound, save partial progress, start rest
       playLogradoSound(false);
-      guardarProgresoParcial(currentEr.id, updatedSeries);
+      guardarProgresoParcial(currentEr.id, updatedSeries, exerciseStartTime, exerciseStartTimestamp);
 
       setIsResting(true);
       setTimer(currentEr.descanso_segundos || 90);
@@ -385,7 +484,7 @@ function LiveWorkout({
   // Button "Regresar" - interrupts active exercise, saves progress registered so far, does NOT mark complete, remains in list
   const handleInterruptAndReturn = () => {
     if (currentEr && loggedSeries.length > 0) {
-      guardarProgresoParcial(currentEr.id, loggedSeries);
+      guardarProgresoParcial(currentEr.id, loggedSeries, exerciseStartTime, exerciseStartTimestamp);
     }
     setIsWorkoutStarted(false);
     setIsExerciseFinished(false);
@@ -915,6 +1014,21 @@ function LiveWorkout({
                           <span className="text-[11px] font-bold text-[#00C9A7] mt-0.5">
                             ✓ {er.series_objetivo} series completadas • {log?.completado_at ? `Registrado a las ${log.completado_at}` : 'Completado'}
                           </span>
+
+                          {/* Exercise execution time breakdown */}
+                          {log && (
+                            <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)] font-mono mt-0.5">
+                              {log.duracion_segundos ? (
+                                <span className="text-[var(--color-text-main)] font-semibold flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-[var(--color-accent-blue)]" />
+                                  Duración: {log.duracion_segundos < 60 ? `${log.duracion_segundos}s` : `${Math.floor(log.duracion_segundos / 60)}m ${log.duracion_segundos % 60}s`}
+                                </span>
+                              ) : null}
+                              {log.hora_inicio && log.hora_fin ? (
+                                <span>({log.hora_inicio} ➔ {log.hora_fin})</span>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -935,7 +1049,7 @@ function LiveWorkout({
                             key={s.numero_serie}
                             className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-text-main)] font-semibold"
                           >
-                            Serie {s.numero_serie}: <strong>{s.reps} reps</strong> × {s.peso_kg} kg (RPE {s.rpe})
+                            Serie {s.numero_serie}: <strong>{s.reps} reps</strong> × {s.peso_kg} kg (RPE {s.rpe}) {s.timestamp ? `• ${s.timestamp}` : ''}
                           </span>
                         ))}
                       </div>
@@ -943,10 +1057,39 @@ function LiveWorkout({
                   </NeuCard>
                 );
               })}
+
+              {/* Action buttons to open comprehensive log and usage sheet */}
+              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                <NeuButton
+                  className="flex-1 py-2 text-xs font-bold text-[#00C9A7] flex items-center justify-center gap-1.5 shadow-neu-flat"
+                  onClick={() => setIsExerciseLogModalOpen(true)}
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Ver Registro Completo de Ejercicios</span>
+                </NeuButton>
+                <NeuButton
+                  className="py-2 px-3 text-xs font-bold text-[var(--color-accent-blue)] flex items-center justify-center gap-1.5 shadow-neu-flat"
+                  onClick={() => setIsUsageModalOpen(true)}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Ficha de Uso Web</span>
+                </NeuButton>
+              </div>
             </>
           )}
         </div>
       )}
+
+      {/* Modals for Web Usage and Performed Exercises */}
+      <FichaEstadisticasUsoModal
+        isOpen={isUsageModalOpen}
+        onClose={() => setIsUsageModalOpen(false)}
+      />
+
+      <RegistroEjerciciosRealizadosModal
+        isOpen={isExerciseLogModalOpen}
+        onClose={() => setIsExerciseLogModalOpen(false)}
+      />
     </div>
   );
 }

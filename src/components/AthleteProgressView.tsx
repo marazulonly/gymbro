@@ -10,14 +10,18 @@ import {
   Calendar, 
   Activity, 
   ArrowLeft, 
-  Sparkles,
-  Scale,
-  Award,
-  ChevronRight
+  Sparkles, 
+  Scale, 
+  Award, 
+  ChevronRight,
+  Clock
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { Usuario, Rutina, EjercicioRutina } from "@/types";
+import { FichaEstadisticasUsoModal } from "./FichaEstadisticasUsoModal";
+import { RegistroEjerciciosRealizadosModal } from "./RegistroEjerciciosRealizadosModal";
+
 
 interface Props {
   athleteId?: string;
@@ -96,6 +100,10 @@ export function AthleteProgressView({
   const [selectedLift, setSelectedLift] = useState<string>("deadlift");
   const [isLiftSelectorOpen, setIsLiftSelectorOpen] = useState(false);
 
+  // Modals for statistics sheet and exercise logs
+  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+
   // Month selector state
   const currentMonthIdx = new Date().getMonth();
   const [selectedMonth, setSelectedMonth] = useState<string>(MONTHS[currentMonthIdx] || "Octubre");
@@ -147,7 +155,7 @@ export function AthleteProgressView({
   return (
     <div className="flex flex-col gap-4 h-full pb-10">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-2 flex-wrap">
         <div className="flex items-center gap-3">
           {isTrainerView && onBack && (
             <NeuButton
@@ -169,16 +177,39 @@ export function AthleteProgressView({
           </div>
         </div>
 
-        {/* Optional quick access to physical evaluation sheet */}
-        {onOpenPhysicalFicha && (
+        {/* Action buttons */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           <NeuButton
-            className="text-xs font-bold text-[#4D7CFE] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat"
-            onClick={onOpenPhysicalFicha}
+            className="text-xs font-bold text-[#00C9A7] px-2.5 py-1.5 flex items-center gap-1 shadow-neu-flat"
+            onClick={() => setIsLogModalOpen(true)}
+            title="Ver registro de ejercicios realizados"
           >
-            <Scale className="w-3.5 h-3.5" />
-            <span>Ficha Física</span>
+            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span className="hidden sm:inline">Ejercicios</span>
+            <span>Realizados</span>
           </NeuButton>
-        )}
+
+          <NeuButton
+            className="text-xs font-bold text-[#4D7CFE] px-2.5 py-1.5 flex items-center gap-1 shadow-neu-flat"
+            onClick={() => setIsUsageModalOpen(true)}
+            title="Ver ficha de estadísticas de uso web"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Ficha</span>
+            <span>Uso Web</span>
+          </NeuButton>
+
+          {/* Optional quick access to physical evaluation sheet */}
+          {onOpenPhysicalFicha && (
+            <NeuButton
+              className="text-xs font-bold text-[#718096] px-2.5 py-1.5 flex items-center gap-1 shadow-neu-flat"
+              onClick={onOpenPhysicalFicha}
+            >
+              <Scale className="w-3.5 h-3.5" />
+              <span>Ficha Física</span>
+            </NeuButton>
+          )}
+        </div>
       </div>
 
       {/* Card: Frecuencia (deadlift o lift) with smooth chart */}
@@ -466,6 +497,18 @@ export function AthleteProgressView({
           </NeuCard>
         )}
       </div>
+
+      <FichaEstadisticasUsoModal
+        isOpen={isUsageModalOpen}
+        onClose={() => setIsUsageModalOpen(false)}
+        initialUserId={athlete?.id}
+      />
+
+      <RegistroEjerciciosRealizadosModal
+        isOpen={isLogModalOpen}
+        onClose={() => setIsLogModalOpen(false)}
+        initialAthleteId={athlete?.id}
+      />
     </div>
   );
 }
