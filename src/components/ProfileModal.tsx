@@ -3,8 +3,9 @@ import { useStore } from "@/store";
 import { NeuCard } from "./ui/NeuCard";
 import { NeuInput } from "./ui/NeuInput";
 import { NeuButton } from "./ui/NeuButton";
-import { X, Sun, Moon, Palette, Check } from "lucide-react";
+import { X, Sun, Moon, Palette, Check, Sparkles, Layers } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { UIStyle } from "@/types";
 
 const ACCENT_PRESETS = [
   { name: "Azul Clásico", value: "#4D7CFE" },
@@ -28,7 +29,9 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
     themeMode,
     setThemeMode,
     accentColor,
-    setAccentColor
+    setAccentColor,
+    uiStyle,
+    setUIStyle
   } = useStore();
   
   const targetUser = userId ? usuarios.find(u => u.id === userId) : currentUser;
@@ -41,6 +44,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
   const [sexo, setSexo] = useState<'masculino' | 'femenino' | 'otro'>('masculino');
   const [contrasena, setContrasena] = useState('');
   const [estado_suscripcion, setEstadoSuscripcion] = useState<'activo' | 'inactivo'>('activo');
+  const [targetUIStyle, setTargetUIStyle] = useState<UIStyle>('neumorfico');
 
   useEffect(() => {
     if (targetUser) {
@@ -51,6 +55,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
       setSexo(targetUser.sexo || 'masculino');
       setContrasena(targetUser.contrasena || '');
       setEstadoSuscripcion(targetUser.estado_suscripcion || 'activo');
+      setTargetUIStyle(targetUser.estilo_diseno || 'neumorfico');
     }
   }, [targetUser, isOpen]);
 
@@ -69,6 +74,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
       estado_suscripcion,
       color_acento: isEditingOther ? targetUser.color_acento : accentColor,
       modo_tema: isEditingOther ? targetUser.modo_tema : themeMode,
+      estilo_diseno: isEditingOther ? targetUIStyle : uiStyle,
     });
     onClose();
   };
@@ -100,8 +106,80 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
           {/* Theme & Color Settings Section */}
           {!isEditingOther && (
             <NeuCard className="p-4 mb-4 flex flex-col gap-4">
-              {/* Day / Night Theme */}
+              {/* Design Style Selector */}
               <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                    <h3 className="font-bold text-sm text-[var(--color-text-main)]">Estilo de Diseño Visual</h3>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    Nuevo estilo
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--color-text-muted)] mb-3 leading-relaxed">
+                  Elige entre el diseño neumórfico original con relieve táctil o el nuevo estilo app fitness con tarjetas modernas, botón Reproducir y cabecera dorada curvada.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setUIStyle('neumorfico')}
+                    className={`p-3.5 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                      uiStyle === 'neumorfico'
+                        ? 'shadow-neu-pressed border-[var(--color-accent-blue)]/50 bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
+                        : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-xl shadow-neu-flat flex items-center justify-center text-[var(--color-accent-blue)]">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <span className="font-bold text-xs text-[var(--color-text-main)]">Neumórfico Clásico</span>
+                      </div>
+                      {uiStyle === 'neumorfico' && (
+                        <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[var(--color-text-muted)] leading-normal">
+                      Aspecto tridimensional original con botones circulares, sombras suaves y relieves táctiles.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUIStyle('modern_gold')}
+                    className={`p-3.5 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                      uiStyle === 'modern_gold'
+                        ? 'shadow-neu-pressed border-amber-500/60 bg-[var(--color-bg-base)] ring-2 ring-amber-500/30'
+                        : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-sm">
+                          <Sparkles className="w-4 h-4 fill-current" />
+                        </div>
+                        <span className="font-bold text-xs text-[var(--color-text-main)]">Fitness Gold (Estilo App)</span>
+                      </div>
+                      {uiStyle === 'modern_gold' && (
+                        <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[var(--color-text-muted)] leading-normal">
+                      Diseño igual a la imagen: cabecera dorada curvada, tarjetas redondeadas, botón Reproducir y cuadrícula de series de alta densidad.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Day / Night Theme */}
+              <div className="pt-2 border-t border-[var(--color-text-muted)]/15">
                 <div className="flex items-center gap-2 mb-2">
                   <Sun className="w-4 h-4 text-[var(--color-accent-blue)]" />
                   <h3 className="font-bold text-sm text-[var(--color-text-main)]">Tema de Pantalla</h3>

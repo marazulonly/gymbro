@@ -1,4 +1,5 @@
 export type Role = 'admin' | 'entrenador' | 'cliente';
+export type UIStyle = 'neumorfico' | 'modern_gold';
 
 export interface Usuario {
   id: string;
@@ -14,6 +15,7 @@ export interface Usuario {
   avatar_url?: string;
   color_acento?: string;
   modo_tema?: 'light' | 'dark';
+  estilo_diseno?: UIStyle;
 }
 
 export interface Ejercicio {

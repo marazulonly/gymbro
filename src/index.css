@@ -20,6 +20,29 @@ html.dark, :root.dark, body.dark {
   --neu-circle: 6px 6px 12px #12151b, -6px -6px 12px #242b35;
 }
 
+/* Estilo App Moderna / Fitness Gold (Inspirado en la imagen adjunta) */
+html[data-ui-style="modern_gold"], 
+body[data-ui-style="modern_gold"] {
+  --color-bg-base: #FFFFFF;
+  --color-text-main: #0F172A;
+  --color-text-muted: #64748B;
+  --color-accent-gold: #F5A623;
+  --neu-flat: 0 4px 18px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  --neu-pressed: inset 0 2px 4px 0 rgba(15, 23, 42, 0.06);
+  --neu-circle: 0 4px 14px 0 rgba(15, 23, 42, 0.08);
+}
+
+html[data-ui-style="modern_gold"].dark, 
+body[data-ui-style="modern_gold"].dark {
+  --color-bg-base: #0B0F17;
+  --color-text-main: #F8FAFC;
+  --color-text-muted: #94A3B8;
+  --color-accent-gold: #F59E0B;
+  --neu-flat: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
+  --neu-pressed: inset 0 2px 4px 0 rgba(0, 0, 0, 0.5);
+  --neu-circle: 0 4px 14px 0 rgba(0, 0, 0, 0.55);
+}
+
 @theme {
   --color-bg-base: var(--color-bg-base);
   --color-text-main: var(--color-text-main);

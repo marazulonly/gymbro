@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
-import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft, BarChart2 } from "lucide-react";
+import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft, BarChart2, MoreVertical, Plus, ChevronDown } from "lucide-react";
 import { useStore, getClientRoutines, getClientActiveRoutines, getDiaSemanaNombre, getDiaSemanaCorto, SerieLograda, EjercicioRealizadoLog } from "@/store";
 import { playLogradoSound } from "@/utils/audio";
 import { motion, AnimatePresence } from "motion/react";
@@ -10,6 +10,8 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { AthleteProgressView } from "@/components/AthleteProgressView";
 import { FichaEstadisticasUsoModal } from "@/components/FichaEstadisticasUsoModal";
 import { RegistroEjerciciosRealizadosModal } from "@/components/RegistroEjerciciosRealizadosModal";
+import { MuscleIcon } from "@/components/ui/MuscleIcon";
+import { getRoutineThumbnail, getRoutineCategoryName } from "@/utils/routineAssets";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
   const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
@@ -29,13 +31,249 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
 
 
 function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) => void }) {
-  const { currentUser, rutinas, planNutricion, ejerciciosRutina, ejercicios } = useStore();
+  const { currentUser, rutinas, planNutricion, ejerciciosRutina, ejercicios, uiStyle } = useStore();
   const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
   const todayDay = new Date().getDay();
   const todayRoutine = activeRoutines.find((r) => r.dia_semana === todayDay);
   
   const [homeUsageModalOpen, setHomeUsageModalOpen] = useState(false);
   const [homeLogModalOpen, setHomeLogModalOpen] = useState(false);
+
+  // Modern Gold view matching the user's uploaded photo exactly
+  if (uiStyle === 'modern_gold') {
+    const displayRoutine = todayRoutine || activeRoutines[0] || rutinas[0];
+    const routineExercises = displayRoutine ? ejerciciosRutina.filter(er => er.id_rutina === displayRoutine.id) : [];
+
+    return (
+      <div className="flex flex-col h-full -mx-4">
+        {/* Top Organic Golden Curved Banner */}
+        <div className="bg-amber-400 dark:bg-amber-500 rounded-b-[40px] px-4 pt-3 pb-6 text-slate-950 shadow-md">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-xl font-black tracking-tight text-slate-950">
+              Rutinas de Entrenamiento
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                if (displayRoutine) {
+                  onStartWorkout(displayRoutine.id);
+                }
+              }}
+              className="bg-white hover:bg-slate-50 text-slate-950 text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" />
+              <span>Añadir</span>
+            </button>
+          </div>
+
+          {/* Horizontal Carousel of Routine Cards */}
+          <div className="flex gap-3 overflow-x-auto pb-1 pt-1 px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x">
+            {(activeRoutines.length > 0 ? activeRoutines : rutinas.slice(0, 3)).map((routine) => {
+              const routineErs = ejerciciosRutina.filter(er => er.id_rutina === routine.id);
+              const isToday = routine.dia_semana === todayDay;
+              const thumbImg = getRoutineThumbnail(routine.nombre_sesion);
+              const categoryTitle = getRoutineCategoryName(routine.nombre_sesion);
+
+              return (
+                <div
+                  key={routine.id}
+                  className="w-[155px] shrink-0 bg-white dark:bg-slate-900 rounded-[28px] p-3 shadow-sm flex flex-col justify-between snap-start border border-amber-200/60 dark:border-slate-800"
+                >
+                  <div className="relative w-full aspect-square rounded-2xl overflow-hidden mb-2.5 bg-slate-100 dark:bg-slate-800">
+                    <img
+                      src={thumbImg}
+                      alt={routine.nombre_sesion}
+                      className="w-full h-full object-cover"
+                    />
+                    {isToday && (
+                      <span className="absolute top-2 left-2 bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
+                        Hoy
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStartWorkout(routine.id);
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-xs transition-colors"
+                    >
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="px-1 mb-2.5">
+                    <h3 className="font-black text-xs text-slate-900 dark:text-white leading-tight truncate">
+                      {categoryTitle}
+                    </h3>
+                    <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {getDiaSemanaNombre(routine.dia_semana)} • {routineErs.length} ej.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onStartWorkout(routine.id)}
+                    className="w-full bg-black hover:bg-slate-800 text-white dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300 text-[11px] font-bold py-2 px-3 rounded-full flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Reproducir</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section Entrenamientos & Exercise Cards */}
+        <div className="px-4 pt-5 pb-6 flex flex-col gap-3.5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              Entrenamientos
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                if (displayRoutine) {
+                  onStartWorkout(displayRoutine.id);
+                }
+              }}
+              className="bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Añadir</span>
+            </button>
+          </div>
+
+          {/* Quick Access Badges (Uso Web & Realizados) */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setHomeUsageModalOpen(true)}
+              className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-2.5 text-left hover:border-amber-400 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-900 dark:text-white block leading-tight">
+                  Uso Web
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  Estadísticas y tiempo
+                </span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setHomeLogModalOpen(true)}
+              className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-2.5 text-left hover:border-emerald-500 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                <Check className="w-4 h-4 stroke-[3]" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-900 dark:text-white block leading-tight">
+                  Realizados
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  Historial de series
+                </span>
+              </div>
+            </button>
+          </div>
+
+          {/* List of Exercise Cards matching the photo exactly */}
+          <div className="flex flex-col gap-3">
+            {routineExercises.length === 0 ? (
+              <div className="p-6 rounded-3xl bg-slate-100 dark:bg-slate-900 text-center text-slate-500">
+                <Dumbbell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs font-bold">Sin ejercicios programados para hoy</p>
+                <p className="text-[11px] mt-1">Toca en reproducir en cualquier rutina superior para iniciar.</p>
+              </div>
+            ) : (
+              routineExercises.map((er) => {
+                const ex = ejercicios.find((e) => e.id === er.id_ejercicio);
+                const targetKg1 = er.series_objetivo * 5;
+                const targetKg2 = er.series_objetivo * 5 + 5;
+
+                return (
+                  <div
+                    key={er.id}
+                    onClick={() => onStartWorkout(displayRoutine.id)}
+                    className="bg-[#F1F5F9] dark:bg-[#1E293B] rounded-[26px] p-4 border border-slate-200/60 dark:border-slate-800 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-amber-400/60 active:scale-[0.99] transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center text-white shrink-0 shadow-sm">
+                          <MuscleIcon className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                            {ex?.nombre || 'Ejercicio de Fuerza'}
+                          </h4>
+                          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            {ex?.grupo_muscular || 'Músculo Principal'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStartWorkout(displayRoutine.id);
+                        }}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* 2-column bulleted reps & weights matching the photo */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-700 dark:text-slate-300 font-medium pl-14">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                        <span>{er.reps_objetivo || 8} Reps {targetKg1} kg</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                        <span>{er.reps_objetivo || 8} Reps {targetKg1} kg</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                        <span>{Math.max(Number(er.reps_objetivo || 8) + 2, 10)} Reps {targetKg2} kg</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                        <span>{Math.max(Number(er.reps_objetivo || 8) + 2, 10)} Reps {targetKg2} kg</span>
+                      </div>
+                    </div>
+
+                    {/* Centered Chevron Down */}
+                    <div className="flex justify-center text-slate-400 pt-0.5">
+                      <ChevronDown className="w-5 h-5" />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <FichaEstadisticasUsoModal
+          isOpen={homeUsageModalOpen}
+          onClose={() => setHomeUsageModalOpen(false)}
+        />
+
+        <RegistroEjerciciosRealizadosModal
+          isOpen={homeLogModalOpen}
+          onClose={() => setHomeLogModalOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 h-full pb-6">
@@ -296,7 +534,8 @@ function LiveWorkout({
     progresosParciales,
     guardarProgresoParcial,
     registrarEjercicioCompleto,
-    reabrirEjercicioRealizado
+    reabrirEjercicioRealizado,
+    uiStyle
   } = useStore();
 
   const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
@@ -906,6 +1145,70 @@ function LiveWorkout({
                 const ex = ejercicios.find((e) => e.id === er.id_ejercicio);
                 const partial = getPartialProgress(er.id);
                 const hasPartial = partial && partial.series.length > 0;
+
+                if (uiStyle === 'modern_gold') {
+                  const targetKg1 = er.series_objetivo * 5;
+                  const targetKg2 = er.series_objetivo * 5 + 5;
+
+                  return (
+                    <div
+                      key={er.id}
+                      onClick={() => handleStartExercise(er)}
+                      className="bg-[#F1F5F9] dark:bg-[#1E293B] rounded-[24px] p-4 border border-slate-200/60 dark:border-slate-800 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-amber-400/60 active:scale-[0.99] transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-2xl bg-black flex items-center justify-center text-white shrink-0 shadow-sm">
+                            <MuscleIcon className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                              {ex?.nombre}
+                            </h4>
+                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                              {ex?.grupo_muscular || 'Fuerza'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="bg-black hover:bg-slate-800 dark:bg-amber-400 dark:text-slate-950 text-white text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-sm">
+                          <Play className="w-3 h-3 fill-current" />
+                          <span>Iniciar</span>
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-700 dark:text-slate-300 font-medium pl-14">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                          <span>{er.reps_objetivo || 8} Reps {targetKg1} kg</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                          <span>{er.reps_objetivo || 8} Reps {targetKg1} kg</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                          <span>{Math.max(Number(er.reps_objetivo || 8) + 2, 10)} Reps {targetKg2} kg</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-900 dark:text-white text-base leading-none">•</span>
+                          <span>{Math.max(Number(er.reps_objetivo || 8) + 2, 10)} Reps {targetKg2} kg</span>
+                        </div>
+                      </div>
+
+                      {hasPartial && (
+                        <div className="pl-14 text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                          <span>Avance guardado: {partial.series.length}/{er.series_objetivo} series logradas (Toca para continuar)</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-center text-slate-400 pt-0.5">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <NeuCard 

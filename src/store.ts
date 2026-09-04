@@ -19,10 +19,11 @@ import {
   SerieLograda, 
   EjercicioRealizadoLog, 
   ProgresoParcialEjercicio, 
-  SesionUsoWeb 
+  SesionUsoWeb,
+  UIStyle 
 } from './types';
 
-export type { SerieLograda, EjercicioRealizadoLog, ProgresoParcialEjercicio, SesionUsoWeb };
+export type { SerieLograda, EjercicioRealizadoLog, ProgresoParcialEjercicio, SesionUsoWeb, UIStyle };
 
 interface AppState {
   isCloudReady: boolean;
@@ -30,6 +31,8 @@ interface AppState {
   setThemeMode: (mode: 'light' | 'dark') => void;
   accentColor: string;
   setAccentColor: (color: string) => void;
+  uiStyle: UIStyle;
+  setUIStyle: (style: UIStyle) => void;
   currentRole: Role;
   setCurrentRole: (role: Role) => void;
   isLoggedIn: boolean;
@@ -227,12 +230,14 @@ const PLAN_NUTRICION_STORAGE_KEY = 'gymbro_plan_nutricion_data';
 const FICHAS_PROGRESO_STORAGE_KEY = 'gymbro_fichas_progreso_data';
 const THEME_MODE_STORAGE_KEY = 'gymbro_theme_mode';
 const ACCENT_COLOR_STORAGE_KEY = 'gymbro_accent_color';
+export const UI_STYLE_STORAGE_KEY = 'gymbro_ui_style';
 const EJERCICIOS_REALIZADOS_KEY = 'gymbro_ejercicios_realizados_v1';
 const PROGRESOS_PARCIALES_KEY = 'gymbro_progresos_parciales_v1';
 export const SESIONES_USO_STORAGE_KEY = 'gymbro_sesiones_uso_v1';
 
 export const getUserAccentKey = (userId: string) => `gymbro_user_accent_${userId}`;
 export const getUserThemeKey = (userId: string) => `gymbro_user_theme_${userId}`;
+export const getUserUIStyleKey = (userId: string) => `gymbro_user_ui_style_${userId}`;
 
 export function getUserAccentColor(user?: Usuario | null): string {
   if (!user) return '#4D7CFE';
@@ -246,7 +251,13 @@ export function getUserThemeMode(user?: Usuario | null): 'light' | 'dark' {
   return getStoredItem<'light' | 'dark'>(getUserThemeKey(user.id), 'light');
 }
 
-export function applyThemeToDocument(theme: 'light' | 'dark', accent: string) {
+export function getUserUIStyle(user?: Usuario | null): UIStyle {
+  if (!user) return 'neumorfico';
+  if (user.estilo_diseno) return user.estilo_diseno;
+  return getStoredItem<UIStyle>(getUserUIStyleKey(user.id), 'neumorfico');
+}
+
+export function applyThemeToDocument(theme: 'light' | 'dark', accent: string, uiStyle: UIStyle = 'neumorfico') {
   if (typeof window === 'undefined') return;
   const root = document.documentElement;
   if (theme === 'dark') {
@@ -256,6 +267,9 @@ export function applyThemeToDocument(theme: 'light' | 'dark', accent: string) {
     root.classList.remove('dark');
     document.body.classList.remove('dark');
   }
+  root.setAttribute('data-ui-style', uiStyle);
+  document.body.setAttribute('data-ui-style', uiStyle);
+
   root.style.setProperty('--color-accent-blue', accent);
   root.style.setProperty('--user-accent-color', accent);
 }
@@ -405,9 +419,10 @@ const initialCurrentUser = getStoredItem<Usuario | null>(CURRENT_USER_KEY, null)
 
 const initialThemeMode = initialCurrentUser ? getUserThemeMode(initialCurrentUser) : 'light';
 const initialAccentColor = initialCurrentUser ? getUserAccentColor(initialCurrentUser) : '#4D7CFE';
+const initialUIStyle = initialCurrentUser ? getUserUIStyle(initialCurrentUser) : 'neumorfico';
 
 // Apply immediately on module load
-applyThemeToDocument(initialThemeMode, initialAccentColor);
+applyThemeToDocument(initialThemeMode, initialAccentColor, initialUIStyle);
 
 const initialEjercicios = mergeWithMock(getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, mockEjercicios), mockEjercicios);
 const initialRutinas = mergeWithMock(getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas), mockRutinas);
@@ -419,9 +434,30 @@ export const useStore = create<AppState>((set, get) => ({
   isCloudReady: false,
   themeMode: initialThemeMode,
   accentColor: initialAccentColor,
+  uiStyle: initialUIStyle,
+  setUIStyle: (style) => {
+    setStoredItem(UI_STYLE_STORAGE_KEY, style);
+    applyThemeToDocument(get().themeMode, get().accentColor, style);
+    set({ uiStyle: style });
+
+    // Persist individually for currently logged in user
+    const currentUser = get().currentUser;
+    if (currentUser) {
+      setStoredItem(getUserUIStyleKey(currentUser.id), style);
+      const updatedUser: Usuario = { ...currentUser, estilo_diseno: style };
+      const updatedList = get().usuarios.map((u) => (u.id === currentUser.id ? updatedUser : u));
+      set({ currentUser: updatedUser, usuarios: updatedList });
+      setStoredItem(CURRENT_USER_KEY, updatedUser);
+      setStoredItem(USERS_STORAGE_KEY, updatedList);
+
+      setDoc(doc(db, 'usuarios', currentUser.id), { estilo_diseno: style }, { merge: true }).catch((err) => {
+        console.warn('Error saving individual UI style to Firestore:', err);
+      });
+    }
+  },
   setThemeMode: (mode) => {
     setStoredItem(THEME_MODE_STORAGE_KEY, mode);
-    applyThemeToDocument(mode, get().accentColor);
+    applyThemeToDocument(mode, get().accentColor, get().uiStyle);
     set({ themeMode: mode });
 
     // Persist individually for currently logged in user
@@ -441,7 +477,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setAccentColor: (color) => {
     setStoredItem(ACCENT_COLOR_STORAGE_KEY, color);
-    applyThemeToDocument(get().themeMode, color);
+    applyThemeToDocument(get().themeMode, color, get().uiStyle);
     set({ accentColor: color });
 
     // Persist individually for currently logged in user
@@ -503,12 +539,14 @@ export const useStore = create<AppState>((set, get) => ({
         return { success: false, error: 'Cuenta inactiva por falta de pago.' };
       }
 
-      // Automatically activate this individual user's chosen color & theme
+      // Automatically activate this individual user's chosen color, theme & design style
       const userAccent = getUserAccentColor(user);
       const userTheme = getUserThemeMode(user);
-      applyThemeToDocument(userTheme, userAccent);
+      const userUIStyle = getUserUIStyle(user);
+      applyThemeToDocument(userTheme, userAccent, userUIStyle);
       setStoredItem(THEME_MODE_STORAGE_KEY, userTheme);
       setStoredItem(ACCENT_COLOR_STORAGE_KEY, userAccent);
+      setStoredItem(UI_STYLE_STORAGE_KEY, userUIStyle);
 
       setStoredItem(CURRENT_USER_KEY, user);
       if (typeof window !== 'undefined') {
@@ -519,7 +557,8 @@ export const useStore = create<AppState>((set, get) => ({
         currentUser: user, 
         currentRole: user.rol,
         accentColor: userAccent,
-        themeMode: userTheme
+        themeMode: userTheme,
+        uiStyle: userUIStyle
       });
 
       // Start tracking web usage for athlete or trainer
@@ -536,16 +575,18 @@ export const useStore = create<AppState>((set, get) => ({
       localStorage.removeItem(SAVED_USER_ID_KEY);
       localStorage.removeItem(CURRENT_USER_KEY);
     }
-    // Return to neutral default theme for login screen
-    applyThemeToDocument('light', '#4D7CFE');
+    // Return to neutral default theme & neumorphic style for login screen
+    applyThemeToDocument('light', '#4D7CFE', 'neumorfico');
     setStoredItem(THEME_MODE_STORAGE_KEY, 'light');
     setStoredItem(ACCENT_COLOR_STORAGE_KEY, '#4D7CFE');
+    setStoredItem(UI_STYLE_STORAGE_KEY, 'neumorfico');
 
     set({ 
       isLoggedIn: false, 
       currentUser: null,
       accentColor: '#4D7CFE',
-      themeMode: 'light'
+      themeMode: 'light',
+      uiStyle: 'neumorfico'
     });
   },
 
@@ -571,7 +612,7 @@ export const useStore = create<AppState>((set, get) => ({
     const isCurrent = get().currentUser?.id === updatedUsuario.id;
     const updatedCurrent = isCurrent ? updatedUsuario : get().currentUser;
     
-    // If editing currently logged in user, activate their colors if modified
+    // If editing currently logged in user, activate their colors and styles if modified
     if (isCurrent) {
       if (updatedUsuario.color_acento) {
         setStoredItem(getUserAccentKey(updatedUsuario.id), updatedUsuario.color_acento);
@@ -581,12 +622,18 @@ export const useStore = create<AppState>((set, get) => ({
         setStoredItem(getUserThemeKey(updatedUsuario.id), updatedUsuario.modo_tema);
         setStoredItem(THEME_MODE_STORAGE_KEY, updatedUsuario.modo_tema);
       }
+      if (updatedUsuario.estilo_diseno) {
+        setStoredItem(getUserUIStyleKey(updatedUsuario.id), updatedUsuario.estilo_diseno);
+        setStoredItem(UI_STYLE_STORAGE_KEY, updatedUsuario.estilo_diseno);
+      }
       const activeColor = updatedUsuario.color_acento || get().accentColor;
       const activeTheme = updatedUsuario.modo_tema || get().themeMode;
-      applyThemeToDocument(activeTheme, activeColor);
+      const activeUIStyle = updatedUsuario.estilo_diseno || get().uiStyle;
+      applyThemeToDocument(activeTheme, activeColor, activeUIStyle);
       set({
         accentColor: activeColor,
-        themeMode: activeTheme
+        themeMode: activeTheme,
+        uiStyle: activeUIStyle
       });
     }
 
@@ -1060,6 +1107,7 @@ export function initFirestoreSync() {
         let updatedCurrentUser = state.currentUser;
         let newAccent = state.accentColor;
         let newTheme = state.themeMode;
+        let newUIStyle = state.uiStyle;
 
         if (state.currentUser) {
           const fresh = users.find(
@@ -1075,10 +1123,12 @@ export function initFirestoreSync() {
             }
             const freshAccent = getUserAccentColor(fresh);
             const freshTheme = getUserThemeMode(fresh);
-            if (freshAccent !== state.accentColor || freshTheme !== state.themeMode) {
+            const freshUIStyle = getUserUIStyle(fresh);
+            if (freshAccent !== state.accentColor || freshTheme !== state.themeMode || freshUIStyle !== state.uiStyle) {
               newAccent = freshAccent;
               newTheme = freshTheme;
-              applyThemeToDocument(newTheme, newAccent);
+              newUIStyle = freshUIStyle;
+              applyThemeToDocument(newTheme, newAccent, newUIStyle);
             }
           }
         } else {
@@ -1096,7 +1146,8 @@ export function initFirestoreSync() {
               }
               const matchedAccent = getUserAccentColor(matched);
               const matchedTheme = getUserThemeMode(matched);
-              applyThemeToDocument(matchedTheme, matchedAccent);
+              const matchedUIStyle = getUserUIStyle(matched);
+              applyThemeToDocument(matchedTheme, matchedAccent, matchedUIStyle);
               return { 
                 usuarios: users, 
                 currentUser: matched, 
@@ -1104,7 +1155,8 @@ export function initFirestoreSync() {
                 currentRole: matched.rol, 
                 isCloudReady: true,
                 accentColor: matchedAccent,
-                themeMode: matchedTheme
+                themeMode: matchedTheme,
+                uiStyle: matchedUIStyle
               };
             }
           }
@@ -1114,7 +1166,8 @@ export function initFirestoreSync() {
           currentUser: updatedCurrentUser, 
           isCloudReady: true,
           accentColor: newAccent,
-          themeMode: newTheme
+          themeMode: newTheme,
+          uiStyle: newUIStyle
         };
       });
     } else {
