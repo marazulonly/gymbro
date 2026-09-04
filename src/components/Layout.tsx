@@ -55,7 +55,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
   const isModernGold = uiStyle === 'modern_gold';
 
   return (
-    <div className={`flex flex-col h-[100dvh] w-full max-w-md mx-auto overflow-hidden relative ${
+    <div className={`flex flex-col h-[100dvh] w-full max-w-full sm:max-w-md mx-auto overflow-hidden relative ${
       isModernGold 
         ? "bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100" 
         : "bg-[var(--color-bg-base)]"
@@ -84,9 +84,6 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
           <div className="flex flex-col items-end">
             <span className={`text-xs font-bold leading-tight ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}>
               {currentUser?.nombre}
-            </span>
-            <span className={`text-[10px] font-medium capitalize ${isModernGold ? "text-slate-800/80" : "text-[var(--color-text-muted)]"}`}>
-              {currentUser?.rol}
             </span>
           </div>
 
@@ -133,7 +130,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto overscroll-contain pb-24 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <main className="flex-1 overflow-y-auto overscroll-contain px-4 pb-24 pt-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <AnimatePresence mode="wait">
           <motion.div
             key={`${currentRole}-${activeTab}-${uiStyle}`}

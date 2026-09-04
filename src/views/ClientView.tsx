@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
@@ -547,6 +547,30 @@ function LiveWorkout({
 
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>(defaultRoutineId);
   const [activeListTab, setActiveListTab] = useState<'pendientes' | 'realizados'>('pendientes');
+  const daysContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToDay = (diaSemana: number, smooth = true) => {
+    if (!daysContainerRef.current) return;
+    const container = daysContainerRef.current;
+    const dayBtn = container.querySelector<HTMLElement>(`#btn-day-${diaSemana}`);
+    if (dayBtn) {
+      const scrollTarget = dayBtn.offsetLeft - (container.clientWidth / 2) + (dayBtn.clientWidth / 2);
+      container.scrollTo({
+        left: scrollTarget,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  };
+
+  // Keep today centered on load and whenever active routines change
+  useEffect(() => {
+    const targetDay = todayRoutine ? todayRoutine.dia_semana : (currentRoutine ? currentRoutine.dia_semana : todayDay);
+    scrollToDay(targetDay, false);
+    const t = setTimeout(() => {
+      scrollToDay(targetDay, false);
+    }, 60);
+    return () => clearTimeout(t);
+  }, [todayDay, activeRoutines.length]);
 
   useEffect(() => {
     if (initialRoutineId) {
@@ -1004,19 +1028,18 @@ function LiveWorkout({
     <div className="flex flex-col gap-3 h-full pb-4">
       {/* Day Selector Navigation Bar - Max 7 days, no duplicate days */}
       <div className="flex flex-col gap-1.5">
-        <div className="flex justify-between items-center px-1">
+        <div className="flex items-center px-1">
           <span className="text-[11px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">
-            Días de Entrenamiento ({activeRoutines.length} máx. 7)
-          </span>
-          <span className="text-[10px] font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-full shadow-neu-pressed">
-            {activeRoutines.length} Sesiones
+            Días de Entrenamiento
           </span>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div 
+          ref={daysContainerRef}
+          className="-mx-4 px-[calc(50%-44px)] flex gap-2.5 overflow-x-auto pb-1 scrollbar-none snap-x snap-mandatory"
+        >
           {activeRoutines.map((r) => {
             const isSelected = r.id === currentRoutine?.id;
-            const exercisesCount = ejerciciosRutina.filter((er) => er.id_rutina === r.id).length;
             const dayName = getDiaSemanaNombre(r.dia_semana);
             const isToday = r.dia_semana === todayDay;
 
@@ -1024,30 +1047,25 @@ function LiveWorkout({
               <button
                 key={r.id}
                 id={`btn-day-${r.dia_semana}`}
+                data-is-today={isToday ? "true" : "false"}
                 onClick={() => {
                   setSelectedRoutineId(r.id);
+                  scrollToDay(r.dia_semana, true);
                 }}
-                className={`flex-1 min-w-[78px] py-2.5 px-2 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                className={`w-[88px] min-w-[88px] shrink-0 py-2.5 px-2 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-1 snap-center ${
                   isSelected
                     ? 'bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)] ring-2 ring-[var(--color-accent-blue)]/40 font-bold'
                     : 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] font-medium active:shadow-neu-pressed'
                 }`}
               >
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-bold leading-tight">{dayName}</span>
+                  <span className="text-xs font-bold leading-tight capitalize">{dayName}</span>
                 </div>
                 {isToday && (
-                  <span className="text-[8px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded-full shadow-sm">
+                  <span className="text-[8px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.5 rounded-full shadow-sm">
                     Hoy
                   </span>
                 )}
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold ${
-                  isSelected 
-                    ? 'bg-[var(--color-accent-blue)]/15 text-[var(--color-accent-blue)]' 
-                    : 'bg-[#c5cad1]/25 text-[var(--color-text-muted)]'
-                }`}>
-                  {exercisesCount > 0 ? `${exercisesCount} ej.` : 'Sesión'}
-                </span>
               </button>
             );
           })}
@@ -1064,22 +1082,9 @@ function LiveWorkout({
         </div>
       )}
 
-      {/* Routine Title & Day header */}
-      <div className="flex flex-col mt-0.5">
-        <div className="flex items-center gap-2">
-          <span className="text-[var(--color-accent-blue)] font-bold text-xs tracking-widest uppercase">
-            {getDiaSemanaNombre(currentRoutine.dia_semana)}
-          </span>
-          {isCurrentDayToday && (
-            <span className="text-[9px] font-black uppercase bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded shadow-sm">
-              Rutina de Hoy
-            </span>
-          )}
-        </div>
+      {/* Routine Title */}
+      <div className="flex flex-col mt-0.5 px-1">
         <h2 className="text-lg font-bold text-[var(--color-text-main)] leading-snug">{currentRoutine.nombre_sesion}</h2>
-        <span className="text-xs text-[var(--color-text-muted)]">
-          {routineExercises.length} ejercicios recomendados por tu entrenador
-        </span>
       </div>
 
       {/* Sub-tabs: Pendientes vs Realizados */}
