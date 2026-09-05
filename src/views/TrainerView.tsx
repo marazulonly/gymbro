@@ -104,6 +104,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [whatsapp, setWhatsapp] = useState("");
   const [fecha, setFecha] = useState("");
   const [sexo, setSexo] = useState<"masculino" | "femenino" | "otro">("masculino");
+  const [contrasena, setContrasena] = useState("0000");
 
   // Alphabetically sorted athletes list
   const athletes = usuarios
@@ -142,7 +143,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       whatsapp,
       fecha_nacimiento: fecha,
       sexo,
-      contrasena: "0000",
+      contrasena: contrasena.trim() || "0000",
       estado_suscripcion: "activo",
       rol: "cliente",
       id_entrenador: currentUser?.id || "entrenador1",
@@ -153,6 +154,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
     setDni("");
     setWhatsapp("");
     setFecha("");
+    setContrasena("0000");
     
     // Automatically open routine management for the newly created athlete
     onManageRoutines(newUserId);
@@ -188,9 +190,13 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
               </select>
             </div>
 
-            <p className="text-xs text-[#718096] px-2 text-center mt-2">
-              La contraseña inicial será <span className="font-bold">0000</span>
-            </p>
+            <NeuInput 
+              label="Contraseña de Acceso" 
+              placeholder="0000" 
+              value={contrasena} 
+              onChange={(e) => setContrasena(e.target.value)} 
+              required 
+            />
 
             <NeuButton type="submit" className="mt-2 h-12 text-[#4D7CFE] font-bold">
               Guardar Atleta y Asignar Rutinas

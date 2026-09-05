@@ -26,7 +26,8 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
     usuarios, 
     updateUsuario, 
     deleteUsuario,
-    themeMode,
+    assignAthleteToTrainer,
+    themeMode, 
     setThemeMode,
     accentColor,
     setAccentColor,
@@ -43,8 +44,10 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
   const [fecha, setFecha] = useState('');
   const [sexo, setSexo] = useState<'masculino' | 'femenino' | 'otro'>('masculino');
   const [contrasena, setContrasena] = useState('');
+  const [id_entrenador, setIdEntrenador] = useState('');
   const [estado_suscripcion, setEstadoSuscripcion] = useState<'activo' | 'inactivo'>('activo');
   const [targetUIStyle, setTargetUIStyle] = useState<UIStyle>('neumorfico');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (targetUser) {
@@ -54,29 +57,42 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
       setFecha(targetUser.fecha_nacimiento || '');
       setSexo(targetUser.sexo || 'masculino');
       setContrasena(targetUser.contrasena || '');
+      setIdEntrenador(targetUser.id_entrenador || '');
       setEstadoSuscripcion(targetUser.estado_suscripcion || 'activo');
       setTargetUIStyle(targetUser.estilo_diseno || 'neumorfico');
     }
   }, [targetUser, isOpen]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetUser) return;
 
-    updateUsuario({
-      ...targetUser,
-      nombre,
-      dni,
-      whatsapp,
-      fecha_nacimiento: fecha,
-      sexo,
-      contrasena,
-      estado_suscripcion,
-      color_acento: isEditingOther ? targetUser.color_acento : accentColor,
-      modo_tema: isEditingOther ? targetUser.modo_tema : themeMode,
-      estilo_diseno: isEditingOther ? targetUIStyle : uiStyle,
-    });
-    onClose();
+    setIsSaving(true);
+    try {
+      await updateUsuario({
+        ...targetUser,
+        nombre,
+        dni,
+        whatsapp,
+        fecha_nacimiento: fecha,
+        sexo,
+        contrasena,
+        estado_suscripcion,
+        id_entrenador: targetUser.rol === 'cliente' ? id_entrenador : targetUser.id_entrenador,
+        color_acento: isEditingOther ? targetUser.color_acento : accentColor,
+        modo_tema: isEditingOther ? targetUser.modo_tema : themeMode,
+        estilo_diseno: isEditingOther ? targetUIStyle : uiStyle,
+      });
+
+      if (targetUser.rol === 'cliente' && id_entrenador && id_entrenador !== targetUser.id_entrenador) {
+        await assignAthleteToTrainer(targetUser.id, id_entrenador);
+      }
+      onClose();
+    } catch (err) {
+      console.error('Error saving user profile:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDelete = () => {
@@ -306,10 +322,32 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                 </div>
               )}
 
+              {targetUser?.rol === 'cliente' && (currentUser?.rol === 'admin' || currentUser?.rol === 'entrenador') && (
+                <div className="flex flex-col gap-1 w-full">
+                  <span className="text-sm font-medium text-[var(--color-text-muted)] pl-2">Entrenador Asignado</span>
+                  <select 
+                    className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-2 text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20"
+                    value={id_entrenador}
+                    onChange={(e) => setIdEntrenador(e.target.value)}
+                  >
+                    <option value="">-- Sin Entrenador Asignado --</option>
+                    {usuarios.filter((u) => u.rol === 'entrenador').map((trainer) => (
+                      <option key={trainer.id} value={trainer.id}>
+                        {trainer.nombre} (DNI: {trainer.dni})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <NeuInput label="Contraseña" type="text" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required />
               
-              <NeuButton type="submit" className="mt-4 h-12 text-[var(--color-accent-blue)] font-bold">
-                Guardar Cambios
+              <NeuButton 
+                type="submit" 
+                disabled={isSaving}
+                className="mt-4 h-12 text-[var(--color-accent-blue)] font-bold flex items-center justify-center gap-2"
+              >
+                {isSaving ? 'Guardando en la nube...' : 'Guardar Cambios'}
               </NeuButton>
 
               {isEditingOther && currentUser?.rol === 'admin' && (

@@ -5,7 +5,10 @@ import {
   setDoc, 
   deleteDoc, 
   onSnapshot, 
-  writeBatch
+  writeBatch,
+  getDocs,
+  query,
+  where
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { 
@@ -38,11 +41,12 @@ interface AppState {
   isLoggedIn: boolean;
   currentUser: Usuario | null;
   usuarios: Usuario[];
-  login: (dni: string, contrasena: string) => { success: boolean; error?: string };
+  login: (dni: string, contrasena: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   addUsuario: (usuario: Usuario) => Promise<void>;
   updateUsuario: (usuario: Usuario) => Promise<void>;
   deleteUsuario: (id: string) => Promise<void>;
+  assignAthleteToTrainer: (athleteId: string, newTrainerId: string) => Promise<void>;
   planNutricion: PlanNutricion;
   updatePlanNutricion: (plan: PlanNutricion) => Promise<void>;
   ejercicios: Ejercicio[];
@@ -509,9 +513,9 @@ export const useStore = create<AppState>((set, get) => ({
   progresosParciales: getStoredItem<Record<string, ProgresoParcialEjercicio>>(PROGRESOS_PARCIALES_KEY, {}),
   sesionesUso: getStoredItem<SesionUsoWeb[]>(SESIONES_USO_STORAGE_KEY, []),
 
-  login: (dni, contrasena) => {
+  login: async (dni, contrasena) => {
     const trimmedDni = dni.trim();
-    const user = get().usuarios.find((u) => {
+    let user = get().usuarios.find((u) => {
       const isDniMatch =
         u.dni.trim() === trimmedDni ||
         (trimmedDni === '00000000' && (u.id === 'entrenador1' || u.rol === 'entrenador')) ||
@@ -520,18 +524,35 @@ export const useStore = create<AppState>((set, get) => ({
       return isDniMatch;
     });
 
+    // Real-time Firestore fallback: If user not found in local memory or password didn't match,
+    // query Firestore directly so users created on other devices can log in instantly.
+    if (!user || user.contrasena !== contrasena) {
+      try {
+        const usersRef = collection(db, 'usuarios');
+        const q = query(usersRef, where('dni', '==', trimmedDni));
+        const querySnap = await getDocs(q);
+        if (!querySnap.empty) {
+          const docSnap = querySnap.docs[0];
+          const cloudUser = { id: docSnap.id, ...docSnap.data() } as Usuario;
+          const filtered = get().usuarios.filter((u) => u.id !== cloudUser.id);
+          const updatedUsers = [...filtered, cloudUser];
+          set({ usuarios: updatedUsers });
+          setStoredItem(USERS_STORAGE_KEY, updatedUsers);
+          user = cloudUser;
+        }
+      } catch (cloudErr) {
+        console.warn('Real-time Firestore user fetch check:', cloudErr);
+      }
+    }
+
     if (user) {
-      // Trainer password requirement: "La Contraseña para los entrenadores es '0000'"
-      const isPasswordValid = user.rol === 'entrenador'
-        ? (contrasena === '0000' || user.contrasena === contrasena)
-        : (user.contrasena === contrasena);
+      // Validate password strictly. Never force 0000 over user's actual password.
+      const isPasswordValid = user.contrasena ? (user.contrasena === contrasena) : (contrasena === '0000');
 
       if (!isPasswordValid) {
         return { 
           success: false, 
-          error: user.rol === 'entrenador' 
-            ? 'Contraseña incorrecta. La contraseña para entrenadores es 0000.' 
-            : 'Credenciales incorrectas.' 
+          error: 'Contraseña incorrecta.' 
         };
       }
 
@@ -566,7 +587,7 @@ export const useStore = create<AppState>((set, get) => ({
 
       return { success: true };
     }
-    return { success: false, error: 'Credenciales incorrectas.' };
+    return { success: false, error: 'Credenciales incorrectas o usuario no encontrado.' };
   },
 
   logout: () => {
@@ -591,7 +612,8 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addUsuario: async (usuario) => {
-    if (usuario.rol === 'entrenador') {
+    // Preserve custom password strictly. Only default to '0000' if no password was provided.
+    if (!usuario.contrasena || !usuario.contrasena.trim()) {
       usuario.contrasena = '0000';
     }
     const updated = [...get().usuarios.filter(u => u.id !== usuario.id), usuario];
@@ -601,12 +623,17 @@ export const useStore = create<AppState>((set, get) => ({
       await setDoc(doc(db, 'usuarios', usuario.id), cleanObject(usuario));
     } catch (err) {
       console.error('Error saving user to Firestore:', err);
+      throw err;
     }
   },
 
   updateUsuario: async (updatedUsuario) => {
-    if (updatedUsuario.rol === 'entrenador') {
-      updatedUsuario.contrasena = '0000';
+    // Never reset user password or names. If password is not provided in update, keep existing password.
+    if (!updatedUsuario.contrasena || !updatedUsuario.contrasena.trim()) {
+      const existing = get().usuarios.find(u => u.id === updatedUsuario.id);
+      if (existing?.contrasena) {
+        updatedUsuario.contrasena = existing.contrasena;
+      }
     }
     const updatedList = get().usuarios.map(u => u.id === updatedUsuario.id ? updatedUsuario : u);
     const isCurrent = get().currentUser?.id === updatedUsuario.id;
@@ -650,6 +677,7 @@ export const useStore = create<AppState>((set, get) => ({
       await setDoc(doc(db, 'usuarios', updatedUsuario.id), cleanObject(updatedUsuario));
     } catch (err) {
       console.error('Error updating user in Firestore:', err);
+      throw err;
     }
   },
 
@@ -661,6 +689,51 @@ export const useStore = create<AppState>((set, get) => ({
       await deleteDoc(doc(db, 'usuarios', id));
     } catch (err) {
       console.error('Error deleting user in Firestore:', err);
+      throw err;
+    }
+  },
+
+  assignAthleteToTrainer: async (athleteId: string, newTrainerId: string) => {
+    const athlete = get().usuarios.find((u) => u.id === athleteId);
+    if (!athlete) return;
+
+    const updatedAthlete: Usuario = { ...athlete, id_entrenador: newTrainerId };
+    const updatedUsers = get().usuarios.map((u) => (u.id === athleteId ? updatedAthlete : u));
+    set({ usuarios: updatedUsers });
+    setStoredItem(USERS_STORAGE_KEY, updatedUsers);
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'usuarios', athleteId), cleanObject(updatedAthlete), { merge: true });
+
+    // Also reassign all existing routines belonging to this athlete to the new trainer
+    const updatedRoutines = get().rutinas.map((r) => {
+      if (r.id_cliente === athleteId) {
+        const updated = { ...r, id_entrenador: newTrainerId };
+        batch.set(doc(db, 'rutinas', r.id), cleanObject(updated), { merge: true });
+        return updated;
+      }
+      return r;
+    });
+    set({ rutinas: updatedRoutines });
+    setStoredItem(RUTINAS_STORAGE_KEY, updatedRoutines);
+
+    // Also reassign progress cards belonging to this athlete to the new trainer
+    const updatedFichas = get().fichasProgreso.map((f) => {
+      if (f.id_cliente === athleteId) {
+        const updated = { ...f, id_entrenador: newTrainerId };
+        batch.set(doc(db, 'fichasProgreso', f.id), cleanObject(updated), { merge: true });
+        return updated;
+      }
+      return f;
+    });
+    set({ fichasProgreso: updatedFichas });
+    setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, updatedFichas);
+
+    try {
+      await batch.commit();
+    } catch (err) {
+      console.error('Error reassigning athlete to trainer in Firestore:', err);
+      throw err;
     }
   },
 
