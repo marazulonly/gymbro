@@ -764,6 +764,7 @@ function LiveWorkout({
 
   // Active exercise elapsed seconds ticker (tracks elapsed seconds while developing the exercise)
   const [exerciseElapsedSeconds, setExerciseElapsedSeconds] = useState(0);
+  const [showLogradoNotice, setShowLogradoNotice] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -858,11 +859,14 @@ function LiveWorkout({
     setIsWorkoutStarted(true);
     setIsExerciseFinished(false);
     setIsResting(false);
+    setShowLogradoNotice(false);
   };
 
-  // Button "LOGRADO!" - emits sound, logs set, advances or finishes
+  // Click on the cronómetro - emits sound, shows "LOGRADO" notice, logs set, advances or finishes
   const handleLogradoClick = () => {
-    if (!currentEr || !currentEx || !currentRoutine) return;
+    if (!currentEr || !currentEx || !currentRoutine || showLogradoNotice) return;
+
+    setShowLogradoNotice(true);
 
     const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const parsedWeight = Number(weight) || 0;
@@ -911,16 +915,23 @@ function LiveWorkout({
       };
 
       registrarEjercicioCompleto(completedLog);
-      setIsResting(false);
-      setIsExerciseFinished(true);
+
+      setTimeout(() => {
+        setIsResting(false);
+        setIsExerciseFinished(true);
+        setShowLogradoNotice(false);
+      }, 900);
     } else {
       // Intermediate set completed! Emit pleasant sound, save partial progress, start rest
       playLogradoSound(false);
       guardarProgresoParcial(currentEr.id, updatedSeries, exerciseStartTime, exerciseStartTimestamp);
 
-      setIsResting(true);
-      setTimer(currentEr.descanso_segundos || 90);
-      setCurrentSet((prev) => prev + 1);
+      setTimeout(() => {
+        setIsResting(true);
+        setTimer(currentEr.descanso_segundos || 90);
+        setCurrentSet((prev) => prev + 1);
+        setShowLogradoNotice(false);
+      }, 900);
     }
   };
 
@@ -1188,22 +1199,33 @@ function LiveWorkout({
                 />
               </div>
 
-              {/* Requirement: Cambia el botón "COMPLETAR SERIE" por "LOGRADO!" y debe emitir un sonido */}
-              <NeuButton 
-                className="mt-3 h-14 text-lg text-[#00C9A7] font-extrabold flex items-center justify-center gap-2 shadow-neu-flat active:shadow-neu-pressed tracking-wide"
-                onClick={handleLogradoClick}
-              >
-                <Check className="w-7 h-7 stroke-[3]" />
-                <span>LOGRADO!</span>
-              </NeuButton>
+              {/* Aviso con el mensaje "LOGRADO" en el mismo tamaño del botón borrado cuando se pulsa el cronómetro */}
+              <AnimatePresence>
+                {showLogradoNotice && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-2 h-14 w-full rounded-2xl flex items-center justify-center gap-2.5 shadow-neu-flat bg-[var(--color-bg-base)] text-[#00C9A7] font-extrabold text-lg tracking-wide border border-[#00C9A7]/40 select-none"
+                  >
+                    <Check className="w-7 h-7 stroke-[3]" />
+                    <span>LOGRADO</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {/* Reloj que marca los segundos que van transcurriendo mientras desarrolla el ejercicio debajo del botón LOGRADO */}
-              <div className="flex justify-center my-3">
-                <AnalogExerciseClock elapsedSeconds={exerciseElapsedSeconds} size={180} />
+              {/* Reloj que marca los segundos que van transcurriendo mientras desarrolla el ejercicio; pulsar sobre él completa la serie */}
+              <div className="flex justify-center my-2">
+                <AnalogExerciseClock 
+                  elapsedSeconds={exerciseElapsedSeconds} 
+                  size={180} 
+                  onClick={handleLogradoClick}
+                />
               </div>
 
-              <p className="text-[11px] text-center text-[var(--color-text-muted)] mt-1">
-                Presiona <strong>"Regresar"</strong> arriba si necesitas pausar o interrumpir. Tu progreso quedará guardado.
+              <p className="text-xs text-center text-[var(--color-text-muted)] font-medium mt-1 select-none">
+                Pulsa sobre el cronometro cuando acabes la serie.
               </p>
             </motion.div>
           )}

@@ -6,12 +6,14 @@ interface AnalogExerciseClockProps {
   elapsedSeconds: number;
   className?: string;
   size?: number;
+  onClick?: () => void;
 }
 
 export const AnalogExerciseClock: React.FC<AnalogExerciseClockProps> = ({
   elapsedSeconds,
   className = '',
   size = 180,
+  onClick,
 }) => {
   const { uiStyle = 'soft_porcelain', themeMode = 'light' } = useStore();
   const isDark = themeMode === 'dark';
@@ -92,7 +94,20 @@ export const AnalogExerciseClock: React.FC<AnalogExerciseClockProps> = ({
       {/* Analog Clock Disc */}
       <div
         style={{ width: `${size}px`, height: `${size}px` }}
-        className={`relative rounded-full flex items-center justify-center select-none transition-all duration-300 ${theme.shadowClass}`}
+        onClick={onClick}
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={onClick ? (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        } : undefined}
+        title={onClick ? 'Pulsa sobre el cronometro cuando acabes la serie' : undefined}
+        aria-label={onClick ? 'Completar serie (LOGRADO)' : 'Cronómetro analógico'}
+        className={`relative rounded-full flex items-center justify-center select-none transition-all duration-300 ${theme.shadowClass} ${
+          onClick ? 'cursor-pointer active:scale-95 hover:scale-[1.02] transition-transform duration-150' : ''
+        }`}
       >
         <svg
           viewBox="0 0 100 100"
