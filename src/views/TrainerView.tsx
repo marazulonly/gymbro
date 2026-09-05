@@ -31,7 +31,9 @@ import {
   AlertTriangle,
   Lock,
   Unlock,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "@/components/ProfileModal";
@@ -93,12 +95,44 @@ const DIAS_SEMANA = [
 ];
 
 function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: string, mode?: "gestionar" | "progreso") => void }) {
-  const { currentUser, usuarios, addUsuario, rutinas, fichasProgreso } = useStore();
+  const { currentUser, usuarios, addUsuario, rutinas, fichasProgreso, uiStyle } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
   const [accessModalAthlete, setAccessModalAthlete] = useState<Usuario | null>(null);
   const [filterTrainerMode, setFilterTrainerMode] = useState<"mis_atletas" | "todos">("mis_atletas");
+  const [expandedAthleteId, setExpandedAthleteId] = useState<string | null>(null);
+
+  // Auto-collapse expanded athlete card when clicking outside anywhere on the screen
+  useEffect(() => {
+    if (!expandedAthleteId) return;
+
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Do not collapse if interacting inside any modal, portal or dialog
+      if (target.closest('.fixed') || target.closest('[role="dialog"]')) {
+        return;
+      }
+
+      // Check if clicked inside the currently expanded athlete's card
+      const cardEl = document.getElementById(`athlete-card-${expandedAthleteId}`);
+      if (cardEl && cardEl.contains(target)) {
+        return;
+      }
+
+      // Click was outside the expanded card: collapse it
+      setExpandedAthleteId(null);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [expandedAthleteId]);
 
   // Modals for web usage stats and exercise completion history
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
@@ -285,7 +319,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         </button>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5 pb-8">
         {displayedAthletes.length === 0 ? (
           <p className="text-center text-[#718096] my-6 text-sm">
             {filterTrainerMode === "mis_atletas"
@@ -309,150 +343,204 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
               daysBadge = diff;
             }
 
+            const isExpanded = expandedAthleteId === athlete.id;
+
             return (
-              <NeuCard key={athlete.id} className="flex flex-col gap-3 p-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[#4D7CFE] text-base">
-                      {athlete.nombre.charAt(0)}
+              <NeuCard 
+                key={athlete.id} 
+                id={`athlete-card-${athlete.id}`}
+                className={`transition-all duration-200 ${
+                  !isExpanded 
+                    ? "p-2.5 sm:p-3" 
+                    : "flex flex-col gap-3 p-4"
+                }`}
+              >
+                {!isExpanded ? (
+                  /* Ficha de una sola línea: circulo con la inicial, el nombre del atleta y botón para expandir */
+                  <div 
+                    className="flex items-center justify-between gap-3 cursor-pointer select-none"
+                    onClick={() => setExpandedAthleteId(athlete.id)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[var(--color-accent-blue)] text-sm shrink-0">
+                        {athlete.nombre.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-bold text-[var(--color-text-main)] text-sm truncate">
+                        {athlete.nombre}
+                      </span>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-[#2D3748] text-sm leading-tight">{athlete.nombre}</span>
-                      <div className="flex items-center gap-2 text-[10px] text-[#718096] mt-0.5 flex-wrap">
-                        <span>DNI: {athlete.dni}</span>
-                        <span
-                          className={`px-1.5 py-0.2 rounded-md ${
-                            athlete.estado_suscripcion === "inactivo"
-                              ? "bg-red-100 text-red-600"
-                              : "bg-green-100 text-green-600"
-                          }`}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedAthleteId(athlete.id);
+                      }}
+                      className="w-8 h-8 rounded-full shadow-neu-flat hover:shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)] transition-all shrink-0 active:scale-95"
+                      title="Expandir vista completa"
+                      aria-label="Expandir vista completa"
+                    >
+                      <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                  </div>
+                ) : (
+                  /* Vista expandida tal cual como está actualmente con botón para contraer */
+                  <>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[#4D7CFE] text-base shrink-0">
+                          {athlete.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-[#2D3748] text-base leading-tight">{athlete.nombre}</span>
+                          <div className="flex items-center gap-2 text-[10px] text-[#718096] mt-0.5 flex-wrap">
+                            <span
+                              className={`px-1.5 py-0.2 rounded-md ${
+                                athlete.estado_suscripcion === "inactivo"
+                                  ? "bg-red-100 text-red-600"
+                                  : "bg-green-100 text-green-600"
+                              }`}
+                            >
+                              {athlete.estado_suscripcion === "inactivo" ? "Inactivo" : "Activo"}
+                            </span>
+                            {/* Access Mode Badge */}
+                            <span
+                              className={`px-2 py-0.2 rounded-md font-bold flex items-center gap-1 ${
+                                modoAcceso === "siempre_visible"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : modoAcceso === "solo_hoy"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : modoAcceso === "horario_manual"
+                                  ? athlete.control_acceso?.manual_activo !== false
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-red-100 text-red-700"
+                                  : "bg-purple-100 text-purple-700"
+                              }`}
+                            >
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>
+                                {modoAcceso === "solo_hoy"
+                                  ? "Solo hoy"
+                                  : modoAcceso === "horario_manual"
+                                  ? `Manual: ${athlete.control_acceso?.manual_activo !== false ? "ON" : "OFF"}`
+                                  : modoAcceso === "franja_horaria"
+                                  ? "Franja horaria"
+                                  : "Siempre visible"}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <NeuButton
+                          variant="circle"
+                          className="w-8 h-8 shadow-neu-flat text-[#718096] !p-0 flex items-center justify-center"
+                          onClick={() => setSelectedUserId(athlete.id)}
+                          title="Editar Perfil"
                         >
-                          {athlete.estado_suscripcion === "inactivo" ? "Inactivo" : "Activo"}
-                        </span>
-                        {/* Access Mode Badge */}
-                        <span
-                          className={`px-2 py-0.2 rounded-md font-bold flex items-center gap-1 ${
-                            modoAcceso === "siempre_visible"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : modoAcceso === "solo_hoy"
-                              ? "bg-blue-100 text-blue-700"
-                              : modoAcceso === "horario_manual"
-                              ? athlete.control_acceso?.manual_activo !== false
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-red-100 text-red-700"
-                              : "bg-purple-100 text-purple-700"
-                          }`}
+                          <User className="w-4 h-4" />
+                        </NeuButton>
+
+                        <button
+                          type="button"
+                          className="w-8 h-8 rounded-full shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)] active:scale-95"
+                          onClick={() => setExpandedAthleteId(null)}
+                          title="Contraer ficha"
+                          aria-label="Contraer ficha"
                         >
-                          <Lock className="w-2.5 h-2.5" />
-                          <span>
-                            {modoAcceso === "solo_hoy"
-                              ? "Solo hoy"
-                              : modoAcceso === "horario_manual"
-                              ? `Manual: ${athlete.control_acceso?.manual_activo !== false ? "ON" : "OFF"}`
-                              : modoAcceso === "franja_horaria"
-                              ? "Franja horaria"
-                              : "Siempre visible"}
-                          </span>
-                        </span>
+                          <ChevronUp className="w-4 h-4 stroke-[2.5]" />
+                        </button>
                       </div>
                     </div>
-                  </div>
 
-                  <NeuButton
-                    variant="circle"
-                    className="w-8 h-8 shadow-neu-flat text-[#718096] !p-0 flex items-center justify-center"
-                    onClick={() => setSelectedUserId(athlete.id)}
-                    title="Editar Perfil"
-                  >
-                    <User className="w-4 h-4" />
-                  </NeuButton>
-                </div>
+                    {/* Routine status info banner */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#E0E5EC] p-2.5 rounded-xl shadow-neu-pressed gap-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Dumbbell className="w-4 h-4 text-[#4D7CFE] shrink-0" />
+                        <span className="text-[#2D3748] font-bold">
+                          {athleteRoutinesCount > 0 ? `${athleteRoutinesCount} Días de Rutina` : "Sin rutinas"}
+                        </span>
+                      </div>
 
-                {/* Routine status info banner */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#E0E5EC] p-2.5 rounded-xl shadow-neu-pressed gap-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <Dumbbell className="w-4 h-4 text-[#4D7CFE] shrink-0" />
-                    <span className="text-[#2D3748] font-bold">
-                      {athleteRoutinesCount > 0 ? `${athleteRoutinesCount} Días de Rutina` : "Sin rutinas"}
-                    </span>
-                  </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <NeuButton
+                          className="px-2 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          onClick={() => setAccessModalAthlete(athlete)}
+                          title="Configurar Control de Acceso a Rutinas (Siempre visible, Solo hoy, Manual, Franja horaria)"
+                        >
+                          <Lock className="w-3 h-3 text-[#4D7CFE]" />
+                          <span>Acceso</span>
+                        </NeuButton>
 
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <NeuButton
-                      className="px-2 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
-                      onClick={() => setAccessModalAthlete(athlete)}
-                      title="Configurar Control de Acceso a Rutinas (Siempre visible, Solo hoy, Manual, Franja horaria)"
-                    >
-                      <Lock className="w-3 h-3 text-[#4D7CFE]" />
-                      <span>Acceso</span>
-                    </NeuButton>
+                        <NeuButton
+                          className="px-2 py-1 text-[11px] text-[#00C9A7] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          onClick={() => handleOpenAthleteExercises(athlete.id)}
+                          title="Ver ejercicios completados por esta atleta"
+                        >
+                          <Check className="w-3 h-3 stroke-[2.5]" />
+                          <span>Ejercicios</span>
+                        </NeuButton>
 
-                    <NeuButton
-                      className="px-2 py-1 text-[11px] text-[#00C9A7] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
-                      onClick={() => handleOpenAthleteExercises(athlete.id)}
-                      title="Ver ejercicios completados por esta atleta"
-                    >
-                      <Check className="w-3 h-3 stroke-[2.5]" />
-                      <span>Ejercicios</span>
-                    </NeuButton>
+                        <NeuButton
+                          className="px-2 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          onClick={() => handleOpenAthleteUsage(athlete.id)}
+                          title="Ver ficha de tiempos de uso web de esta atleta"
+                        >
+                          <Clock className="w-3 h-3" />
+                          <span>Uso Web</span>
+                        </NeuButton>
 
-                    <NeuButton
-                      className="px-2 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
-                      onClick={() => handleOpenAthleteUsage(athlete.id)}
-                      title="Ver ficha de tiempos de uso web de esta atleta"
-                    >
-                      <Clock className="w-3 h-3" />
-                      <span>Uso Web</span>
-                    </NeuButton>
+                        <NeuButton
+                          className="px-2.5 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          onClick={() => onManageRoutines(athlete.id, "progreso")}
+                          title="Ver pantalla Tu Progreso de la atleta"
+                        >
+                          <Activity className="w-3 h-3" />
+                          <span>Progreso</span>
+                        </NeuButton>
 
-                    <NeuButton
-                      className="px-2.5 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
-                      onClick={() => onManageRoutines(athlete.id, "progreso")}
-                      title="Ver pantalla Tu Progreso de la atleta"
-                    >
-                      <Activity className="w-3 h-3" />
-                      <span>Progreso</span>
-                    </NeuButton>
+                        <NeuButton
+                          className="px-2.5 py-1 text-[11px] text-[#2D3748] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          onClick={() => onManageRoutines(athlete.id, "gestionar")}
+                          title="Editar rutinas y ejercicios"
+                        >
+                          <Sliders className="w-3 h-3" />
+                          <span>Rutinas</span>
+                        </NeuButton>
+                      </div>
+                    </div>
 
-                    <NeuButton
-                      className="px-2.5 py-1 text-[11px] text-[#2D3748] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
-                      onClick={() => onManageRoutines(athlete.id, "gestionar")}
-                      title="Editar rutinas y ejercicios"
-                    >
-                      <Sliders className="w-3 h-3" />
-                      <span>Rutinas</span>
-                    </NeuButton>
-                  </div>
-                </div>
+                    {/* Progress quick glance & action */}
+                    <div className="flex items-center justify-between pt-1 border-t border-[#c5cad1]/30">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-3.5 h-3.5 text-[#4D7CFE]" />
+                        <span className="text-[11px] font-medium text-[#718096]">{checkinText}</span>
+                        {daysBadge !== null && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                              daysBadge < 0
+                                ? "bg-red-100 text-red-600"
+                                : daysBadge <= 3
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {daysBadge < 0 ? `${Math.abs(daysBadge)}d atrasado` : daysBadge === 0 ? "Hoy" : `${daysBadge}d`}
+                          </span>
+                        )}
+                      </div>
 
-                {/* Progress quick glance & action */}
-                <div className="flex items-center justify-between pt-1 border-t border-[#c5cad1]/30">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-3.5 h-3.5 text-[#4D7CFE]" />
-                    <span className="text-[11px] font-medium text-[#718096]">{checkinText}</span>
-                    {daysBadge !== null && (
-                      <span
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                          daysBadge < 0
-                            ? "bg-red-100 text-red-600"
-                            : daysBadge <= 3
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700"
-                        }`}
+                      <NeuButton
+                        className="px-3 py-1 text-xs text-[#718096] font-bold flex items-center gap-1 h-8"
+                        onClick={() => setProgressModalAthlete(athlete)}
                       >
-                        {daysBadge < 0 ? `${Math.abs(daysBadge)}d atrasado` : daysBadge === 0 ? "Hoy" : `${daysBadge}d`}
-                      </span>
-                    )}
-                  </div>
-
-                  <NeuButton
-                    className="px-3 py-1 text-xs text-[#718096] font-bold flex items-center gap-1 h-8"
-                    onClick={() => setProgressModalAthlete(athlete)}
-                  >
-                    <Scale className="w-3.5 h-3.5" />
-                    Ficha
-                  </NeuButton>
-                </div>
+                        <Scale className="w-3.5 h-3.5" />
+                        Ficha
+                      </NeuButton>
+                    </div>
+                  </>
+                )}
               </NeuCard>
             );
           })

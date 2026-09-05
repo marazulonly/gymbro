@@ -52,6 +52,31 @@ body[data-ui-style="modern_gold"].dark {
   --neu-circle: 0 4px 14px 0 rgba(0, 0, 0, 0.55);
 }
 
+/* Nuevo Estilo: Soft Porcelain 3D (Neumorfismo Blanco Puro - Exacto a la imagen) */
+html[data-ui-style="soft_porcelain"], 
+body[data-ui-style="soft_porcelain"] {
+  --color-bg-base: #EEF2F6;
+  --color-text-main: #1E293B;
+  --color-text-muted: #64748B;
+  --color-accent-blue: #00A3FF;
+  --color-accent-green: #00C9A7;
+  --neu-flat: 12px 12px 24px #d2dbe5, -12px -12px 24px #ffffff;
+  --neu-pressed: inset 4px 4px 8px #d2dbe5, inset -4px -4px 8px #ffffff;
+  --neu-circle: 8px 8px 18px #d2dbe5, -8px -8px 18px #ffffff;
+}
+
+html[data-ui-style="soft_porcelain"].dark, 
+body[data-ui-style="soft_porcelain"].dark {
+  --color-bg-base: #111722;
+  --color-text-main: #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --color-accent-blue: #38BDF8;
+  --color-accent-green: #2DD4BF;
+  --neu-flat: 10px 10px 22px #0a0e16, -10px -10px 22px #182030;
+  --neu-pressed: inset 4px 4px 8px #0a0e16, inset -4px -4px 8px #182030;
+  --neu-circle: 8px 8px 16px #0a0e16, -8px -8px 16px #182030;
+}
+
 @theme {
   --color-bg-base: var(--color-bg-base);
   --color-text-main: var(--color-text-main);

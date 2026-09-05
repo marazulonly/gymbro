@@ -137,11 +137,38 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                   Elige entre el diseño neumórfico original con relieve táctil o el nuevo estilo app fitness con tarjetas modernas, botón Reproducir y cabecera dorada curvada.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setUIStyle('soft_porcelain')}
+                    className={`p-3 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                      uiStyle === 'soft_porcelain'
+                        ? 'shadow-neu-pressed border-[#00A3FF] bg-[var(--color-bg-base)] ring-2 ring-[#00A3FF]/30'
+                        : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-xl bg-[#00A3FF] text-white flex items-center justify-center shadow-[0_4px_10px_rgba(0,163,255,0.4)]">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <span className="font-bold text-xs text-[var(--color-text-main)]">Soft Porcelain 3D</span>
+                      </div>
+                      {uiStyle === 'soft_porcelain' && (
+                        <div className="w-5 h-5 rounded-full bg-[#00A3FF] text-white flex items-center justify-center">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[var(--color-text-muted)] leading-normal">
+                      Igual a la imagen: blanco suave porcelana, sombras difusas, azul cian vibrante, fichas con bordes sutiles y dock flotante.
+                    </p>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setUIStyle('neumorfico')}
-                    className={`p-3.5 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                    className={`p-3 rounded-2xl text-left transition-all flex flex-col justify-between border ${
                       uiStyle === 'neumorfico'
                         ? 'shadow-neu-pressed border-[var(--color-accent-blue)]/50 bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
                         : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
@@ -168,7 +195,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                   <button
                     type="button"
                     onClick={() => setUIStyle('modern_gold')}
-                    className={`p-3.5 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                    className={`p-3 rounded-2xl text-left transition-all flex flex-col justify-between border ${
                       uiStyle === 'modern_gold'
                         ? 'shadow-neu-pressed border-amber-500/60 bg-[var(--color-bg-base)] ring-2 ring-amber-500/30'
                         : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
@@ -179,7 +206,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                         <div className="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-sm">
                           <Sparkles className="w-4 h-4 fill-current" />
                         </div>
-                        <span className="font-bold text-xs text-[var(--color-text-main)]">Fitness Gold (Estilo App)</span>
+                        <span className="font-bold text-xs text-[var(--color-text-main)]">Fitness Gold</span>
                       </div>
                       {uiStyle === 'modern_gold' && (
                         <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center">
@@ -188,7 +215,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                       )}
                     </div>
                     <p className="text-[11px] text-[var(--color-text-muted)] leading-normal">
-                      Diseño igual a la imagen: cabecera dorada curvada, tarjetas redondeadas, botón Reproducir y cuadrícula de series de alta densidad.
+                      Cabecera dorada curvada, tarjetas redondeadas, botón Reproducir y cuadrícula de series.
                     </p>
                   </button>
                 </div>
@@ -333,7 +360,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                     <option value="">-- Sin Entrenador Asignado --</option>
                     {usuarios.filter((u) => u.rol === 'entrenador').map((trainer) => (
                       <option key={trainer.id} value={trainer.id}>
-                        {trainer.nombre} (DNI: {trainer.dni})
+                        {trainer.nombre}
                       </option>
                     ))}
                   </select>

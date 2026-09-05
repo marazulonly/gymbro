@@ -490,7 +490,7 @@ function AccountManagement() {
                     <option value="">-- Sin Entrenador Inicial --</option>
                     {trainers.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.nombre} (DNI: {t.dni})
+                        {t.nombre}
                       </option>
                     ))}
                   </select>
