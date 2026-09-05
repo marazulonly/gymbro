@@ -1,6 +1,24 @@
 export type Role = 'admin' | 'entrenador' | 'cliente';
 export type UIStyle = 'neumorfico' | 'modern_gold';
 
+export type ModoControlAcceso = 'siempre_visible' | 'solo_hoy' | 'horario_manual' | 'franja_horaria';
+
+export interface FranjaHorariaDia {
+  activo: boolean;
+  hora_inicio: string; // ej. "08:00"
+  hora_fin: string;    // ej. "20:00"
+}
+
+export interface ControlAccesoRutinas {
+  modo: ModoControlAcceso;
+  manual_activo?: boolean; // Para horario_manual: true = ON (permitido), false = OFF (pausado)
+  franjas_semanales?: {
+    [diaSemana: number]: FranjaHorariaDia; // 0 = Dom, 1 = Lun, ..., 6 = Sáb
+  };
+  mensaje_personalizado?: string;
+  ultima_actualizacion?: string;
+}
+
 export interface Usuario {
   id: string;
   nombre: string;
@@ -16,6 +34,7 @@ export interface Usuario {
   color_acento?: string;
   modo_tema?: 'light' | 'dark';
   estilo_diseno?: UIStyle;
+  control_acceso?: ControlAccesoRutinas;
 }
 
 export interface Ejercicio {

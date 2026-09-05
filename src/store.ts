@@ -85,7 +85,11 @@ function cleanObject<T extends Record<string, any>>(obj: T): T {
   const result: any = {};
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) {
-      result[key] = value;
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        result[key] = cleanObject(value);
+      } else {
+        result[key] = value;
+      }
     }
   }
   return result;

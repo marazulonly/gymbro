@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
-import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft, BarChart2, MoreVertical, Plus, ChevronDown } from "lucide-react";
+import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft, BarChart2, MoreVertical, Plus, ChevronDown, Lock } from "lucide-react";
 import { useStore, getClientRoutines, getClientActiveRoutines, getDiaSemanaNombre, getDiaSemanaCorto, SerieLograda, EjercicioRealizadoLog } from "@/store";
 import { playLogradoSound } from "@/utils/audio";
 import { motion, AnimatePresence } from "motion/react";
@@ -12,6 +12,9 @@ import { FichaEstadisticasUsoModal } from "@/components/FichaEstadisticasUsoModa
 import { RegistroEjerciciosRealizadosModal } from "@/components/RegistroEjerciciosRealizadosModal";
 import { MuscleIcon } from "@/components/ui/MuscleIcon";
 import { getRoutineThumbnail, getRoutineCategoryName } from "@/utils/routineAssets";
+import { checkAthleteRoutineAccess, RoutineAccessStatus } from "@/utils/routineAccess";
+import { RoutineAccessBlockedCard } from "@/components/RoutineAccessBlockedCard";
+import { WorkoutTimeExpiredModal } from "@/components/WorkoutTimeExpiredModal";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
   const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
@@ -31,13 +34,28 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
 
 
 function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) => void }) {
-  const { currentUser, rutinas, planNutricion, ejerciciosRutina, ejercicios, uiStyle } = useStore();
+  const { currentUser, usuarios, rutinas, planNutricion, ejerciciosRutina, ejercicios, uiStyle } = useStore();
   const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
   const todayDay = new Date().getDay();
   const todayRoutine = activeRoutines.find((r) => r.dia_semana === todayDay);
   
   const [homeUsageModalOpen, setHomeUsageModalOpen] = useState(false);
   const [homeLogModalOpen, setHomeLogModalOpen] = useState(false);
+  const [blockedStatus, setBlockedStatus] = useState<RoutineAccessStatus | null>(null);
+
+  // General routine access status
+  const generalAccess = checkAthleteRoutineAccess(currentUser, usuarios);
+
+  const handleTryStartWorkout = (routineId: string) => {
+    const routine = rutinas.find((r) => r.id === routineId);
+    const targetDay = routine?.dia_semana;
+    const access = checkAthleteRoutineAccess(currentUser, usuarios, targetDay);
+    if (!access.allowed) {
+      setBlockedStatus(access);
+      return;
+    }
+    onStartWorkout(routineId);
+  };
 
   // Modern Gold view matching the user's uploaded photo exactly
   if (uiStyle === 'modern_gold') {
@@ -56,7 +74,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
               type="button"
               onClick={() => {
                 if (displayRoutine) {
-                  onStartWorkout(displayRoutine.id);
+                  handleTryStartWorkout(displayRoutine.id);
                 }
               }}
               className="bg-white hover:bg-slate-50 text-slate-950 text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1 shadow-sm active:scale-95 transition-all"
@@ -73,6 +91,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
               const isToday = routine.dia_semana === todayDay;
               const thumbImg = getRoutineThumbnail(routine.nombre_sesion);
               const categoryTitle = getRoutineCategoryName(routine.nombre_sesion);
+              const routineAccess = checkAthleteRoutineAccess(currentUser, usuarios, routine.dia_semana);
 
               return (
                 <div
@@ -90,16 +109,24 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                         Hoy
                       </span>
                     )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStartWorkout(routine.id);
-                      }}
-                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-xs transition-colors"
-                    >
-                      <MoreVertical className="w-3.5 h-3.5" />
-                    </button>
+                    {!routineAccess.allowed && (
+                      <span className="absolute top-2 right-2 bg-slate-900/80 text-amber-300 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm backdrop-blur-xs">
+                        <Lock className="w-2.5 h-2.5" />
+                        <span>{routineAccess.modo === 'solo_hoy' ? 'Solo hoy' : 'Pausado'}</span>
+                      </span>
+                    )}
+                    {routineAccess.allowed && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTryStartWorkout(routine.id);
+                        }}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-xs transition-colors"
+                      >
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   <div className="px-1 mb-2.5">
@@ -113,17 +140,33 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
 
                   <button
                     type="button"
-                    onClick={() => onStartWorkout(routine.id)}
+                    onClick={() => handleTryStartWorkout(routine.id)}
                     className="w-full bg-black hover:bg-slate-800 text-white dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300 text-[11px] font-bold py-2 px-3 rounded-full flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
                   >
-                    <Play className="w-3 h-3 fill-current" />
-                    <span>Reproducir</span>
+                    {!routineAccess.allowed ? (
+                      <>
+                        <Lock className="w-3 h-3" />
+                        <span>Acceso Restringido</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Reproducir</span>
+                      </>
+                    )}
                   </button>
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* Global Access Block Notice in Modern Gold */}
+        {!generalAccess.allowed && generalAccess.modo !== 'solo_hoy' && (
+          <div className="px-4 pt-4">
+            <RoutineAccessBlockedCard status={generalAccess} />
+          </div>
+        )}
 
         {/* Section Entrenamientos & Exercise Cards */}
         <div className="px-4 pt-5 pb-6 flex flex-col gap-3.5">
@@ -135,7 +178,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
               type="button"
               onClick={() => {
                 if (displayRoutine) {
-                  onStartWorkout(displayRoutine.id);
+                  handleTryStartWorkout(displayRoutine.id);
                 }
               }}
               className="bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 transition-colors"
@@ -201,7 +244,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                 return (
                   <div
                     key={er.id}
-                    onClick={() => onStartWorkout(displayRoutine.id)}
+                    onClick={() => handleTryStartWorkout(displayRoutine.id)}
                     className="bg-[#F1F5F9] dark:bg-[#1E293B] rounded-[26px] p-4 border border-slate-200/60 dark:border-slate-800 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-amber-400/60 active:scale-[0.99] transition-all"
                   >
                     <div className="flex items-center justify-between">
@@ -223,7 +266,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onStartWorkout(displayRoutine.id);
+                          handleTryStartWorkout(displayRoutine.id);
                         }}
                         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
                       >
@@ -261,6 +304,27 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
             )}
           </div>
         </div>
+
+        {/* Modal when athlete tries to access a restricted routine */}
+        {blockedStatus && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="w-full max-w-sm">
+              <RoutineAccessBlockedCard
+                status={blockedStatus}
+                onRetry={() => setBlockedStatus(null)}
+              />
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setBlockedStatus(null)}
+                  className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-white/90 dark:bg-slate-800/90 hover:bg-white px-5 py-2 rounded-xl shadow-sm transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <FichaEstadisticasUsoModal
           isOpen={homeUsageModalOpen}
@@ -305,6 +369,11 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
           </NeuButton>
         </div>
       </div>
+
+      {/* Global Access Block Notice in Neumorphic mode */}
+      {!generalAccess.allowed && generalAccess.modo !== 'solo_hoy' && (
+        <RoutineAccessBlockedCard status={generalAccess} />
+      )}
 
       {/* Quick Action Cards: Ficha de Uso Web & Ejercicios Realizados */}
       <div className="grid grid-cols-2 gap-2.5">
@@ -362,7 +431,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
           <NeuButton 
             variant="circle" 
             className="w-12 h-12 text-[var(--color-accent-blue)] shrink-0" 
-            onClick={() => onStartWorkout(todayRoutine.id)}
+            onClick={() => handleTryStartWorkout(todayRoutine.id)}
           >
             <Play className="w-5 h-5 ml-1" />
           </NeuButton>
@@ -388,7 +457,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
           {activeRoutines.length > 0 && (
             <NeuButton
               className="px-3 py-1.5 text-xs font-bold text-[var(--color-accent-blue)] h-8 flex items-center gap-1"
-              onClick={() => onStartWorkout(activeRoutines[0].id)}
+              onClick={() => handleTryStartWorkout(activeRoutines[0].id)}
             >
               <span>Ver Plan</span>
             </NeuButton>
@@ -447,6 +516,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
             const routineErs = ejerciciosRutina.filter(er => er.id_rutina === routine.id);
             const dayName = getDiaSemanaNombre(routine.dia_semana);
             const isToday = routine.dia_semana === todayDay;
+            const routineAccess = checkAthleteRoutineAccess(currentUser, usuarios, routine.dia_semana);
 
             return (
               <NeuCard 
@@ -454,7 +524,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                 className={`p-3.5 flex flex-col gap-2 cursor-pointer hover:shadow-neu-pressed transition-all ${
                   isToday ? 'ring-2 ring-[var(--color-accent-blue)]/30' : ''
                 }`}
-                onClick={() => onStartWorkout(routine.id)}
+                onClick={() => handleTryStartWorkout(routine.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -470,17 +540,32 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                         Hoy
                       </span>
                     )}
+                    {!routineAccess.allowed && (
+                      <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded flex items-center gap-1 shadow-neu-pressed">
+                        <Lock className="w-2.5 h-2.5" />
+                        <span>{routineAccess.modo === 'solo_hoy' ? 'Solo hoy' : 'Pausado'}</span>
+                      </span>
+                    )}
                     <span className="font-bold text-xs text-[var(--color-text-main)]">{routine.nombre_sesion}</span>
                   </div>
                   <NeuButton 
                     className="px-2.5 py-1 text-[11px] font-bold text-[var(--color-accent-blue)] h-7 flex items-center gap-1"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onStartWorkout(routine.id);
+                      handleTryStartWorkout(routine.id);
                     }}
                   >
-                    <Play className="w-3 h-3 fill-current" />
-                    <span>Ver</span>
+                    {!routineAccess.allowed ? (
+                      <>
+                        <Lock className="w-3 h-3 text-amber-500" />
+                        <span>Restringido</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Ver</span>
+                      </>
+                    )}
                   </NeuButton>
                 </div>
 
@@ -505,6 +590,26 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         </div>
       </div>
 
+      {/* Modal dialog when trying to access locked routine in Neumorphic mode */}
+      {blockedStatus && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm">
+            <RoutineAccessBlockedCard
+              status={blockedStatus}
+              onRetry={() => setBlockedStatus(null)}
+            />
+            <div className="mt-3 text-center">
+              <NeuButton
+                onClick={() => setBlockedStatus(null)}
+                className="px-6 py-2 text-xs font-bold text-[var(--color-text-main)]"
+              >
+                Cerrar
+              </NeuButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       <FichaEstadisticasUsoModal
         isOpen={homeUsageModalOpen}
         onClose={() => setHomeUsageModalOpen(false)}
@@ -527,6 +632,7 @@ function LiveWorkout({
 }) {
   const { 
     currentUser, 
+    usuarios,
     rutinas, 
     ejerciciosRutina, 
     ejercicios,
@@ -548,6 +654,11 @@ function LiveWorkout({
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>(defaultRoutineId);
   const [activeListTab, setActiveListTab] = useState<'pendientes' | 'realizados'>('pendientes');
   const daysContainerRef = useRef<HTMLDivElement>(null);
+
+  // Routine Access and Timeout States
+  const [isTimeExpiredModalOpen, setIsTimeExpiredModalOpen] = useState(false);
+  const [hasExtendedTime, setHasExtendedTime] = useState(false);
+  const [gracePeriodEnd, setGracePeriodEnd] = useState<number | null>(null);
 
   const scrollToDay = (diaSemana: number, smooth = true) => {
     if (!daysContainerRef.current) return;
@@ -589,6 +700,9 @@ function LiveWorkout({
 
   const currentRoutine = activeRoutines.find((r) => r.id === selectedRoutineId) || activeRoutines[0];
   const routineExercises = ejerciciosRutina.filter((er) => er.id_rutina === currentRoutine?.id);
+
+  // Real-time access check for currently selected routine
+  const currentAccess = checkAthleteRoutineAccess(currentUser, usuarios, currentRoutine?.dia_semana);
 
   // Status helpers for routine exercises
   const isErCompleted = (erId: string) => {
@@ -647,8 +761,55 @@ function LiveWorkout({
     return () => clearInterval(interval);
   }, [isResting, timer]);
 
+  // Periodic access control check during an active workout session
+  useEffect(() => {
+    if (!isWorkoutStarted) {
+      setIsTimeExpiredModalOpen(false);
+      setHasExtendedTime(false);
+      setGracePeriodEnd(null);
+      return;
+    }
+
+    const checkInterval = setInterval(() => {
+      const access = checkAthleteRoutineAccess(currentUser, usuarios, currentRoutine?.dia_semana);
+      if (!access.allowed) {
+        if (hasExtendedTime) {
+          if (gracePeriodEnd && Date.now() > gracePeriodEnd) {
+            // Grace period ended! Gracefully interrupt and save partial progress
+            setIsTimeExpiredModalOpen(false);
+            handleInterruptAndReturn();
+          }
+        } else {
+          // Trigger timeout warning modal
+          setIsTimeExpiredModalOpen(true);
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(checkInterval);
+  }, [isWorkoutStarted, currentUser, usuarios, currentRoutine?.dia_semana, hasExtendedTime, gracePeriodEnd]);
+
+  // Handle athlete requesting 5-minute extension when access times out during exercise
+  const handleExtendWorkout = () => {
+    setHasExtendedTime(true);
+    setGracePeriodEnd(Date.now() + 5 * 60 * 1000); // 5 minutes grace period
+    setIsTimeExpiredModalOpen(false);
+  };
+
+  // Handle athlete clicking save and exit on expiration modal
+  const handleSaveAndExitWorkout = () => {
+    setIsTimeExpiredModalOpen(false);
+    handleInterruptAndReturn();
+  };
+
   // Start training a specific exercise (either fresh or resuming from partial)
   const handleStartExercise = (er: typeof routineExercises[0]) => {
+    // Check access permission before starting
+    const access = checkAthleteRoutineAccess(currentUser, usuarios, currentRoutine?.dia_semana);
+    if (!access.allowed) {
+      return;
+    }
+
     setCurrentErId(er.id);
     const partial = getPartialProgress(er.id);
     const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -865,6 +1026,14 @@ function LiveWorkout({
             <span>Regresar a la Lista</span>
           </NeuButton>
         </div>
+
+        {/* Workout Time Expired Modal for finished view */}
+        <WorkoutTimeExpiredModal
+          isOpen={isTimeExpiredModalOpen}
+          onExtend={handleExtendWorkout}
+          onSaveAndExit={handleSaveAndExitWorkout}
+          trainerName={currentAccess.trainerName}
+        />
       </div>
     );
   }
@@ -1015,6 +1184,14 @@ function LiveWorkout({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Workout Time Expired Modal for active exercise */}
+        <WorkoutTimeExpiredModal
+          isOpen={isTimeExpiredModalOpen}
+          onExtend={handleExtendWorkout}
+          onSaveAndExit={handleSaveAndExitWorkout}
+          trainerName={currentAccess.trainerName}
+        />
       </div>
     );
   }
@@ -1042,6 +1219,7 @@ function LiveWorkout({
             const isSelected = r.id === currentRoutine?.id;
             const dayName = getDiaSemanaNombre(r.dia_semana);
             const isToday = r.dia_semana === todayDay;
+            const rAccess = checkAthleteRoutineAccess(currentUser, usuarios, r.dia_semana);
 
             return (
               <button
@@ -1060,6 +1238,9 @@ function LiveWorkout({
               >
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-bold leading-tight capitalize">{dayName}</span>
+                  {!rAccess.allowed && (
+                    <Lock className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                  )}
                 </div>
                 {isToday && (
                   <span className="text-[8px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.5 rounded-full shadow-sm">
@@ -1087,31 +1268,38 @@ function LiveWorkout({
         <h2 className="text-lg font-bold text-[var(--color-text-main)] leading-snug">{currentRoutine.nombre_sesion}</h2>
       </div>
 
-      {/* Sub-tabs: Pendientes vs Realizados */}
-      <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed mt-1">
-        <button
-          onClick={() => setActiveListTab('pendientes')}
-          className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-            activeListTab === 'pendientes'
-              ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]'
-              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>Pendientes ({pendingExercises.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveListTab('realizados')}
-          className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-            activeListTab === 'realizados'
-              ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[#00C9A7]'
-              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
-          }`}
-        >
-          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Realizados ({completedExercises.length})</span>
-        </button>
-      </div>
+      {/* Access Control Guard for this day */}
+      {!currentAccess.allowed ? (
+        <div className="mt-2">
+          <RoutineAccessBlockedCard status={currentAccess} />
+        </div>
+      ) : (
+        <>
+          {/* Sub-tabs: Pendientes vs Realizados */}
+          <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed mt-1">
+            <button
+              onClick={() => setActiveListTab('pendientes')}
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                activeListTab === 'pendientes'
+                  ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Pendientes ({pendingExercises.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveListTab('realizados')}
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                activeListTab === 'realizados'
+                  ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[#00C9A7]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Realizados ({completedExercises.length})</span>
+            </button>
+          </div>
 
       {/* TAB CONTENT: PENDIENTES */}
       {activeListTab === 'pendientes' && (
@@ -1386,6 +1574,8 @@ function LiveWorkout({
             </>
           )}
         </div>
+      )}
+      </>
       )}
 
       {/* Modals for Web Usage and Performed Exercises */}

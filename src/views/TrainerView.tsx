@@ -28,7 +28,10 @@ import {
   ArrowRightLeft,
   Eraser,
   Coffee,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  Unlock,
+  SlidersHorizontal
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "@/components/ProfileModal";
@@ -36,7 +39,8 @@ import { AthleteProgressModal } from "@/components/AthleteProgressModal";
 import { AthleteProgressView } from "@/components/AthleteProgressView";
 import { FichaEstadisticasUsoModal } from "@/components/FichaEstadisticasUsoModal";
 import { RegistroEjerciciosRealizadosModal } from "@/components/RegistroEjerciciosRealizadosModal";
-import { Rutina, EjercicioRutina, Usuario, Ejercicio } from "@/types";
+import { RoutineAccessControlModal } from "@/components/RoutineAccessControlModal";
+import { Rutina, EjercicioRutina, Usuario, Ejercicio, ModoControlAcceso } from "@/types";
 
 export function TrainerView({ 
   tab, 
@@ -45,7 +49,7 @@ export function TrainerView({
   tab: number; 
   onNavigateTab?: (tab: number) => void;
 }) {
-  const { usuarios } = useStore();
+  const { usuarios, currentUser } = useStore();
   const athletes = usuarios
     .filter((u) => u.rol === "cliente")
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
@@ -93,6 +97,8 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
+  const [accessModalAthlete, setAccessModalAthlete] = useState<Usuario | null>(null);
+  const [filterTrainerMode, setFilterTrainerMode] = useState<"mis_atletas" | "todos">("mis_atletas");
 
   // Modals for web usage stats and exercise completion history
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
@@ -110,6 +116,16 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const athletes = usuarios
     .filter((u) => u.rol === "cliente")
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
+  // Athletes assigned to this trainer
+  const assignedAthletes = athletes.filter(
+    (u) =>
+      currentUser?.rol === "admin" ||
+      u.id_entrenador === currentUser?.id ||
+      (!u.id_entrenador && currentUser?.id === "entrenador1")
+  );
+
+  const displayedAthletes = filterTrainerMode === "mis_atletas" ? assignedAthletes : athletes;
 
   const handleOpenAthleteExercises = (athleteId: string) => {
     setSelectedModalAthleteId(athleteId);
@@ -241,13 +257,46 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         </div>
       </div>
 
+      {/* Trainer Athletes Filter Tabs */}
+      <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+        <button
+          type="button"
+          onClick={() => setFilterTrainerMode("mis_atletas")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            filterTrainerMode === "mis_atletas"
+              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+              : "text-[#718096] hover:text-[#2D3748]"
+          }`}
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>Mis Atletas Asignados ({assignedAthletes.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterTrainerMode("todos")}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            filterTrainerMode === "todos"
+              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+              : "text-[#718096] hover:text-[#2D3748]"
+          }`}
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          <span>Todos los Atletas ({athletes.length})</span>
+        </button>
+      </div>
+
       <div className="flex flex-col gap-3">
-        {athletes.length === 0 ? (
-          <p className="text-center text-[#718096] my-6 text-sm">No tienes atletas registrados.</p>
+        {displayedAthletes.length === 0 ? (
+          <p className="text-center text-[#718096] my-6 text-sm">
+            {filterTrainerMode === "mis_atletas"
+              ? "No tienes atletas asignados a tu cuenta actualmente."
+              : "No hay atletas registrados en el gimnasio."}
+          </p>
         ) : (
-          athletes.map((athlete) => {
+          displayedAthletes.map((athlete) => {
             const ficha = fichasProgreso.find((f) => f.id_cliente === athlete.id);
             const athleteRoutinesCount = rutinas.filter((r) => r.id_cliente === athlete.id).length;
+            const modoAcceso = athlete.control_acceso?.modo || "siempre_visible";
 
             let checkinText = "Sin ficha";
             let daysBadge = null;
@@ -269,7 +318,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                     </div>
                     <div className="flex flex-col">
                       <span className="font-bold text-[#2D3748] text-sm leading-tight">{athlete.nombre}</span>
-                      <div className="flex items-center gap-2 text-[10px] text-[#718096] mt-0.5">
+                      <div className="flex items-center gap-2 text-[10px] text-[#718096] mt-0.5 flex-wrap">
                         <span>DNI: {athlete.dni}</span>
                         <span
                           className={`px-1.5 py-0.2 rounded-md ${
@@ -279,6 +328,31 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                           }`}
                         >
                           {athlete.estado_suscripcion === "inactivo" ? "Inactivo" : "Activo"}
+                        </span>
+                        {/* Access Mode Badge */}
+                        <span
+                          className={`px-2 py-0.2 rounded-md font-bold flex items-center gap-1 ${
+                            modoAcceso === "siempre_visible"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : modoAcceso === "solo_hoy"
+                              ? "bg-blue-100 text-blue-700"
+                              : modoAcceso === "horario_manual"
+                              ? athlete.control_acceso?.manual_activo !== false
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-red-100 text-red-700"
+                              : "bg-purple-100 text-purple-700"
+                          }`}
+                        >
+                          <Lock className="w-2.5 h-2.5" />
+                          <span>
+                            {modoAcceso === "solo_hoy"
+                              ? "Solo hoy"
+                              : modoAcceso === "horario_manual"
+                              ? `Manual: ${athlete.control_acceso?.manual_activo !== false ? "ON" : "OFF"}`
+                              : modoAcceso === "franja_horaria"
+                              ? "Franja horaria"
+                              : "Siempre visible"}
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -304,6 +378,15 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    <NeuButton
+                      className="px-2 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                      onClick={() => setAccessModalAthlete(athlete)}
+                      title="Configurar Control de Acceso a Rutinas (Siempre visible, Solo hoy, Manual, Franja horaria)"
+                    >
+                      <Lock className="w-3 h-3 text-[#4D7CFE]" />
+                      <span>Acceso</span>
+                    </NeuButton>
+
                     <NeuButton
                       className="px-2 py-1 text-[11px] text-[#00C9A7] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
                       onClick={() => handleOpenAthleteExercises(athlete.id)}
@@ -376,6 +459,12 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         )}
       </div>
 
+      <RoutineAccessControlModal
+        isOpen={!!accessModalAthlete}
+        athlete={accessModalAthlete}
+        onClose={() => setAccessModalAthlete(null)}
+      />
+
       <ProfileModal
         isOpen={!!selectedUserId}
         onClose={() => setSelectedUserId(null)}
@@ -439,11 +528,48 @@ function RoutineManager({
     copyRoutinesToAthlete,
     clearRutinaEjercicios,
     moveRutinaToDay,
-    toggleRutinaDescanso
+    toggleRutinaDescanso,
+    updateUsuario
   } = useStore();
 
   const [viewMode, setViewMode] = useState<"gestionar" | "progreso">(initialViewMode);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
+  const [accessModalAthlete, setAccessModalAthlete] = useState<Usuario | null>(null);
+
+  const handleQuickSetMode = async (modo: ModoControlAcceso) => {
+    if (!currentAthlete) return;
+    const currentControl = currentAthlete.control_acceso || {
+      modo: "siempre_visible",
+      manual_activo: true,
+      franjas_semanales: [],
+    };
+    const updatedUser: Usuario = {
+      ...currentAthlete,
+      control_acceso: {
+        ...currentControl,
+        modo,
+      },
+    };
+    await updateUsuario(updatedUser);
+  };
+
+  const handleToggleManual = async () => {
+    if (!currentAthlete) return;
+    const currentControl = currentAthlete.control_acceso || {
+      modo: "horario_manual",
+      manual_activo: true,
+      franjas_semanales: [],
+    };
+    const updatedUser: Usuario = {
+      ...currentAthlete,
+      control_acceso: {
+        ...currentControl,
+        modo: "horario_manual",
+        manual_activo: currentControl.manual_activo === false ? true : false,
+      },
+    };
+    await updateUsuario(updatedUser);
+  };
 
   useEffect(() => {
     if (initialViewMode) {
@@ -1222,6 +1348,144 @@ function RoutineManager({
         </div>
       </NeuCard>
 
+      {/* Control de Acceso a Rutinas Card */}
+      {currentAthlete && (
+        <NeuCard className="p-3.5 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[#4D7CFE]">
+                <Sliders className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xs font-bold text-[#2D3748]">Control de Acceso a Rutinas</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.2 rounded-md bg-[#4D7CFE]/10 text-[#4D7CFE]">
+                    {currentAthlete.control_acceso?.modo === "solo_hoy"
+                      ? "Solo hoy"
+                      : currentAthlete.control_acceso?.modo === "horario_manual"
+                      ? `Manual: ${currentAthlete.control_acceso?.manual_activo !== false ? "ON" : "OFF"}`
+                      : currentAthlete.control_acceso?.modo === "franja_horaria"
+                      ? "Por franja horaria"
+                      : "Siempre visible"}
+                  </span>
+                </div>
+                <span className="text-[10px] text-[#718096]">
+                  Define cuándo {currentAthlete.nombre} puede visualizar y registrar sus ejercicios
+                </span>
+              </div>
+            </div>
+
+            <NeuButton
+              className="px-2.5 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1 h-7"
+              onClick={() => setAccessModalAthlete(currentAthlete)}
+            >
+              <span>Detalles</span>
+            </NeuButton>
+          </div>
+
+          {/* 4 Access Modes Exclusive Selector Buttons */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+            {/* 1. Siempre visible */}
+            <button
+              type="button"
+              onClick={() => handleQuickSetMode("siempre_visible")}
+              className={`p-2 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
+                (currentAthlete.control_acceso?.modo || "siempre_visible") === "siempre_visible"
+                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-emerald-500/40 text-emerald-700"
+                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold">1. Siempre visible</span>
+                {(currentAthlete.control_acceso?.modo || "siempre_visible") === "siempre_visible" && (
+                  <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                )}
+              </div>
+              <span className="text-[9px] text-[#718096] leading-tight">Acceso total e irrestricto</span>
+            </button>
+
+            {/* 2. Solo hoy */}
+            <button
+              type="button"
+              onClick={() => handleQuickSetMode("solo_hoy")}
+              className={`p-2 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
+                currentAthlete.control_acceso?.modo === "solo_hoy"
+                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-blue-500/40 text-blue-700"
+                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold">2. Solo hoy</span>
+                {currentAthlete.control_acceso?.modo === "solo_hoy" && (
+                  <Check className="w-3 h-3 text-blue-600 stroke-[3]" />
+                )}
+              </div>
+              <span className="text-[9px] text-[#718096] leading-tight">Solo fecha actual (00:00-23:59)</span>
+            </button>
+
+            {/* 3. Horario manual */}
+            <div
+              className={`p-2 rounded-xl text-left flex flex-col gap-1 transition-all ${
+                currentAthlete.control_acceso?.modo === "horario_manual"
+                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-amber-500/40 text-amber-800"
+                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+              }`}
+            >
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => handleQuickSetMode("horario_manual")}
+              >
+                <span className="text-[11px] font-bold">3. Horario manual</span>
+                {currentAthlete.control_acceso?.modo === "horario_manual" && (
+                  <Check className="w-3 h-3 text-amber-600 stroke-[3]" />
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-[#718096]">
+                  {currentAthlete.control_acceso?.manual_activo !== false ? "Habilitado" : "Pausado"}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleManual();
+                  }}
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-full transition-all ${
+                    currentAthlete.control_acceso?.manual_activo !== false
+                      ? "bg-emerald-500 text-white shadow-sm"
+                      : "bg-red-500 text-white shadow-sm"
+                  }`}
+                >
+                  {currentAthlete.control_acceso?.manual_activo !== false ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+
+            {/* 4. Por franja horaria */}
+            <button
+              type="button"
+              onClick={() => {
+                handleQuickSetMode("franja_horaria");
+                setAccessModalAthlete(currentAthlete);
+              }}
+              className={`p-2 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
+                currentAthlete.control_acceso?.modo === "franja_horaria"
+                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-purple-500/40 text-purple-700"
+                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold">4. Franja horaria</span>
+                {currentAthlete.control_acceso?.modo === "franja_horaria" && (
+                  <Check className="w-3 h-3 text-purple-600 stroke-[3]" />
+                )}
+              </div>
+              <span className="text-[9px] text-[#718096] leading-tight">Días y horas permitidas</span>
+            </button>
+          </div>
+        </NeuCard>
+      )}
+
       {/* View Mode Switcher: Rutinas vs Vista "Tu Progreso" */}
       <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
         <button
@@ -1940,6 +2204,12 @@ function RoutineManager({
         isOpen={!!progressModalAthlete}
         onClose={() => setProgressModalAthlete(null)}
         athlete={progressModalAthlete}
+      />
+
+      <RoutineAccessControlModal
+        isOpen={!!accessModalAthlete}
+        athlete={accessModalAthlete}
+        onClose={() => setAccessModalAthlete(null)}
       />
     </div>
   );
