@@ -15,6 +15,7 @@ import { getRoutineThumbnail, getRoutineCategoryName } from "@/utils/routineAsse
 import { checkAthleteRoutineAccess, RoutineAccessStatus } from "@/utils/routineAccess";
 import { RoutineAccessBlockedCard } from "@/components/RoutineAccessBlockedCard";
 import { WorkoutTimeExpiredModal } from "@/components/WorkoutTimeExpiredModal";
+import { AnalogExerciseClock } from "@/components/AnalogExerciseClock";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
   const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
@@ -761,6 +762,19 @@ function LiveWorkout({
     return () => clearInterval(interval);
   }, [isResting, timer]);
 
+  // Active exercise elapsed seconds ticker (tracks elapsed seconds while developing the exercise)
+  const [exerciseElapsedSeconds, setExerciseElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isWorkoutStarted && !isResting && !isExerciseFinished) {
+      interval = setInterval(() => {
+        setExerciseElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isWorkoutStarted, isResting, isExerciseFinished]);
+
   // Periodic access control check during an active workout session
   useEffect(() => {
     if (!isWorkoutStarted) {
@@ -826,6 +840,10 @@ function LiveWorkout({
       setRpe(String(last.rpe || er.rpe_objetivo || 8));
       setExerciseStartTime(partial.hora_inicio || nowTimeStr);
       setExerciseStartTimestamp(partial.inicio_timestamp || nowTs);
+      const elapsedSinceStart = partial.inicio_timestamp 
+        ? Math.max(0, Math.floor((nowTs - partial.inicio_timestamp) / 1000)) 
+        : 0;
+      setExerciseElapsedSeconds(elapsedSinceStart);
     } else {
       // Fresh start
       setLoggedSeries([]);
@@ -835,6 +853,7 @@ function LiveWorkout({
       setRpe(er.rpe_objetivo?.toString() || "8");
       setExerciseStartTime(nowTimeStr);
       setExerciseStartTimestamp(nowTs);
+      setExerciseElapsedSeconds(0);
     }
     setIsWorkoutStarted(true);
     setIsExerciseFinished(false);
@@ -1055,8 +1074,8 @@ function LiveWorkout({
             <span>Regresar</span>
           </NeuButton>
 
-          <NeuCard inset className="px-3 py-1.5 !rounded-xl whitespace-nowrap">
-            <span className="text-[var(--color-accent-blue)] font-bold text-xs">
+          <NeuCard inset className="px-4 py-2 !rounded-2xl whitespace-nowrap flex items-center justify-center shadow-neu-pressed">
+            <span className="text-[var(--color-accent-blue)] font-normal text-xl tracking-tight leading-none">
               Serie {currentSet}/{currentEr.series_objetivo}
             </span>
           </NeuCard>
@@ -1177,6 +1196,11 @@ function LiveWorkout({
                 <Check className="w-7 h-7 stroke-[3]" />
                 <span>LOGRADO!</span>
               </NeuButton>
+
+              {/* Reloj que marca los segundos que van transcurriendo mientras desarrolla el ejercicio debajo del botón LOGRADO */}
+              <div className="flex justify-center my-3">
+                <AnalogExerciseClock elapsedSeconds={exerciseElapsedSeconds} size={180} />
+              </div>
 
               <p className="text-[11px] text-center text-[var(--color-text-muted)] mt-1">
                 Presiona <strong>"Regresar"</strong> arriba si necesitas pausar o interrumpir. Tu progreso quedará guardado.
