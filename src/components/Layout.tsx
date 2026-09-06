@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useStore } from "@/store";
-import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Cloud, Heart, Calendar, Search, Plus } from "lucide-react";
+import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Heart, Calendar, Search, Plus } from "lucide-react";
 import { NeuButton } from "./ui/NeuButton";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "./ProfileModal";
@@ -54,45 +54,42 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
   const navItems = getNavItems();
   const isModernGold = uiStyle === 'modern_gold';
   const isSoftPorcelain = uiStyle === 'soft_porcelain';
+  const isAthleteHomeScreen = currentRole === 'cliente' && activeTab === 0;
 
   return (
     <div className={`flex flex-col h-[100dvh] w-full max-w-full sm:max-w-md mx-auto overflow-hidden relative ${
       isModernGold 
         ? "bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100" 
-        : isSoftPorcelain
-        ? "bg-[#EEF2F6] dark:bg-[#111722] font-sans text-[#1E293B] dark:text-[#F1F5F9]"
-        : "bg-[var(--color-bg-base)]"
+        : "bg-[var(--color-bg-base)] text-[var(--color-text-main)]"
     }`}>
       {/* Top Header */}
       {isSoftPorcelain ? (
-        <header className="z-10 px-4 pt-3 pb-2.5 flex justify-between items-center bg-[#EEF2F6]/90 dark:bg-[#111722]/90 backdrop-blur-md">
+        <header className="z-10 px-4 pt-3 pb-2.5 flex justify-between items-center bg-[var(--color-bg-base)]/90 backdrop-blur-md">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[#00A3FF]">
+            <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M4 14.5L9.5 4H14.5L9 14.5H4Z" />
                 <path d="M10 20L15.5 9.5H20.5L15 20H10Z" opacity="0.65" />
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tight text-[#1E293B] dark:text-[#F1F5F9]">
+              <h1 className="text-lg font-black tracking-tight text-[var(--color-text-main)]">
                 GymBro
               </h1>
-            </div>
-            <div className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEF2F6] dark:bg-[#161D2A] text-[#00A3FF] shadow-neu-flat">
-              <Cloud className="w-3 h-3" />
-              <span>Nube</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#1E293B] dark:text-[#F1F5F9] hidden xs:inline">
-              {currentUser?.nombre}
-            </span>
+            {!isAthleteHomeScreen && (
+              <span className="text-xs font-bold text-[var(--color-text-main)] hidden xs:inline">
+                {currentUser?.nombre}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setIsProfileOpen(true)}
               title="Buscar / Ajustes"
-              className="w-9 h-9 rounded-full shadow-neu-pressed flex items-center justify-center text-[#64748B] hover:text-[#00A3FF] transition-colors"
+              className="w-9 h-9 rounded-full shadow-neu-pressed flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent-blue)] transition-colors"
             >
               <Search className="w-4 h-4" />
             </button>
@@ -100,7 +97,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
               type="button"
               onClick={() => setIsProfileOpen(true)}
               title="Personalizar Estilo"
-              className="w-9 h-9 rounded-full bg-[#00A3FF] text-white flex items-center justify-center shadow-[0_6px_14px_rgba(0,163,255,0.45)] hover:bg-[#0092e6] active:scale-95 transition-all"
+              className="w-9 h-9 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shadow-sm hover:opacity-90 active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
             </button>
@@ -108,7 +105,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
               type="button"
               onClick={logout}
               title="Cerrar sesión"
-              className="w-9 h-9 rounded-full shadow-neu-flat flex items-center justify-center text-[#64748B] hover:text-red-500 transition-colors"
+              className="w-9 h-9 rounded-full shadow-neu-flat flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent-amber)] transition-colors"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -124,22 +121,16 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
             <h1 className={`text-xl font-black tracking-tight ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}>
               GymBro
             </h1>
-            <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              isModernGold 
-                ? "bg-white/80 text-slate-900 shadow-sm" 
-                : "bg-[var(--color-bg-base)] text-[#00C9A7] shadow-neu-flat"
-            }`}>
-              <Cloud className="w-3 h-3" />
-              <span>Nube</span>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex flex-col items-end">
-              <span className={`text-xs font-bold leading-tight ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}>
-                {currentUser?.nombre}
-              </span>
-            </div>
+            {!isAthleteHomeScreen && (
+              <div className="flex flex-col items-end">
+                <span className={`text-xs font-bold leading-tight ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}>
+                  {currentUser?.nombre}
+                </span>
+              </div>
+            )}
 
             {isModernGold ? (
               <>
@@ -203,7 +194,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
       {/* Bottom Navigation */}
       {isSoftPorcelain ? (
         <nav className="absolute bottom-3 left-0 right-0 px-4 z-30 pointer-events-none">
-          <div className="pointer-events-auto max-w-[340px] mx-auto bg-[#EEF2F6] dark:bg-[#161D2A] rounded-[28px] px-5 py-2 shadow-[10px_10px_24px_#d2dbe5,-10px_-10px_24px_#ffffff] dark:shadow-[8px_8px_20px_#090c12,-8px_-8px_20px_#1f293b] border border-white/60 dark:border-slate-800/60 flex justify-between items-center">
+          <div className="pointer-events-auto max-w-[340px] mx-auto bg-[var(--color-bg-base)] rounded-[28px] px-5 py-2 shadow-neu-flat border border-white/60 dark:border-slate-800/60 flex justify-between items-center">
             {navItems.map((item, idx) => {
               const isActive = activeTab === idx;
               return (
@@ -216,8 +207,8 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
                   <div
                     className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-300 ${
                       isActive
-                        ? "bg-[#00A3FF] text-white shadow-[0_6px_14px_rgba(0,163,255,0.45)]"
-                        : "text-[#64748B] hover:text-[#1E293B] dark:hover:text-white"
+                        ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
+                        : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
                     }`}
                   >
                     {item.icon}
@@ -237,13 +228,13 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
                   key={idx}
                   onClick={() => setActiveTab(idx)}
                   className={`flex flex-col items-center justify-center w-12 h-11 transition-transform ${
-                    isActive ? "scale-110 text-slate-900 dark:text-amber-400 font-bold" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    isActive ? "scale-110 text-[var(--color-accent-amber)] font-bold" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                   }`}
                 >
                   <div className="flex items-center justify-center">
                     {item.icon}
                   </div>
-                  <span className={`text-[10px] tracking-tight mt-0.5 ${isActive ? "font-bold text-slate-950 dark:text-amber-400" : "font-normal"}`}>
+                  <span className={`text-[10px] tracking-tight mt-0.5 ${isActive ? "font-bold text-[var(--color-accent-amber)]" : "font-normal"}`}>
                     {item.label}
                   </span>
                 </button>

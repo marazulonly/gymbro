@@ -58,6 +58,7 @@ interface AppState {
   updateRutina: (rutina: Rutina) => Promise<void>;
   deleteRutina: (id: string) => Promise<void>;
   clearRutinaEjercicios: (rutinaId: string) => Promise<void>;
+  clearAthleteRoutines: (athleteId: string) => Promise<void>;
   moveRutinaToDay: (rutinaId: string, nuevoDia: number) => Promise<void>;
   toggleRutinaDescanso: (rutinaId: string, esDescanso?: boolean) => Promise<void>;
   ejerciciosRutina: EjercicioRutina[];
@@ -280,6 +281,10 @@ export function applyThemeToDocument(theme: 'light' | 'dark', accent: string, ui
 
   root.style.setProperty('--color-accent-blue', accent);
   root.style.setProperty('--user-accent-color', accent);
+  if (document.body) {
+    document.body.style.setProperty('--color-accent-blue', accent);
+    document.body.style.setProperty('--user-accent-color', accent);
+  }
 }
 
 function getStoredItem<T>(key: string, fallback: T): T {
@@ -838,6 +843,33 @@ export const useStore = create<AppState>((set, get) => ({
       }
     } catch (err) {
       console.error('Error clearing ejercicios from Firestore:', err);
+    }
+  },
+
+  clearAthleteRoutines: async (athleteId: string) => {
+    const athleteRoutines = get().rutinas.filter((r) => r.id_cliente === athleteId);
+    if (athleteRoutines.length === 0) return;
+
+    const routineIds = new Set(athleteRoutines.map((r) => r.id));
+    const updatedRutinas = get().rutinas.filter((r) => r.id_cliente !== athleteId);
+    const toDeleteErs = get().ejerciciosRutina.filter((er) => routineIds.has(er.id_rutina));
+    const updatedErs = get().ejerciciosRutina.filter((er) => !routineIds.has(er.id_rutina));
+
+    set({ rutinas: updatedRutinas, ejerciciosRutina: updatedErs });
+    setStoredItem(RUTINAS_STORAGE_KEY, updatedRutinas);
+    setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updatedErs);
+
+    try {
+      const batch = writeBatch(db);
+      for (const r of athleteRoutines) {
+        batch.delete(doc(db, 'rutinas', r.id));
+      }
+      for (const er of toDeleteErs) {
+        batch.delete(doc(db, 'ejerciciosRutina', er.id));
+      }
+      await batch.commit();
+    } catch (err) {
+      console.error('Error clearing athlete routines from Firestore:', err);
     }
   },
 

@@ -163,7 +163,9 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-[var(--color-text-main)] leading-tight">{athlete.nombre}</h2>
-                <span className="text-[11px] text-[var(--color-text-muted)]">Ficha de Progreso & Chequeos</span>
+                <span className="text-[11px] text-[var(--color-text-muted)]">
+                  {existingFicha ? "Ficha de Progreso & Chequeos" : "Ficha Inicial del Atleta"}
+                </span>
               </div>
             </div>
             <NeuButton variant="circle" className="w-9 h-9 shadow-neu-flat" onClick={onClose}>
@@ -172,6 +174,17 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
           </div>
 
           <form onSubmit={handleSave} className="flex flex-col gap-4 pb-12">
+            {/* Informative banner about Ficha Inicial requirement */}
+            {!existingFicha && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-xs">
+                <FileText className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block text-[13px] mb-0.5">Ficha Inicial Obligatoria</span>
+                  Antes de iniciar el entrenamiento, crea esta Ficha Inicial con los datos de referencia para usarlos cuando se evalúe al atleta en la fecha correspondiente y medir sus indicadores.
+                </div>
+              </div>
+            )}
+
             {/* Status & Fechas Clave */}
             <NeuCard className="p-4 flex flex-col gap-3">
               <div className="flex items-center gap-2 text-[var(--color-accent-blue)] font-bold text-xs uppercase tracking-wider">
@@ -225,12 +238,12 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
             {/* Composición Corporal & Métricas Principales */}
             <NeuCard className="p-4 flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#4D7CFE] font-bold text-xs uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-[var(--color-accent-blue)] font-bold text-xs uppercase tracking-wider">
                   <Activity className="w-4 h-4" />
                   <span>Composición Corporal</span>
                 </div>
                 {imc && (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-[#E0E5EC] shadow-neu-pressed text-[#2D3748]">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-text-main)]">
                     IMC: {imc} ({imcLabel})
                   </span>
                 )}
@@ -278,7 +291,7 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
 
             {/* Medidas Antropométricas */}
             <NeuCard className="p-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-[#4D7CFE] font-bold text-xs uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-[var(--color-accent-blue)] font-bold text-xs uppercase tracking-wider">
                 <Ruler className="w-4 h-4" />
                 <span>Medidas Antropométricas (cm)</span>
               </div>
@@ -346,7 +359,7 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
 
             {/* Objetivo y Notas del Entrenador */}
             <NeuCard className="p-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-[#4D7CFE] font-bold text-xs uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-[var(--color-accent-blue)] font-bold text-xs uppercase tracking-wider">
                 <Target className="w-4 h-4" />
                 <span>Pautas & Observaciones Técnicas</span>
               </div>
@@ -360,9 +373,9 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-[#718096] pl-2">Nivel Atleta</span>
+                  <span className="text-xs font-medium text-[var(--color-text-muted)] pl-2">Nivel Atleta</span>
                   <select
-                    className="w-full rounded-2xl bg-[#E0E5EC] px-3 py-2 text-sm text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20"
+                    className="w-full rounded-2xl bg-[var(--color-bg-base)] px-3 py-2 text-sm text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20"
                     value={nivel}
                     onChange={(e) => setNivel(e.target.value as any)}
                   >
@@ -382,12 +395,12 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-[#718096] pl-2 flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5 text-[#4D7CFE]" />
+                <span className="text-xs font-medium text-[var(--color-text-muted)] pl-2 flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
                   Observaciones para el Atleta
                 </span>
                 <textarea
-                  className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-2.5 text-sm text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20 resize-none h-24"
+                  className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-2.5 text-sm text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20 resize-none h-24"
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
                   placeholder="Indica pautas nutricionales, control de sobrecarga progresiva, descansos o sensaciones..."
@@ -399,16 +412,16 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
             <NeuButton
               type="submit"
               className={`h-12 font-bold text-base flex items-center justify-center gap-2 transition-all ${
-                savedSuccess ? "text-[#00C9A7] bg-emerald-50" : "text-[#4D7CFE]"
+                savedSuccess ? "text-[var(--color-accent-green)] bg-[var(--color-accent-green)]/15" : "text-[var(--color-accent-blue)]"
               }`}
             >
               {savedSuccess ? (
                 <>
-                  <CheckCircle2 className="w-5 h-5 text-[#00C9A7]" />
-                  ¡Ficha Guardada con Éxito!
+                  <CheckCircle2 className="w-5 h-5 text-[var(--color-accent-green)]" />
+                  {existingFicha ? "¡Ficha Actualizada con Éxito!" : "¡Ficha Inicial Creada con Éxito!"}
                 </>
               ) : (
-                "Guardar Ficha de Progreso"
+                existingFicha ? "Guardar Ficha de Progreso" : "Crear Ficha Inicial y Habilitar Entrenamiento"
               )}
             </NeuButton>
           </form>

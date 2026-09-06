@@ -133,90 +133,72 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                     Nuevo estilo
                   </span>
                 </div>
-                <p className="text-xs text-[var(--color-text-muted)] mb-3 leading-relaxed">
-                  Elige entre el diseño neumórfico original con relieve táctil o el nuevo estilo app fitness con tarjetas modernas, botón Reproducir y cabecera dorada curvada.
-                </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setUIStyle('soft_porcelain')}
-                    className={`p-3 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                    className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border ${
                       uiStyle === 'soft_porcelain'
-                        ? 'shadow-neu-pressed border-[#00A3FF] bg-[var(--color-bg-base)] ring-2 ring-[#00A3FF]/30'
+                        ? 'shadow-neu-pressed border-[var(--color-accent-blue)] bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
                         : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-xl bg-[#00A3FF] text-white flex items-center justify-center shadow-[0_4px_10px_rgba(0,163,255,0.4)]">
-                          <Layers className="w-4 h-4" />
-                        </div>
-                        <span className="font-bold text-xs text-[var(--color-text-main)]">Soft Porcelain 3D</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-[var(--color-accent-blue)] text-white flex items-center justify-center shadow-sm">
+                        <Layers className="w-4 h-4" />
                       </div>
-                      {uiStyle === 'soft_porcelain' && (
-                        <div className="w-5 h-5 rounded-full bg-[#00A3FF] text-white flex items-center justify-center">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
+                      <span className="font-bold text-xs text-[var(--color-text-main)]">Soft Porcelain 3D</span>
                     </div>
-                    <p className="text-[11px] text-[var(--color-text-muted)] leading-normal">
-                      Igual a la imagen: blanco suave porcelana, sombras difusas, azul cian vibrante, fichas con bordes sutiles y dock flotante.
-                    </p>
+                    {uiStyle === 'soft_porcelain' && (
+                      <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setUIStyle('neumorfico')}
-                    className={`p-3 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                    className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border ${
                       uiStyle === 'neumorfico'
                         ? 'shadow-neu-pressed border-[var(--color-accent-blue)]/50 bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
                         : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-xl shadow-neu-flat flex items-center justify-center text-[var(--color-accent-blue)]">
-                          <Layers className="w-4 h-4" />
-                        </div>
-                        <span className="font-bold text-xs text-[var(--color-text-main)]">Neumórfico Clásico</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl shadow-neu-flat flex items-center justify-center text-[var(--color-accent-blue)]">
+                        <Layers className="w-4 h-4" />
                       </div>
-                      {uiStyle === 'neumorfico' && (
-                        <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
+                      <span className="font-bold text-xs text-[var(--color-text-main)]">Neumórfico Clásico</span>
                     </div>
-                    <p className="text-[11px] text-[var(--color-text-muted)] leading-normal">
-                      Aspecto tridimensional original con botones circulares, sombras suaves y relieves táctiles.
-                    </p>
+                    {uiStyle === 'neumorfico' && (
+                      <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setUIStyle('modern_gold')}
-                    className={`p-3 rounded-2xl text-left transition-all flex flex-col justify-between border ${
+                    className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border ${
                       uiStyle === 'modern_gold'
                         ? 'shadow-neu-pressed border-amber-500/60 bg-[var(--color-bg-base)] ring-2 ring-amber-500/30'
                         : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-sm">
-                          <Sparkles className="w-4 h-4 fill-current" />
-                        </div>
-                        <span className="font-bold text-xs text-[var(--color-text-main)]">Fitness Gold</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-sm">
+                        <Sparkles className="w-4 h-4 fill-current" />
                       </div>
-                      {uiStyle === 'modern_gold' && (
-                        <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
+                      <span className="font-bold text-xs text-[var(--color-text-main)]">Fitness Gold</span>
                     </div>
-                    <p className="text-[11px] text-[var(--color-text-muted)] leading-normal">
-                      Cabecera dorada curvada, tarjetas redondeadas, botón Reproducir y cuadrícula de series.
-                    </p>
+                    {uiStyle === 'modern_gold' && (
+                      <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    )}
                   </button>
                 </div>
               </div>
@@ -378,7 +360,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
               </NeuButton>
 
               {isEditingOther && currentUser?.rol === 'admin' && (
-                <NeuButton type="button" onClick={handleDelete} className="mt-2 h-12 text-red-500 font-bold border-2 border-red-200/50">
+                <NeuButton type="button" onClick={handleDelete} className="mt-2 h-12 text-amber-600 dark:text-amber-400 font-bold border-2 border-amber-500/30">
                   Eliminar Usuario
                 </NeuButton>
               )}

@@ -132,12 +132,12 @@ export function RegistroEjerciciosRealizadosModal({
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl bg-[var(--color-bg-base)] shadow-2xl overflow-hidden border border-[#c5cad1]/20"
+          className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl bg-[var(--color-bg-base)] shadow-2xl overflow-hidden border border-[var(--color-text-muted)]/20"
         >
           {/* Header */}
-          <div className="p-4 sm:p-5 flex items-center justify-between border-b border-[#c5cad1]/20 bg-[var(--color-bg-base)]">
+          <div className="p-4 sm:p-5 flex items-center justify-between border-b border-[var(--color-text-muted)]/20 bg-[var(--color-bg-base)]">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl shadow-neu-flat flex items-center justify-center text-[#00C9A7]">
+              <div className="w-10 h-10 rounded-2xl shadow-neu-flat flex items-center justify-center text-[var(--color-accent-green)]">
                 <Check className="w-6 h-6 stroke-[3]" />
               </div>
               <div>
@@ -159,7 +159,7 @@ export function RegistroEjerciciosRealizadosModal({
           </div>
 
           {/* Filters Bar */}
-          <div className="p-3 sm:p-4 bg-[var(--color-bg-base)] flex flex-col gap-2.5 border-b border-[#c5cad1]/15">
+          <div className="p-3 sm:p-4 bg-[var(--color-bg-base)] flex flex-col gap-2.5 border-b border-[var(--color-text-muted)]/15">
             {/* Athlete selector if trainer */}
             {isTrainer && (
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -251,7 +251,7 @@ export function RegistroEjerciciosRealizadosModal({
               <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
                 Ejercicios Logrados
               </span>
-              <span className="text-base sm:text-lg font-extrabold text-[#00C9A7]">
+              <span className="text-base sm:text-lg font-extrabold text-[var(--color-accent-green)]">
                 {metrics.totalExercises}
               </span>
             </div>
@@ -296,12 +296,12 @@ export function RegistroEjerciciosRealizadosModal({
                 return (
                   <NeuCard
                     key={log.id}
-                    className="p-3.5 sm:p-4 flex flex-col gap-2.5 border border-emerald-500/20"
+                    className="p-3.5 sm:p-4 flex flex-col gap-2.5 border border-[var(--color-accent-green)]/20"
                   >
                     {/* Header line */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-2xl shadow-neu-pressed flex items-center justify-center text-[#00C9A7] shrink-0">
+                        <div className="w-9 h-9 rounded-2xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-green)] shrink-0">
                           <Check className="w-5 h-5 stroke-[3]" />
                         </div>
                         <div>
@@ -362,7 +362,7 @@ export function RegistroEjerciciosRealizadosModal({
 
                     {/* Series breakdown */}
                     {log.series && log.series.length > 0 && (
-                      <div className="flex flex-col gap-1.5 pt-1 border-t border-[#c5cad1]/20">
+                      <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--color-text-muted)]/20">
                         <span className="text-[10px] font-bold uppercase text-[var(--color-text-muted)] tracking-wider">
                           Detalle de Series Logradas ({seriesCount} series):
                         </span>
@@ -400,9 +400,9 @@ export function RegistroEjerciciosRealizadosModal({
           </div>
 
           {/* Footer */}
-          <div className="p-3.5 border-t border-[#c5cad1]/20 flex items-center justify-between bg-[var(--color-bg-base)]">
+          <div className="p-3.5 border-t border-[var(--color-text-muted)]/20 flex items-center justify-between bg-[var(--color-bg-base)]">
             <span className="text-[10px] text-[var(--color-text-muted)] flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <ShieldCheck className="w-3.5 h-3.5 text-[var(--color-accent-green)]" />
               Accesible en tiempo real por el Atleta y el Entrenador
             </span>
             <NeuButton

@@ -94,12 +94,113 @@ const DIAS_SEMANA = [
   { id: 0, label: "Domingo", corto: "Dom" },
 ];
 
+function ClearAthleteRoutinesModal({
+  isOpen,
+  athlete,
+  onClose,
+  onConfirm,
+  isClearing,
+}: {
+  isOpen: boolean;
+  athlete: Usuario | null;
+  onClose: () => void;
+  onConfirm: (athleteId: string) => Promise<void>;
+  isClearing: boolean;
+}) {
+  const { rutinas, ejerciciosRutina } = useStore();
+
+  if (!isOpen || !athlete) return null;
+
+  const athleteRoutines = rutinas.filter((r) => r.id_cliente === athlete.id);
+  const routineIds = new Set(athleteRoutines.map((r) => r.id));
+  const athleteExercisesCount = ejerciciosRutina.filter((er) => routineIds.has(er.id_rutina)).length;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 bg-[var(--color-text-main)]/40 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          className="bg-[var(--color-bg-base)] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6 stroke-[2.5]" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-[var(--color-text-main)]">Limpiar Rutinas</h3>
+              <span className="text-xs text-[var(--color-text-muted)] font-medium">Atleta: {athlete.nombre}</span>
+            </div>
+          </div>
+
+          {/* Warning Content */}
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+              ¿Estás seguro de que deseas eliminar todas las rutinas recomendadas programadas para{" "}
+              <strong className="text-[var(--color-text-main)]">{athlete.nombre}</strong>?
+            </p>
+
+            <div className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)] font-medium">Rutinas a eliminar:</span>
+              <span className="font-bold text-red-500">
+                {athleteRoutines.length} {athleteRoutines.length === 1 ? "sesión" : "sesiones"} ({athleteExercisesCount} {athleteExercisesCount === 1 ? "ejercicio" : "ejercicios"})
+              </span>
+            </div>
+
+            {/* Safety Guarantee */}
+            <div className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed flex flex-col gap-1.5 border border-emerald-500/20">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                <span>Solo se borran las rutinas</span>
+              </div>
+              <p className="text-[11px] text-[var(--color-text-muted)] leading-relaxed">
+                <strong>No se borrará ningún otro dato:</strong> la cuenta del atleta, su ficha inicial, medidas antropométricas, notas de control, plan nutricional e historial se mantendrán 100% intactos.
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-1">
+            <NeuButton
+              className="flex-1 h-11 text-red-600 dark:text-red-400 font-bold text-xs flex items-center justify-center gap-1.5"
+              disabled={isClearing}
+              onClick={() => onConfirm(athlete.id)}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+              <span>{isClearing ? "Borrando..." : "Sí, limpiar rutinas"}</span>
+            </NeuButton>
+
+            <NeuButton
+              className="px-4 h-11 text-[var(--color-text-muted)] text-xs font-medium"
+              disabled={isClearing}
+              onClick={onClose}
+            >
+              Cancelar
+            </NeuButton>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: string, mode?: "gestionar" | "progreso") => void }) {
-  const { currentUser, usuarios, addUsuario, rutinas, fichasProgreso, uiStyle } = useStore();
+  const { currentUser, usuarios, addUsuario, rutinas, fichasProgreso, uiStyle, clearAthleteRoutines } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
   const [accessModalAthlete, setAccessModalAthlete] = useState<Usuario | null>(null);
+  const [clearRoutinesAthlete, setClearRoutinesAthlete] = useState<Usuario | null>(null);
+  const [isClearingRoutines, setIsClearingRoutines] = useState(false);
   const [filterTrainerMode, setFilterTrainerMode] = useState<"mis_atletas" | "todos">("mis_atletas");
   const [expandedAthleteId, setExpandedAthleteId] = useState<string | null>(null);
 
@@ -181,6 +282,18 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
     setIsUsageModalOpen(true);
   };
 
+  const handleConfirmClearRoutines = async (athleteId: string) => {
+    setIsClearingRoutines(true);
+    try {
+      await clearAthleteRoutines(athleteId);
+      setClearRoutinesAthlete(null);
+    } catch (err) {
+      console.error("Error clearing athlete routines:", err);
+    } finally {
+      setIsClearingRoutines(false);
+    }
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre || !dni) return;
@@ -215,9 +328,9 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-4 mb-2">
           <NeuButton variant="circle" className="w-10 h-10 shadow-neu-flat" onClick={() => setIsAdding(false)}>
-            <ArrowLeft className="w-5 h-5 text-[#718096]" />
+            <ArrowLeft className="w-5 h-5 text-[var(--color-text-muted)]" />
           </NeuButton>
-          <h2 className="text-xl font-bold text-[#2D3748]">Nuevo Atleta</h2>
+          <h2 className="text-xl font-bold text-[var(--color-text-main)]">Nuevo Atleta</h2>
         </div>
 
         <NeuCard className="p-4">
@@ -228,9 +341,9 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
             <NeuInput label="Fecha de Nacimiento" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
 
             <div className="flex flex-col gap-1 w-full">
-              <span className="text-sm font-medium text-[#718096] pl-2">Sexo</span>
+              <span className="text-sm font-medium text-[var(--color-text-muted)] pl-2">Sexo</span>
               <select
-                className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-2 text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20"
+                className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-2 text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20"
                 value={sexo}
                 onChange={(e) => setSexo(e.target.value as any)}
               >
@@ -248,7 +361,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
               required 
             />
 
-            <NeuButton type="submit" className="mt-2 h-12 text-[#4D7CFE] font-bold">
+            <NeuButton type="submit" className="mt-2 h-12 text-[var(--color-accent-blue)] font-bold">
               Guardar Atleta y Asignar Rutinas
             </NeuButton>
           </form>
@@ -261,12 +374,12 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-start mb-1 flex-wrap gap-2">
         <div>
-          <h2 className="text-2xl font-bold text-[#2D3748]">Mis Atletas</h2>
-          <span className="text-xs text-[#718096]">Gestión de rutinas, ejercicios y control físico</span>
+          <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Mis Atletas</h2>
+          <span className="text-xs text-[var(--color-text-muted)]">Gestión de rutinas, ejercicios y control físico</span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <NeuButton
-            className="text-xs font-bold text-[#00C9A7] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
+            className="text-xs font-bold text-[var(--color-accent-green)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
             onClick={handleOpenAllExercises}
             title="Ver registro de todos los ejercicios realizados"
           >
@@ -276,7 +389,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           </NeuButton>
 
           <NeuButton
-            className="text-xs font-bold text-[#4D7CFE] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
+            className="text-xs font-bold text-[var(--color-accent-blue)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
             onClick={handleOpenAllUsage}
             title="Ver ficha de estadísticas de uso web de todos los usuarios"
           >
@@ -286,20 +399,20 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           </NeuButton>
 
           <NeuButton variant="circle" className="w-9 h-9 shadow-neu-flat" onClick={() => setIsAdding(true)} title="Registrar Atleta">
-            <Plus className="w-4 h-4 text-[#4D7CFE]" />
+            <Plus className="w-4 h-4 text-[var(--color-accent-blue)]" />
           </NeuButton>
         </div>
       </div>
 
       {/* Trainer Athletes Filter Tabs */}
-      <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+      <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed">
         <button
           type="button"
           onClick={() => setFilterTrainerMode("mis_atletas")}
           className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
             filterTrainerMode === "mis_atletas"
-              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
-              : "text-[#718096] hover:text-[#2D3748]"
+              ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
           }`}
         >
           <User className="w-3.5 h-3.5" />
@@ -310,8 +423,8 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           onClick={() => setFilterTrainerMode("todos")}
           className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
             filterTrainerMode === "todos"
-              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
-              : "text-[#718096] hover:text-[#2D3748]"
+              ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
           }`}
         >
           <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -321,7 +434,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
 
       <div className="flex flex-col gap-2.5 pb-8">
         {displayedAthletes.length === 0 ? (
-          <p className="text-center text-[#718096] my-6 text-sm">
+          <p className="text-center text-[var(--color-text-muted)] my-6 text-sm">
             {filterTrainerMode === "mis_atletas"
               ? "No tienes atletas asignados a tu cuenta actualmente."
               : "No hay atletas registrados en el gimnasio."}
@@ -332,7 +445,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
             const athleteRoutinesCount = rutinas.filter((r) => r.id_cliente === athlete.id).length;
             const modoAcceso = athlete.control_acceso?.modo || "siempre_visible";
 
-            let checkinText = "Sin ficha";
+            let checkinText = "Sin Ficha Inicial";
             let daysBadge = null;
 
             if (ficha?.fecha_chequeo) {
@@ -388,12 +501,12 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                   <>
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[#4D7CFE] text-base shrink-0">
+                        <div className="w-11 h-11 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[var(--color-accent-blue)] text-base shrink-0">
                           {athlete.nombre.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-[#2D3748] text-base leading-tight">{athlete.nombre}</span>
-                          <div className="flex items-center gap-2 text-[10px] text-[#718096] mt-0.5 flex-wrap">
+                          <span className="font-bold text-[var(--color-text-main)] text-base leading-tight">{athlete.nombre}</span>
+                          <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)] mt-0.5 flex-wrap">
                             <span
                               className={`px-1.5 py-0.2 rounded-md ${
                                 athlete.estado_suscripcion === "inactivo"
@@ -435,7 +548,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                       <div className="flex items-center gap-1.5">
                         <NeuButton
                           variant="circle"
-                          className="w-8 h-8 shadow-neu-flat text-[#718096] !p-0 flex items-center justify-center"
+                          className="w-8 h-8 shadow-neu-flat text-[var(--color-text-muted)] !p-0 flex items-center justify-center"
                           onClick={() => setSelectedUserId(athlete.id)}
                           title="Editar Perfil"
                         >
@@ -455,26 +568,26 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                     </div>
 
                     {/* Routine status info banner */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#E0E5EC] p-2.5 rounded-xl shadow-neu-pressed gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-[var(--color-bg-base)] p-2.5 rounded-xl shadow-neu-pressed gap-2">
                       <div className="flex items-center gap-2 text-xs">
-                        <Dumbbell className="w-4 h-4 text-[#4D7CFE] shrink-0" />
-                        <span className="text-[#2D3748] font-bold">
+                        <Dumbbell className="w-4 h-4 text-[var(--color-accent-blue)] shrink-0" />
+                        <span className="text-[var(--color-text-main)] font-bold">
                           {athleteRoutinesCount > 0 ? `${athleteRoutinesCount} Días de Rutina` : "Sin rutinas"}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <NeuButton
-                          className="px-2 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          className="px-2 py-1 text-[11px] text-[var(--color-accent-blue)] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
                           onClick={() => setAccessModalAthlete(athlete)}
                           title="Configurar Control de Acceso a Rutinas (Siempre visible, Solo hoy, Manual, Franja horaria)"
                         >
-                          <Lock className="w-3 h-3 text-[#4D7CFE]" />
+                          <Lock className="w-3 h-3 text-[var(--color-accent-blue)]" />
                           <span>Acceso</span>
                         </NeuButton>
 
                         <NeuButton
-                          className="px-2 py-1 text-[11px] text-[#00C9A7] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          className="px-2 py-1 text-[11px] text-[var(--color-accent-green)] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
                           onClick={() => handleOpenAthleteExercises(athlete.id)}
                           title="Ver ejercicios completados por esta atleta"
                         >
@@ -483,7 +596,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                         </NeuButton>
 
                         <NeuButton
-                          className="px-2 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          className="px-2 py-1 text-[11px] text-[var(--color-accent-blue)] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
                           onClick={() => handleOpenAthleteUsage(athlete.id)}
                           title="Ver ficha de tiempos de uso web de esta atleta"
                         >
@@ -492,7 +605,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                         </NeuButton>
 
                         <NeuButton
-                          className="px-2.5 py-1 text-[11px] text-[#4D7CFE] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          className="px-2.5 py-1 text-[11px] text-[var(--color-accent-blue)] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
                           onClick={() => onManageRoutines(athlete.id, "progreso")}
                           title="Ver pantalla Tu Progreso de la atleta"
                         >
@@ -501,21 +614,43 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                         </NeuButton>
 
                         <NeuButton
-                          className="px-2.5 py-1 text-[11px] text-[#2D3748] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          className="px-2.5 py-1 text-[11px] text-[var(--color-text-main)] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
                           onClick={() => onManageRoutines(athlete.id, "gestionar")}
                           title="Editar rutinas y ejercicios"
                         >
                           <Sliders className="w-3 h-3" />
                           <span>Rutinas</span>
                         </NeuButton>
+
+                        <NeuButton
+                          className={`px-2 py-1 text-[11px] font-bold flex items-center gap-1 h-7 shadow-neu-flat transition-colors ${
+                            athleteRoutinesCount > 0
+                              ? "text-red-600 dark:text-red-400 hover:text-red-700"
+                              : "text-[var(--color-text-muted)] opacity-50 cursor-not-allowed"
+                          }`}
+                          onClick={() => {
+                            if (athleteRoutinesCount > 0) {
+                              setClearRoutinesAthlete(athlete);
+                            }
+                          }}
+                          disabled={athleteRoutinesCount === 0}
+                          title={
+                            athleteRoutinesCount > 0
+                              ? "Limpiar todas las rutinas recomendadas a este atleta"
+                              : "No tiene rutinas recomendadas para limpiar"
+                          }
+                        >
+                          <Trash2 className="w-3 h-3 text-red-500 shrink-0" />
+                          <span>Limpiar rutinas</span>
+                        </NeuButton>
                       </div>
                     </div>
 
                     {/* Progress quick glance & action */}
-                    <div className="flex items-center justify-between pt-1 border-t border-[#c5cad1]/30">
+                    <div className="flex items-center justify-between pt-1 border-t border-[var(--color-text-muted)]/20">
                       <div className="flex items-center gap-2">
-                        <Activity className="w-3.5 h-3.5 text-[#4D7CFE]" />
-                        <span className="text-[11px] font-medium text-[#718096]">{checkinText}</span>
+                        <Activity className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+                        <span className="text-[11px] font-medium text-[var(--color-text-muted)]">{checkinText}</span>
                         {daysBadge !== null && (
                           <span
                             className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
@@ -532,11 +667,16 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                       </div>
 
                       <NeuButton
-                        className="px-3 py-1 text-xs text-[#718096] font-bold flex items-center gap-1 h-8"
+                        className={`px-3 py-1 text-xs font-bold flex items-center gap-1 h-8 ${
+                          ficha 
+                            ? "text-[var(--color-text-muted)]" 
+                            : "text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 shadow-neu-flat"
+                        }`}
                         onClick={() => setProgressModalAthlete(athlete)}
+                        title={ficha ? "Ver Ficha de Progreso" : "Crear Ficha Inicial requerida para iniciar entrenamiento"}
                       >
                         <Scale className="w-3.5 h-3.5" />
-                        Ficha
+                        {ficha ? "Ficha" : "Crear Ficha Inicial"}
                       </NeuButton>
                     </div>
                   </>
@@ -575,6 +715,14 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         isOpen={isExerciseLogModalOpen}
         onClose={() => setIsExerciseLogModalOpen(false)}
         initialAthleteId={selectedModalAthleteId}
+      />
+
+      <ClearAthleteRoutinesModal
+        isOpen={!!clearRoutinesAthlete}
+        athlete={clearRoutinesAthlete}
+        onClose={() => setClearRoutinesAthlete(null)}
+        onConfirm={handleConfirmClearRoutines}
+        isClearing={isClearingRoutines}
       />
     </div>
   );
@@ -615,6 +763,7 @@ function RoutineManager({
     assignBasePlanToAthlete,
     copyRoutinesToAthlete,
     clearRutinaEjercicios,
+    clearAthleteRoutines,
     moveRutinaToDay,
     toggleRutinaDescanso,
     updateUsuario
@@ -623,6 +772,8 @@ function RoutineManager({
   const [viewMode, setViewMode] = useState<"gestionar" | "progreso">(initialViewMode);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
   const [accessModalAthlete, setAccessModalAthlete] = useState<Usuario | null>(null);
+  const [isClearAthleteRoutinesOpen, setIsClearAthleteRoutinesOpen] = useState(false);
+  const [isClearingAthleteRoutines, setIsClearingAthleteRoutines] = useState(false);
 
   const handleQuickSetMode = async (modo: ModoControlAcceso) => {
     if (!currentAthlete) return;
@@ -1114,13 +1265,13 @@ function RoutineManager({
               setEditingRoutineId(null);
             }}
           >
-            <ArrowLeft className="w-5 h-5 text-[#718096]" />
+            <ArrowLeft className="w-5 h-5 text-[var(--color-text-muted)]" />
           </NeuButton>
           <div>
-            <h2 className="text-xl font-bold text-[#2D3748]">
+            <h2 className="text-xl font-bold text-[var(--color-text-main)]">
               {isCreatingNew ? "Nueva Rutina" : "Editar Rutina"}
             </h2>
-            <span className="text-xs text-[#4D7CFE] font-medium">Atleta: {currentAthlete?.nombre}</span>
+            <span className="text-xs text-[var(--color-accent-blue)] font-medium">Atleta: {currentAthlete?.nombre}</span>
           </div>
         </div>
 
@@ -1135,9 +1286,9 @@ function RoutineManager({
             />
 
             <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-[#718096] pl-2">Día de la Semana</span>
+              <span className="text-xs font-medium text-[var(--color-text-muted)] pl-2">Día de la Semana</span>
               <select
-                className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-2.5 text-sm text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20"
+                className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-2.5 text-sm text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20"
                 value={formDiaSemana}
                 onChange={(e) => setFormDiaSemana(Number(e.target.value))}
               >
@@ -1155,14 +1306,14 @@ function RoutineManager({
             </div>
 
             {/* Rest Day Switch */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#E0E5EC] shadow-neu-pressed mt-1">
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed mt-1">
               <div className="flex items-center gap-2.5">
-                <div className={`p-1.5 rounded-lg ${formEsDescanso ? 'bg-amber-100 text-amber-700' : 'bg-[#c5cad1]/20 text-[#718096]'}`}>
+                <div className={`p-1.5 rounded-lg ${formEsDescanso ? 'bg-amber-100 text-amber-700' : 'bg-[var(--color-text-muted)]/20 text-[var(--color-text-muted)]'}`}>
                   <Coffee className="w-4 h-4" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-[#2D3748]">Día de Descanso Recomendado</span>
-                  <span className="text-[10px] text-[#718096]">
+                  <span className="text-xs font-bold text-[var(--color-text-main)]">Día de Descanso Recomendado</span>
+                  <span className="text-[10px] text-[var(--color-text-muted)]">
                     Los días de descanso no se mostrarán al atleta en su lista activa de rutinas
                   </span>
                 </div>
@@ -1172,20 +1323,20 @@ function RoutineManager({
                 id="routine-form-rest-toggle"
                 checked={formEsDescanso}
                 onChange={(e) => setFormEsDescanso(e.target.checked)}
-                className="w-4 h-4 accent-[#4D7CFE] cursor-pointer"
+                className="w-4 h-4 accent-[var(--color-accent-blue)] cursor-pointer"
               />
             </div>
           </NeuCard>
 
           {/* Exercise List for this Routine */}
           <div className="flex justify-between items-center px-1">
-            <h3 className="font-bold text-sm text-[#2D3748] flex items-center gap-2">
-              <Dumbbell className="w-4 h-4 text-[#4D7CFE]" />
+            <h3 className="font-bold text-sm text-[var(--color-text-main)] flex items-center gap-2">
+              <Dumbbell className="w-4 h-4 text-[var(--color-accent-blue)]" />
               Ejercicios de la Sesión ({formExercises.length})
             </h3>
             <NeuButton
               type="button"
-              className="px-3 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1"
+              className="px-3 py-1 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1"
               onClick={() => {
                 setQuickAddTargetRoutineId(null);
                 setExercisePickerOpen(true);
@@ -1197,12 +1348,12 @@ function RoutineManager({
           </div>
 
           {formExercises.length === 0 ? (
-            <NeuCard inset className="p-6 text-center text-[#718096] text-xs flex flex-col items-center gap-2">
-              <Dumbbell className="w-8 h-8 text-[#718096]/40" />
+            <NeuCard inset className="p-6 text-center text-[var(--color-text-muted)] text-xs flex flex-col items-center gap-2">
+              <Dumbbell className="w-8 h-8 text-[var(--color-text-muted)]/40" />
               <p>No has añadido ejercicios a esta rutina.</p>
               <NeuButton
                 type="button"
-                className="text-[#4D7CFE] text-xs font-bold mt-1"
+                className="text-[var(--color-accent-blue)] text-xs font-bold mt-1"
                 onClick={() => {
                   setQuickAddTargetRoutineId(null);
                   setExercisePickerOpen(true);
@@ -1223,7 +1374,7 @@ function RoutineManager({
                   >
                     <NeuCard className="p-3 flex flex-col gap-2.5">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-xs text-[#4D7CFE] uppercase tracking-wider truncate max-w-[240px]">
+                        <span className="font-bold text-xs text-[var(--color-accent-blue)] uppercase tracking-wider truncate max-w-[240px]">
                           {index + 1}. {ex.nombre_ejercicio}
                         </span>
                         <NeuButton
@@ -1281,14 +1432,14 @@ function RoutineManager({
                       </div>
 
                       <div className="flex gap-2 items-center">
-                        <span className="text-[10px] text-[#718096] pl-1 font-medium">Tempo:</span>
+                        <span className="text-[10px] text-[var(--color-text-muted)] pl-1 font-medium">Tempo:</span>
                         <input
                           type="text"
                           value={ex.tempo}
                           onChange={(e) =>
                             handleUpdateFormExercise(ex.tempId, "tempo", e.target.value)
                           }
-                          className="w-28 text-center rounded-lg bg-[#E0E5EC] px-2 py-0.5 text-xs text-[#2D3748] shadow-neu-pressed outline-none"
+                          className="w-28 text-center rounded-lg bg-[var(--color-bg-base)] px-2 py-0.5 text-xs text-[var(--color-text-main)] shadow-neu-pressed outline-none"
                           placeholder="3-0-1-0"
                         />
                       </div>
@@ -1302,7 +1453,7 @@ function RoutineManager({
           <div className="flex gap-3 mt-3">
             <NeuButton
               type="submit"
-              className="flex-1 h-12 text-[#00C9A7] font-bold text-sm flex items-center justify-center gap-2"
+              className="flex-1 h-12 text-[var(--color-accent-green)] font-bold text-sm flex items-center justify-center gap-2"
               disabled={isSyncing}
             >
               <Save className="w-4 h-4" />
@@ -1310,7 +1461,7 @@ function RoutineManager({
             </NeuButton>
             <NeuButton
               type="button"
-              className="px-4 h-12 text-[#718096] font-medium text-sm"
+              className="px-4 h-12 text-[var(--color-text-muted)] font-medium text-sm"
               onClick={() => {
                 setIsCreatingNew(false);
                 setEditingRoutineId(null);
@@ -1333,11 +1484,11 @@ function RoutineManager({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-[#2D3748]">Rutinas</h2>
-          <span className="text-xs text-[#718096]">Asignación y edición de ejercicios por atleta</span>
+          <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Rutinas</h2>
+          <span className="text-xs text-[var(--color-text-muted)]">Asignación y edición de ejercicios por atleta</span>
         </div>
         <NeuButton
-          className="px-3 py-1.5 text-xs text-[#4D7CFE] font-bold flex items-center gap-1.5"
+          className="px-3 py-1.5 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1.5"
           onClick={startCreateRoutine}
         >
           <Plus className="w-4 h-4" />
@@ -1347,7 +1498,7 @@ function RoutineManager({
 
       {/* Athlete Selector Horizontal Pills */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-semibold text-[#718096] pl-1">Seleccionar Atleta</span>
+        <span className="text-xs font-semibold text-[var(--color-text-muted)] pl-1">Seleccionar Atleta</span>
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {athletes.map((a) => {
             const count = rutinas.filter((r) => r.id_cliente === a.id).length;
@@ -1358,18 +1509,18 @@ function RoutineManager({
                 onClick={() => onSelectAthlete(a.id)}
                 className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
                   isSelected
-                    ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]"
-                    : "bg-[#E0E5EC] shadow-neu-flat text-[#718096]"
+                    ? "bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)]"
+                    : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)]"
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                  isSelected ? "bg-[#4D7CFE] text-white" : "bg-[#E0E5EC] shadow-neu-pressed text-[#718096]"
+                  isSelected ? "bg-[var(--color-accent-blue)] text-white" : "bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-text-muted)]"
                 }`}>
                   {a.nombre.charAt(0)}
                 </div>
                 <span>{a.nombre}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                  count > 0 ? "bg-[#4D7CFE]/10 text-[#4D7CFE]" : "bg-gray-200 text-gray-500"
+                  count > 0 ? "bg-[var(--color-accent-blue)]/10 text-[var(--color-accent-blue)]" : "bg-gray-200 text-gray-500"
                 }`}>
                   {count}d
                 </span>
@@ -1383,12 +1534,12 @@ function RoutineManager({
       <NeuCard className="p-3.5 flex flex-col gap-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[#4D7CFE]">
+            <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[var(--color-accent-blue)]">
               {currentAthlete?.nombre.charAt(0)}
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-sm text-[#2D3748]">{currentAthlete?.nombre}</span>
-              <span className="text-[10px] text-[#718096]">
+              <span className="font-bold text-sm text-[var(--color-text-main)]">{currentAthlete?.nombre}</span>
+              <span className="text-[10px] text-[var(--color-text-muted)]">
                 DNI: {currentAthlete?.dni} • {athleteRoutines.length} sesiones programadas
               </span>
             </div>
@@ -1406,9 +1557,9 @@ function RoutineManager({
         </div>
 
         {/* Quick action buttons for athlete */}
-        <div className="flex gap-2 pt-1 border-t border-[#c5cad1]/30">
+        <div className="flex gap-2 pt-1 border-t border-[var(--color-text-muted)]/20">
           <NeuButton
-            className="flex-1 py-1.5 text-xs text-[#4D7CFE] font-bold flex items-center justify-center gap-1 h-8"
+            className="flex-1 py-1.5 text-xs text-[var(--color-accent-blue)] font-bold flex items-center justify-center gap-1 h-8"
             onClick={startCreateRoutine}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -1417,7 +1568,7 @@ function RoutineManager({
 
           {athleteRoutines.length === 0 ? (
             <NeuButton
-              className="flex-1 py-1.5 text-xs text-[#00C9A7] font-bold flex items-center justify-center gap-1 h-8"
+              className="flex-1 py-1.5 text-xs text-[var(--color-accent-green)] font-bold flex items-center justify-center gap-1 h-8"
               onClick={handleAssignBasePlan}
               disabled={isSyncing}
             >
@@ -1425,13 +1576,23 @@ function RoutineManager({
               {isSyncing ? "Asignando..." : "Asignar Plan 5 Días"}
             </NeuButton>
           ) : (
-            <NeuButton
-              className="px-3 py-1.5 text-xs text-[#718096] font-medium flex items-center justify-center gap-1 h-8"
-              onClick={() => setIsCopyModalOpen(true)}
-            >
-              <Copy className="w-3.5 h-3.5" />
-              Copiar de...
-            </NeuButton>
+            <div className="flex items-center gap-2">
+              <NeuButton
+                className="px-3 py-1.5 text-xs text-[var(--color-text-muted)] font-medium flex items-center justify-center gap-1 h-8"
+                onClick={() => setIsCopyModalOpen(true)}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copiar de...
+              </NeuButton>
+              <NeuButton
+                className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 font-bold flex items-center justify-center gap-1 h-8"
+                onClick={() => setIsClearAthleteRoutinesOpen(true)}
+                title="Limpiar todas las rutinas recomendadas a este atleta"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                Limpiar rutinas
+              </NeuButton>
+            </div>
           )}
         </div>
       </NeuCard>
@@ -1441,13 +1602,13 @@ function RoutineManager({
         <NeuCard className="p-3.5 flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[#4D7CFE]">
+              <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
                 <Sliders className="w-4 h-4" />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-xs font-bold text-[#2D3748]">Control de Acceso a Rutinas</h3>
-                  <span className="text-[10px] font-bold px-2 py-0.2 rounded-md bg-[#4D7CFE]/10 text-[#4D7CFE]">
+                  <h3 className="text-xs font-bold text-[var(--color-text-main)]">Control de Acceso a Rutinas</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.2 rounded-md bg-[var(--color-accent-blue)]/10 text-[var(--color-accent-blue)]">
                     {currentAthlete.control_acceso?.modo === "solo_hoy"
                       ? "Solo hoy"
                       : currentAthlete.control_acceso?.modo === "horario_manual"
@@ -1457,14 +1618,14 @@ function RoutineManager({
                       : "Siempre visible"}
                   </span>
                 </div>
-                <span className="text-[10px] text-[#718096]">
+                <span className="text-[10px] text-[var(--color-text-muted)]">
                   Define cuándo {currentAthlete.nombre} puede visualizar y registrar sus ejercicios
                 </span>
               </div>
             </div>
 
             <NeuButton
-              className="px-2.5 py-1 text-xs text-[#4D7CFE] font-bold flex items-center gap-1 h-7"
+              className="px-2.5 py-1 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1 h-7"
               onClick={() => setAccessModalAthlete(currentAthlete)}
             >
               <span>Detalles</span>
@@ -1479,8 +1640,8 @@ function RoutineManager({
               onClick={() => handleQuickSetMode("siempre_visible")}
               className={`p-2 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
                 (currentAthlete.control_acceso?.modo || "siempre_visible") === "siempre_visible"
-                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-emerald-500/40 text-emerald-700"
-                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+                  ? "bg-[var(--color-bg-base)] shadow-neu-pressed border-2 border-emerald-500/40 text-emerald-700"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -1489,7 +1650,7 @@ function RoutineManager({
                   <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
                 )}
               </div>
-              <span className="text-[9px] text-[#718096] leading-tight">Acceso total e irrestricto</span>
+              <span className="text-[9px] text-[var(--color-text-muted)] leading-tight">Acceso total e irrestricto</span>
             </button>
 
             {/* 2. Solo hoy */}
@@ -1498,8 +1659,8 @@ function RoutineManager({
               onClick={() => handleQuickSetMode("solo_hoy")}
               className={`p-2 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
                 currentAthlete.control_acceso?.modo === "solo_hoy"
-                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-blue-500/40 text-blue-700"
-                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+                  ? "bg-[var(--color-bg-base)] shadow-neu-pressed border-2 border-blue-500/40 text-blue-700"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -1508,15 +1669,15 @@ function RoutineManager({
                   <Check className="w-3 h-3 text-blue-600 stroke-[3]" />
                 )}
               </div>
-              <span className="text-[9px] text-[#718096] leading-tight">Solo fecha actual (00:00-23:59)</span>
+              <span className="text-[9px] text-[var(--color-text-muted)] leading-tight">Solo fecha actual (00:00-23:59)</span>
             </button>
 
             {/* 3. Horario manual */}
             <div
               className={`p-2 rounded-xl text-left flex flex-col gap-1 transition-all ${
                 currentAthlete.control_acceso?.modo === "horario_manual"
-                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-amber-500/40 text-amber-800"
-                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+                  ? "bg-[var(--color-bg-base)] shadow-neu-pressed border-2 border-amber-500/40 text-amber-800"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
               }`}
             >
               <div
@@ -1529,7 +1690,7 @@ function RoutineManager({
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[9px] text-[#718096]">
+                <span className="text-[9px] text-[var(--color-text-muted)]">
                   {currentAthlete.control_acceso?.manual_activo !== false ? "Habilitado" : "Pausado"}
                 </span>
                 <button
@@ -1558,8 +1719,8 @@ function RoutineManager({
               }}
               className={`p-2 rounded-xl text-left flex flex-col gap-0.5 transition-all ${
                 currentAthlete.control_acceso?.modo === "franja_horaria"
-                  ? "bg-[#E0E5EC] shadow-neu-pressed border-2 border-purple-500/40 text-purple-700"
-                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+                  ? "bg-[var(--color-bg-base)] shadow-neu-pressed border-2 border-purple-500/40 text-purple-700"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -1568,21 +1729,21 @@ function RoutineManager({
                   <Check className="w-3 h-3 text-purple-600 stroke-[3]" />
                 )}
               </div>
-              <span className="text-[9px] text-[#718096] leading-tight">Días y horas permitidas</span>
+              <span className="text-[9px] text-[var(--color-text-muted)] leading-tight">Días y horas permitidas</span>
             </button>
           </div>
         </NeuCard>
       )}
 
       {/* View Mode Switcher: Rutinas vs Vista "Tu Progreso" */}
-      <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+      <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed">
         <button
           type="button"
           onClick={() => setViewMode("gestionar")}
           className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
             viewMode === "gestionar"
-              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
-              : "text-[#718096] hover:text-[#2D3748]"
+              ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
           }`}
         >
           <Sliders className="w-3.5 h-3.5" />
@@ -1593,8 +1754,8 @@ function RoutineManager({
           onClick={() => setViewMode("progreso")}
           className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
             viewMode === "progreso"
-              ? "bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
-              : "text-[#718096] hover:text-[#2D3748]"
+              ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
           }`}
         >
           <Activity className="w-3.5 h-3.5" />
@@ -1615,7 +1776,7 @@ function RoutineManager({
           <div className="flex flex-col gap-1.5">
         <div className="flex justify-between items-center px-1">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-[#718096] uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">
               Días con Rutina ({activeAthleteRoutines.length})
             </span>
             {restRoutines.length > 0 && (
@@ -1625,7 +1786,7 @@ function RoutineManager({
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition-all flex items-center gap-1 ${
                   showRestDays 
                     ? "bg-amber-100 text-amber-800 shadow-sm"
-                    : "bg-[#E0E5EC] shadow-neu-pressed text-[#a0aec0] hover:text-[#718096]"
+                    : "bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-text-muted)] hover:text-[var(--color-text-muted)]"
                 }`}
                 title={showRestDays ? "Ocultar días de descanso" : "Mostrar días de descanso ocultos"}
               >
@@ -1640,15 +1801,15 @@ function RoutineManager({
               onClick={() => setSelectedDayFilter("todos")}
               className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-all ${
                 selectedDayFilter === "todos"
-                  ? "bg-[#4D7CFE] text-white shadow-sm"
-                  : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748]"
+                  ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
               }`}
             >
               Todos ({activeAthleteRoutines.length})
             </button>
             <button
               onClick={() => startCreateRoutine()}
-              className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#E0E5EC] shadow-neu-flat text-[#00C9A7] hover:text-[#00B094] flex items-center gap-1"
+              className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-green)] hover:text-[var(--color-accent-green)] flex items-center gap-1"
               title="Programar rutina para un nuevo día"
             >
               <Plus className="w-3 h-3" />
@@ -1678,23 +1839,23 @@ function RoutineManager({
                 }}
                 className={`flex-1 min-w-[84px] py-2 px-1.5 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-1 ${
                   isSelected
-                    ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE] ring-2 ring-[#4D7CFE]/40 font-bold"
-                    : "bg-[#E0E5EC] shadow-neu-flat text-[#718096] hover:text-[#2D3748] font-medium active:shadow-neu-pressed"
+                    ? "bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)] ring-2 ring-[var(--color-accent-blue)]/40 font-bold"
+                    : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] font-medium active:shadow-neu-pressed"
                 }`}
               >
                 <span className="text-xs font-bold leading-tight">{dayName}</span>
                 {isToday && (
-                  <span className="text-[8px] font-black uppercase tracking-wider bg-[#4D7CFE] text-white px-1.5 py-0.2 rounded-full shadow-sm">
+                  <span className="text-[8px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded-full shadow-sm">
                     Hoy
                   </span>
                 )}
                 <span
                   className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold ${
                     isSelected
-                      ? "bg-[#4D7CFE]/15 text-[#4D7CFE]"
+                      ? "bg-[var(--color-accent-blue)]/15 text-[var(--color-accent-blue)]"
                       : isRest
                       ? "bg-amber-100 text-amber-700"
-                      : "bg-[#c5cad1]/25 text-[#718096]"
+                      : "bg-[var(--color-text-muted)]/20 text-[var(--color-text-muted)]"
                   }`}
                 >
                   {isRest ? "Descanso" : `${exercisesCount} ej.`}
@@ -1708,17 +1869,17 @@ function RoutineManager({
       {/* List of Routines for Athlete */}
       <div className="flex flex-col gap-3.5">
         {activeAthleteRoutines.length === 0 && !showRestDays ? (
-          <NeuCard inset className="p-6 text-center text-[#718096] text-xs flex flex-col items-center gap-3">
-            <ClipboardList className="w-10 h-10 text-[#718096]/40" />
+          <NeuCard inset className="p-6 text-center text-[var(--color-text-muted)] text-xs flex flex-col items-center gap-3">
+            <ClipboardList className="w-10 h-10 text-[var(--color-text-muted)]/40" />
             <div>
-              <p className="font-bold text-[#2D3748] text-sm">Esta atleta aún no tiene rutinas asignadas</p>
-              <p className="text-[11px] text-[#718096] mt-0.5">
+              <p className="font-bold text-[var(--color-text-main)] text-sm">Esta atleta aún no tiene rutinas asignadas</p>
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
                 Puedes asignarle el plan estructurado base de 5 días o crear rutinas personalizadas desde cero.
               </p>
             </div>
             <div className="flex gap-2 mt-2">
               <NeuButton
-                className="text-[#00C9A7] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                className="text-[var(--color-accent-green)] text-xs font-bold px-3 py-2 flex items-center gap-1"
                 onClick={handleAssignBasePlan}
                 disabled={isSyncing}
               >
@@ -1726,7 +1887,7 @@ function RoutineManager({
                 {isSyncing ? "Cargando..." : "Asignar Plan Base (5 Días)"}
               </NeuButton>
               <NeuButton
-                className="text-[#4D7CFE] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                className="text-[var(--color-accent-blue)] text-xs font-bold px-3 py-2 flex items-center gap-1"
                 onClick={() => startCreateRoutine()}
               >
                 <Plus className="w-4 h-4" />
@@ -1744,26 +1905,26 @@ function RoutineManager({
             if (displayedRoutines.length === 0 && selectedDayFilter !== "todos") {
               const selectedDiaObj = DIAS_SEMANA.find((d) => d.id === selectedDayFilter);
               return (
-                <NeuCard inset className="p-6 text-center text-[#718096] text-xs flex flex-col items-center gap-3">
-                  <Calendar className="w-10 h-10 text-[#718096]/40" />
+                <NeuCard inset className="p-6 text-center text-[var(--color-text-muted)] text-xs flex flex-col items-center gap-3">
+                  <Calendar className="w-10 h-10 text-[var(--color-text-muted)]/40" />
                   <div>
-                    <p className="font-bold text-[#2D3748] text-sm">
+                    <p className="font-bold text-[var(--color-text-main)] text-sm">
                       Sin rutina activa para el {selectedDiaObj?.label || getDiaSemanaNombre(selectedDayFilter)}
                     </p>
-                    <p className="text-[11px] text-[#718096] mt-0.5">
+                    <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
                       Puedes programar una sesión para este día o volver a ver todos los días con rutina.
                     </p>
                   </div>
                   <div className="flex gap-2 mt-2">
                     <NeuButton
-                      className="text-[#4D7CFE] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                      className="text-[var(--color-accent-blue)] text-xs font-bold px-3 py-2 flex items-center gap-1"
                       onClick={() => startCreateRoutine(selectedDayFilter)}
                     >
                       <Plus className="w-4 h-4" />
                       Programar Rutina
                     </NeuButton>
                     <NeuButton
-                      className="text-[#718096] text-xs font-bold px-3 py-2 flex items-center gap-1"
+                      className="text-[var(--color-text-muted)] text-xs font-bold px-3 py-2 flex items-center gap-1"
                       onClick={() => setSelectedDayFilter("todos")}
                     >
                       Ver Todos los Días
@@ -1785,11 +1946,11 @@ function RoutineManager({
                   <div className="flex justify-between items-start">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-md shadow-neu-pressed">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-md shadow-neu-pressed">
                           {diaObj?.label || `Día ${rutina.dia_semana}`}
                         </span>
                         {isToday && (
-                          <span className="text-[8px] font-black uppercase tracking-wider bg-[#4D7CFE] text-white px-1.5 py-0.2 rounded-full shadow-sm">
+                          <span className="text-[8px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded-full shadow-sm">
                             Hoy
                           </span>
                         )}
@@ -1799,11 +1960,11 @@ function RoutineManager({
                             Descanso (Oculto al atleta)
                           </span>
                         )}
-                        <span className="text-[10px] text-[#718096] font-medium">
+                        <span className="text-[10px] text-[var(--color-text-muted)] font-medium">
                           {relatedErs.length} ejercicios
                         </span>
                       </div>
-                      <h3 className="font-bold text-sm text-[#2D3748] leading-tight">
+                      <h3 className="font-bold text-sm text-[var(--color-text-main)] leading-tight">
                         {rutina.nombre_sesion}
                       </h3>
                     </div>
@@ -1812,7 +1973,7 @@ function RoutineManager({
                     <div className="flex gap-1.5 items-center">
                       <NeuButton
                         variant="circle"
-                        className="w-8 h-8 shadow-neu-flat text-[#00C9A7] !p-0 flex items-center justify-center"
+                        className="w-8 h-8 shadow-neu-flat text-[var(--color-accent-green)] !p-0 flex items-center justify-center"
                         onClick={() => {
                           setQuickAddTargetRoutineId(rutina.id);
                           setExercisePickerOpen(true);
@@ -1823,7 +1984,7 @@ function RoutineManager({
                       </NeuButton>
                       <NeuButton
                         variant="circle"
-                        className="w-8 h-8 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center"
+                        className="w-8 h-8 shadow-neu-flat text-[var(--color-accent-blue)] !p-0 flex items-center justify-center"
                         onClick={() => setMoveModalRoutine(rutina)}
                         title="Mover rutina a otro día"
                       >
@@ -1841,7 +2002,7 @@ function RoutineManager({
                       <NeuButton
                         variant="circle"
                         className={`w-8 h-8 shadow-neu-flat !p-0 flex items-center justify-center ${
-                          isRest ? "text-amber-700 bg-amber-100" : "text-[#718096]"
+                          isRest ? "text-amber-700 bg-amber-100" : "text-[var(--color-text-muted)]"
                         }`}
                         onClick={() => toggleRutinaDescanso(rutina.id)}
                         title={isRest ? "Activar rutina de entrenamiento" : "Marcar como día de descanso"}
@@ -1850,7 +2011,7 @@ function RoutineManager({
                       </NeuButton>
                       <NeuButton
                         variant="circle"
-                        className="w-8 h-8 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center"
+                        className="w-8 h-8 shadow-neu-flat text-[var(--color-accent-blue)] !p-0 flex items-center justify-center"
                         onClick={() => startEditRoutine(rutina)}
                         title="Editar Sesión"
                       >
@@ -1868,16 +2029,16 @@ function RoutineManager({
                   </div>
 
                 {/* Exercises list inside routine card */}
-                <div className="flex flex-col gap-2 pt-1 border-t border-[#c5cad1]/20">
+                <div className="flex flex-col gap-2 pt-1 border-t border-[var(--color-text-muted)]/20">
                   {relatedErs.length === 0 ? (
-                    <div className="flex justify-between items-center py-2 px-3 rounded-lg bg-[#E0E5EC] shadow-neu-pressed">
-                      <span className="text-xs text-[#718096] italic">Sin ejercicios en esta sesión</span>
+                    <div className="flex justify-between items-center py-2 px-3 rounded-lg bg-[var(--color-bg-base)] shadow-neu-pressed">
+                      <span className="text-xs text-[var(--color-text-muted)] italic">Sin ejercicios en esta sesión</span>
                       <button
                         onClick={() => {
                           setQuickAddTargetRoutineId(rutina.id);
                           setExercisePickerOpen(true);
                         }}
-                        className="text-xs font-bold text-[#4D7CFE] flex items-center gap-1"
+                        className="text-xs font-bold text-[var(--color-accent-blue)] flex items-center gap-1"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Añadir Ejercicio
@@ -1889,14 +2050,14 @@ function RoutineManager({
                       return (
                         <div
                           key={er.id}
-                          className="flex flex-col gap-1.5 py-2 px-3 rounded-xl bg-[#E0E5EC] shadow-neu-pressed"
+                          className="flex flex-col gap-1.5 py-2 px-3 rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed"
                         >
                           <div className="flex justify-between items-start">
                             <div className="flex flex-col max-w-[210px]">
-                              <span className="font-bold text-xs text-[#2D3748]">
+                              <span className="font-bold text-xs text-[var(--color-text-main)]">
                                 {idx + 1}. {ej?.nombre || "Ejercicio"}
                               </span>
-                              <span className="text-[9px] text-[#718096]">{ej?.grupo_muscular || "General"}</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)]">{ej?.grupo_muscular || "General"}</span>
                             </div>
 
                             {/* Quick buttons: edit params & remove exercise */}
@@ -1913,7 +2074,7 @@ function RoutineManager({
                                     rpe: er.rpe_objetivo,
                                   })
                                 }
-                                className="p-1 rounded-md text-[#4D7CFE] hover:bg-[#4D7CFE]/10"
+                                className="p-1 rounded-md text-[var(--color-accent-blue)] hover:bg-[var(--color-accent-blue)]/10"
                                 title="Editar parámetros"
                               >
                                 <Sliders className="w-3.5 h-3.5" />
@@ -1931,18 +2092,18 @@ function RoutineManager({
                           </div>
 
                           {/* Parameters Badges */}
-                          <div className="flex items-center gap-2 text-[10px] text-[#718096] flex-wrap">
-                            <span className="font-bold text-[#4D7CFE] bg-[#E0E5EC] px-2 py-0.5 rounded-md shadow-neu-flat">
+                          <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)] flex-wrap">
+                            <span className="font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-md shadow-neu-flat">
                               {er.series_objetivo} series × {er.reps_objetivo}
                             </span>
-                            <span className="bg-[#E0E5EC] px-1.5 py-0.5 rounded shadow-neu-flat">
+                            <span className="bg-[var(--color-bg-base)] px-1.5 py-0.5 rounded shadow-neu-flat">
                               Descanso: {er.descanso_segundos}s
                             </span>
-                            <span className="bg-[#E0E5EC] px-1.5 py-0.5 rounded shadow-neu-flat">
+                            <span className="bg-[var(--color-bg-base)] px-1.5 py-0.5 rounded shadow-neu-flat">
                               RPE: {er.rpe_objetivo}
                             </span>
                             {er.tempo && er.tempo !== "-" && (
-                              <span className="bg-[#E0E5EC] px-1.5 py-0.5 rounded shadow-neu-flat">
+                              <span className="bg-[var(--color-bg-base)] px-1.5 py-0.5 rounded shadow-neu-flat">
                                 Tempo: {er.tempo}
                               </span>
                             )}
@@ -1967,25 +2128,25 @@ function RoutineManager({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-[var(--color-text-main)]/40 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+              className="bg-[var(--color-bg-base)] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-bold text-base text-[#2D3748]">Editar Parámetros</h3>
-                  <span className="text-xs font-semibold text-[#4D7CFE]">{editingExerciseParam.ejercicioNombre}</span>
+                  <h3 className="font-bold text-base text-[var(--color-text-main)]">Editar Parámetros</h3>
+                  <span className="text-xs font-semibold text-[var(--color-accent-blue)]">{editingExerciseParam.ejercicioNombre}</span>
                 </div>
                 <NeuButton
                   variant="circle"
                   className="w-7 h-7 shadow-neu-flat"
                   onClick={() => setEditingExerciseParam(null)}
                 >
-                  <X className="w-4 h-4 text-[#718096]" />
+                  <X className="w-4 h-4 text-[var(--color-text-muted)]" />
                 </NeuButton>
               </div>
 
@@ -2054,14 +2215,14 @@ function RoutineManager({
 
               <div className="flex gap-2 mt-2">
                 <NeuButton
-                  className="flex-1 h-11 text-[#00C9A7] font-bold text-sm flex items-center justify-center gap-2"
+                  className="flex-1 h-11 text-[var(--color-accent-green)] font-bold text-sm flex items-center justify-center gap-2"
                   onClick={handleSaveQuickParamEdit}
                 >
                   <Check className="w-4 h-4" />
                   Guardar Cambios
                 </NeuButton>
                 <NeuButton
-                  className="px-4 h-11 text-[#718096] text-sm"
+                  className="px-4 h-11 text-[var(--color-text-muted)] text-sm"
                   onClick={() => setEditingExerciseParam(null)}
                 >
                   Cancelar
@@ -2079,32 +2240,32 @@ function RoutineManager({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-[var(--color-text-main)]/40 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+              className="bg-[var(--color-bg-base)] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
             >
               <div className="flex justify-between items-center">
-                <h3 className="font-bold text-base text-[#2D3748]">Copiar Rutinas</h3>
+                <h3 className="font-bold text-base text-[var(--color-text-main)]">Copiar Rutinas</h3>
                 <NeuButton
                   variant="circle"
                   className="w-7 h-7 shadow-neu-flat"
                   onClick={() => setIsCopyModalOpen(false)}
                 >
-                  <X className="w-4 h-4 text-[#718096]" />
+                  <X className="w-4 h-4 text-[var(--color-text-muted)]" />
                 </NeuButton>
               </div>
 
-              <p className="text-xs text-[#718096]">
+              <p className="text-xs text-[var(--color-text-muted)]">
                 Selecciona de qué atleta deseas replicar las rutinas hacia{" "}
-                <strong className="text-[#2D3748]">{currentAthlete?.nombre}</strong>:
+                <strong className="text-[var(--color-text-main)]">{currentAthlete?.nombre}</strong>:
               </p>
 
               <select
-                className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-2.5 text-sm text-[#2D3748] shadow-neu-pressed outline-none"
+                className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-2.5 text-sm text-[var(--color-text-main)] shadow-neu-pressed outline-none"
                 value={sourceAthleteIdForCopy}
                 onChange={(e) => setSourceAthleteIdForCopy(e.target.value)}
               >
@@ -2123,7 +2284,7 @@ function RoutineManager({
 
               <div className="flex gap-2 mt-2">
                 <NeuButton
-                  className="flex-1 h-11 text-[#4D7CFE] font-bold text-sm flex items-center justify-center gap-2"
+                  className="flex-1 h-11 text-[var(--color-accent-blue)] font-bold text-sm flex items-center justify-center gap-2"
                   onClick={handleCopyFromAthlete}
                   disabled={!sourceAthleteIdForCopy || isSyncing}
                 >
@@ -2131,7 +2292,7 @@ function RoutineManager({
                   {isSyncing ? "Copiando..." : "Copiar Rutinas"}
                 </NeuButton>
                 <NeuButton
-                  className="px-4 h-11 text-[#718096] text-sm"
+                  className="px-4 h-11 text-[var(--color-text-muted)] text-sm"
                   onClick={() => setIsCopyModalOpen(false)}
                 >
                   Cancelar
@@ -2149,22 +2310,22 @@ function RoutineManager({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-[var(--color-text-main)]/40 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+              className="bg-[var(--color-bg-base)] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-[#4D7CFE]/10 text-[#4D7CFE]">
+                  <div className="p-2 rounded-xl bg-[var(--color-accent-blue)]/10 text-[var(--color-accent-blue)]">
                     <ArrowRightLeft className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-base text-[#2D3748]">Mover Rutina de Día</h3>
-                    <span className="text-xs text-[#718096]">Reorganizar planificación</span>
+                    <h3 className="font-bold text-base text-[var(--color-text-main)]">Mover Rutina de Día</h3>
+                    <span className="text-xs text-[var(--color-text-muted)]">Reorganizar planificación</span>
                   </div>
                 </div>
                 <NeuButton
@@ -2172,12 +2333,12 @@ function RoutineManager({
                   className="w-7 h-7 shadow-neu-flat"
                   onClick={() => setMoveModalRoutine(null)}
                 >
-                  <X className="w-4 h-4 text-[#718096]" />
+                  <X className="w-4 h-4 text-[var(--color-text-muted)]" />
                 </NeuButton>
               </div>
 
-              <p className="text-xs text-[#718096]">
-                Mover <strong className="text-[#2D3748]">{moveModalRoutine.nombre_sesion}</strong> (actualmente en {getDiaSemanaNombre(moveModalRoutine.dia_semana)}) a otro día de la semana:
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Mover <strong className="text-[var(--color-text-main)]">{moveModalRoutine.nombre_sesion}</strong> (actualmente en {getDiaSemanaNombre(moveModalRoutine.dia_semana)}) a otro día de la semana:
               </p>
 
               <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
@@ -2193,12 +2354,12 @@ function RoutineManager({
                         setSelectedDayFilter(dia.id);
                         setMoveModalRoutine(null);
                       }}
-                      className="p-3 rounded-2xl bg-[#E0E5EC] shadow-neu-flat hover:shadow-neu-pressed active:shadow-neu-pressed flex items-center justify-between text-left transition-all"
+                      className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed active:shadow-neu-pressed flex items-center justify-between text-left transition-all"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-[#2D3748]">{dia.label}</span>
+                        <span className="font-bold text-xs text-[var(--color-text-main)]">{dia.label}</span>
                         {isToday && (
-                          <span className="text-[8px] font-black uppercase bg-[#4D7CFE] text-white px-1.5 py-0.2 rounded-full">
+                          <span className="text-[8px] font-black uppercase bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded-full">
                             Hoy
                           </span>
                         )}
@@ -2218,7 +2379,7 @@ function RoutineManager({
               </div>
 
               <NeuButton
-                className="h-10 text-[#718096] text-xs font-medium"
+                className="h-10 text-[var(--color-text-muted)] text-xs font-medium"
                 onClick={() => setMoveModalRoutine(null)}
               >
                 Cancelar
@@ -2235,29 +2396,29 @@ function RoutineManager({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[#2D3748]/40 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-[var(--color-text-main)]/40 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#E0E5EC] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
+              className="bg-[var(--color-bg-base)] rounded-3xl p-5 w-full max-w-sm shadow-neu-flat flex flex-col gap-4"
             >
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-amber-100 text-amber-700">
                   <Eraser className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-[#2D3748]">Limpiar Ejercicios</h3>
-                  <span className="text-xs text-[#718096]">{clearConfirmRoutine.nombre_sesion}</span>
+                  <h3 className="font-bold text-base text-[var(--color-text-main)]">Limpiar Ejercicios</h3>
+                  <span className="text-xs text-[var(--color-text-muted)]">{clearConfirmRoutine.nombre_sesion}</span>
                 </div>
               </div>
 
-              <p className="text-xs text-[#718096] leading-relaxed">
+              <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
                 ¿Estás seguro de que deseas eliminar todos los ejercicios de la sesión del día{" "}
-                <strong className="text-[#2D3748]">{getDiaSemanaNombre(clearConfirmRoutine.dia_semana)}</strong>?
+                <strong className="text-[var(--color-text-main)]">{getDiaSemanaNombre(clearConfirmRoutine.dia_semana)}</strong>?
                 <br />
-                <span className="text-[11px] text-[#718096]/80 mt-1 block">
+                <span className="text-[11px] text-[var(--color-text-muted)]/80 mt-1 block">
                   La sesión permanecerá programada para este día pero quedará limpia para agregar nuevos ejercicios.
                 </span>
               </p>
@@ -2273,7 +2434,7 @@ function RoutineManager({
                   Limpiar Ejercicios
                 </NeuButton>
                 <NeuButton
-                  className="px-4 h-11 text-[#718096] text-xs"
+                  className="px-4 h-11 text-[var(--color-text-muted)] text-xs"
                   onClick={() => setClearConfirmRoutine(null)}
                 >
                   Cancelar
@@ -2299,6 +2460,22 @@ function RoutineManager({
         athlete={accessModalAthlete}
         onClose={() => setAccessModalAthlete(null)}
       />
+
+      <ClearAthleteRoutinesModal
+        isOpen={isClearAthleteRoutinesOpen}
+        athlete={currentAthlete || null}
+        onClose={() => setIsClearAthleteRoutinesOpen(false)}
+        onConfirm={async (athleteId) => {
+          setIsClearingAthleteRoutines(true);
+          try {
+            await clearAthleteRoutines(athleteId);
+            setIsClearAthleteRoutinesOpen(false);
+          } finally {
+            setIsClearingAthleteRoutines(false);
+          }
+        }}
+        isClearing={isClearingAthleteRoutines}
+      />
     </div>
   );
 
@@ -2311,12 +2488,12 @@ function RoutineManager({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-50 bg-[#E0E5EC]/95 backdrop-blur-sm flex flex-col p-4 max-w-md mx-auto"
+            className="fixed inset-0 z-50 bg-[var(--color-bg-base)]/95 backdrop-blur-sm flex flex-col p-4 max-w-md mx-auto"
           >
             <div className="flex justify-between items-center mb-3">
               <div>
-                <h3 className="font-bold text-base text-[#2D3748]">Seleccionar Ejercicio</h3>
-                <span className="text-[10px] text-[#718096]">
+                <h3 className="font-bold text-base text-[var(--color-text-main)]">Seleccionar Ejercicio</h3>
+                <span className="text-[10px] text-[var(--color-text-muted)]">
                   {quickAddTargetRoutineId ? "Añadir a sesión activa" : "Añadir a la rutina en edición"}
                 </span>
               </div>
@@ -2328,7 +2505,7 @@ function RoutineManager({
                   setQuickAddTargetRoutineId(null);
                 }}
               >
-                <ArrowLeft className="w-4 h-4 text-[#718096]" />
+                <ArrowLeft className="w-4 h-4 text-[var(--color-text-muted)]" />
               </NeuButton>
             </div>
 
@@ -2345,8 +2522,8 @@ function RoutineManager({
                 onClick={() => setSelectedMuscleFilter("todos")}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
                   selectedMuscleFilter === "todos"
-                    ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]"
-                    : "bg-[#E0E5EC] shadow-neu-flat text-[#718096]"
+                    ? "bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)]"
+                    : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)]"
                 }`}
               >
                 Todos
@@ -2357,8 +2534,8 @@ function RoutineManager({
                   onClick={() => setSelectedMuscleFilter(group)}
                   className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
                     selectedMuscleFilter === group
-                      ? "bg-[#E0E5EC] shadow-neu-pressed text-[#4D7CFE]"
-                      : "bg-[#E0E5EC] shadow-neu-flat text-[#718096]"
+                      ? "bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)]"
+                      : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)]"
                   }`}
                 >
                   {group}
@@ -2375,12 +2552,12 @@ function RoutineManager({
                   onClick={() => handleAddExerciseToRoutine(ej)}
                 >
                   <div className="flex flex-col">
-                    <span className="font-bold text-xs text-[#2D3748]">{ej.nombre}</span>
-                    <span className="text-[10px] text-[#718096]">{ej.grupo_muscular}</span>
+                    <span className="font-bold text-xs text-[var(--color-text-main)]">{ej.nombre}</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">{ej.grupo_muscular}</span>
                   </div>
                   <NeuButton
                     variant="circle"
-                    className="w-7 h-7 shadow-neu-flat text-[#4D7CFE] !p-0 flex items-center justify-center shrink-0"
+                    className="w-7 h-7 shadow-neu-flat text-[var(--color-accent-blue)] !p-0 flex items-center justify-center shrink-0"
                   >
                     <Plus className="w-4 h-4" />
                   </NeuButton>
@@ -2388,7 +2565,7 @@ function RoutineManager({
               ))}
 
               {filteredEjercicios.length === 0 && (
-                <div className="text-center text-[#718096] py-8 text-xs">
+                <div className="text-center text-[var(--color-text-muted)] py-8 text-xs">
                   No se encontraron ejercicios con ese criterio.
                 </div>
               )}
@@ -2469,9 +2646,9 @@ function ExercisesLibrary() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-4 mb-2">
           <NeuButton variant="circle" className="w-10 h-10 shadow-neu-flat" onClick={() => setIsEditing(null)}>
-            <ArrowLeft className="w-5 h-5 text-[#718096]" />
+            <ArrowLeft className="w-5 h-5 text-[var(--color-text-muted)]" />
           </NeuButton>
-          <h2 className="text-xl font-bold text-[#2D3748]">
+          <h2 className="text-xl font-bold text-[var(--color-text-main)]">
             {isEditing === "new" ? "Nuevo Ejercicio" : "Editar Ejercicio"}
           </h2>
         </div>
@@ -2492,16 +2669,16 @@ function ExercisesLibrary() {
               required
             />
             <div className="flex flex-col gap-1 w-full">
-              <span className="text-sm font-medium text-[#718096] pl-2">Instrucciones / Ejecución</span>
+              <span className="text-sm font-medium text-[var(--color-text-muted)] pl-2">Instrucciones / Ejecución</span>
               <textarea
-                className="w-full rounded-2xl bg-[#E0E5EC] px-4 py-3 text-[#2D3748] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[#4D7CFE]/20 resize-none h-24 text-sm"
+                className="w-full rounded-2xl bg-[var(--color-bg-base)] px-4 py-3 text-[var(--color-text-main)] shadow-neu-pressed outline-none focus:ring-2 focus:ring-[var(--color-accent-blue)]/20 resize-none h-24 text-sm"
                 value={instrucciones}
                 onChange={(e) => setInstrucciones(e.target.value)}
                 placeholder="Pautas técnicas, recorrido, respiración..."
               />
             </div>
 
-            <NeuButton onClick={handleSave} className="mt-2 h-12 text-[#4D7CFE] font-bold">
+            <NeuButton onClick={handleSave} className="mt-2 h-12 text-[var(--color-accent-blue)] font-bold">
               Guardar Ejercicio
             </NeuButton>
 
@@ -2523,11 +2700,11 @@ function ExercisesLibrary() {
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center mb-1">
         <div>
-          <h2 className="text-2xl font-bold text-[#2D3748]">Biblioteca</h2>
-          <span className="text-xs text-[#718096]">{ejercicios.length} ejercicios registrados</span>
+          <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Biblioteca</h2>
+          <span className="text-xs text-[var(--color-text-muted)]">{ejercicios.length} ejercicios registrados</span>
         </div>
         <NeuButton variant="circle" className="w-10 h-10 shadow-neu-flat" onClick={handleAddNew}>
-          <Plus className="w-5 h-5 text-[#4D7CFE]" />
+          <Plus className="w-5 h-5 text-[var(--color-accent-blue)]" />
         </NeuButton>
       </div>
 
@@ -2546,19 +2723,19 @@ function ExercisesLibrary() {
             onClick={() => handleEdit(ej.id)}
           >
             <div className="flex flex-col">
-              <span className="font-bold text-[#2D3748] text-sm">{ej.nombre}</span>
-              <span className="text-[10px] text-[#718096]">{ej.grupo_muscular}</span>
+              <span className="font-bold text-[var(--color-text-main)] text-sm">{ej.nombre}</span>
+              <span className="text-[10px] text-[var(--color-text-muted)]">{ej.grupo_muscular}</span>
             </div>
             <NeuButton
               variant="circle"
-              className="w-8 h-8 shadow-neu-pressed text-[#4D7CFE] !p-0 flex items-center justify-center shrink-0"
+              className="w-8 h-8 shadow-neu-pressed text-[var(--color-accent-blue)] !p-0 flex items-center justify-center shrink-0"
             >
               <ChevronRight className="w-4 h-4" />
             </NeuButton>
           </NeuCard>
         ))}
         {filtered.length === 0 && (
-          <p className="text-center text-[#718096] my-4 text-sm">No se encontraron ejercicios.</p>
+          <p className="text-center text-[var(--color-text-muted)] my-4 text-sm">No se encontraron ejercicios.</p>
         )}
       </div>
     </div>
@@ -2575,8 +2752,8 @@ function CheckinsDashboard() {
   return (
     <div className="flex flex-col gap-4 pb-12">
       <div>
-        <h2 className="text-2xl font-bold text-[#2D3748]">Revisiones & Progreso</h2>
-        <span className="text-xs text-[#718096]">Control de fechas de chequeo y avances físicos</span>
+        <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Revisiones & Progreso</h2>
+        <span className="text-xs text-[var(--color-text-muted)]">Control de fechas de chequeo y avances físicos</span>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -2592,14 +2769,14 @@ function CheckinsDashboard() {
 
           return (
             <NeuCard key={athlete.id} className="flex flex-col gap-3 p-4">
-              <div className="flex justify-between items-center border-b border-[#c5cad1]/30 pb-3">
+              <div className="flex justify-between items-center border-b border-[var(--color-text-muted)]/20 pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[#4D7CFE]">
+                  <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center font-bold text-[var(--color-accent-blue)]">
                     {athlete.nombre.charAt(0)}
                   </div>
                   <div>
-                    <div className="font-bold text-[#2D3748] text-sm">{athlete.nombre}</div>
-                    <div className="text-[10px] text-[#718096]">
+                    <div className="font-bold text-[var(--color-text-main)] text-sm">{athlete.nombre}</div>
+                    <div className="text-[10px] text-[var(--color-text-muted)]">
                       {ficha ? `Inicio: ${ficha.fecha_inicio} • Próx: ${ficha.fecha_chequeo}` : "Sin ficha registrada"}
                     </div>
                   </div>
@@ -2622,7 +2799,7 @@ function CheckinsDashboard() {
                       : `En ${diasRestantes}d`}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-[#718096] bg-[#E0E5EC] px-2 py-0.5 rounded shadow-neu-pressed">
+                  <span className="text-[10px] text-[var(--color-text-muted)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded shadow-neu-pressed">
                     Pendiente
                   </span>
                 )}
@@ -2631,45 +2808,47 @@ function CheckinsDashboard() {
               {/* Physical stats summary */}
               {ficha ? (
                 <div className="grid grid-cols-4 gap-2 text-center">
-                  <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-                    <span className="text-[9px] text-[#718096]">Peso</span>
-                    <span className="font-bold text-[#2D3748] text-xs">{ficha.peso_kg} kg</span>
+                  <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+                    <span className="text-[9px] text-[var(--color-text-muted)]">Peso</span>
+                    <span className="font-bold text-[var(--color-text-main)] text-xs">{ficha.peso_kg} kg</span>
                   </div>
-                  <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-                    <span className="text-[9px] text-[#718096]">% Grasa</span>
-                    <span className="font-bold text-[#2D3748] text-xs">
+                  <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+                    <span className="text-[9px] text-[var(--color-text-muted)]">% Grasa</span>
+                    <span className="font-bold text-[var(--color-text-main)] text-xs">
                       {ficha.grasa_porcentaje ? `${ficha.grasa_porcentaje}%` : "--"}
                     </span>
                   </div>
-                  <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-                    <span className="text-[9px] text-[#718096]">% Músculo</span>
-                    <span className="font-bold text-[#2D3748] text-xs">
+                  <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+                    <span className="text-[9px] text-[var(--color-text-muted)]">% Músculo</span>
+                    <span className="font-bold text-[var(--color-text-main)] text-xs">
                       {ficha.musculo_porcentaje ? `${ficha.musculo_porcentaje}%` : "--"}
                     </span>
                   </div>
-                  <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-                    <span className="text-[9px] text-[#718096]">Cintura</span>
-                    <span className="font-bold text-[#2D3748] text-xs">
+                  <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+                    <span className="text-[9px] text-[var(--color-text-muted)]">Cintura</span>
+                    <span className="font-bold text-[var(--color-text-main)] text-xs">
                       {ficha.cintura_cm ? `${ficha.cintura_cm} cm` : "--"}
                     </span>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-[#718096] italic">No se han registrado mediciones antropométricas.</p>
+                <p className="text-xs text-[var(--color-text-muted)] italic">No se han registrado mediciones antropométricas.</p>
               )}
 
               {ficha?.notas_entrenador && (
-                <p className="text-[11px] text-[#718096] bg-[#E0E5EC] p-2 rounded-xl shadow-neu-pressed line-clamp-2">
-                  <strong className="text-[#2D3748]">Pauta:</strong> {ficha.notas_entrenador}
+                <p className="text-[11px] text-[var(--color-text-muted)] bg-[var(--color-bg-base)] p-2 rounded-xl shadow-neu-pressed line-clamp-2">
+                  <strong className="text-[var(--color-text-main)]">Pauta:</strong> {ficha.notas_entrenador}
                 </p>
               )}
 
               <NeuButton
-                className="w-full flex gap-2 justify-center text-[#4D7CFE] font-bold text-xs h-10"
+                className={`w-full flex gap-2 justify-center font-bold text-xs h-10 ${
+                  ficha ? "text-[var(--color-accent-blue)]" : "text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 shadow-neu-flat"
+                }`}
                 onClick={() => setSelectedProgressAthlete(athlete)}
               >
                 <Activity className="w-4 h-4" />
-                {ficha ? "Actualizar Ficha & Chequeo" : "Crear Ficha de Progreso"}
+                {ficha ? "Actualizar Ficha & Chequeo" : "Crear Ficha Inicial (Requerida para entrenar)"}
               </NeuButton>
             </NeuCard>
           );

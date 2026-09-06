@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
-import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft, BarChart2, MoreVertical, Plus, ChevronDown, Lock } from "lucide-react";
+import { Dumbbell, Check, Play, Pause, RotateCcw, Droplets, Calendar, Scale, Ruler, Target, Clock, Activity, ChevronRight, Coffee, Sparkles, ArrowLeft, BarChart2, MoreVertical, Plus, ChevronDown, Lock, FileText, AlertCircle } from "lucide-react";
 import { useStore, getClientRoutines, getClientActiveRoutines, getDiaSemanaNombre, getDiaSemanaCorto, SerieLograda, EjercicioRealizadoLog } from "@/store";
 import { playLogradoSound } from "@/utils/audio";
 import { motion, AnimatePresence } from "motion/react";
@@ -16,6 +16,8 @@ import { checkAthleteRoutineAccess, RoutineAccessStatus } from "@/utils/routineA
 import { RoutineAccessBlockedCard } from "@/components/RoutineAccessBlockedCard";
 import { WorkoutTimeExpiredModal } from "@/components/WorkoutTimeExpiredModal";
 import { AnalogExerciseClock } from "@/components/AnalogExerciseClock";
+import { EvaluationCountdownCard } from "@/components/EvaluationCountdownCard";
+import { MissingFichaModal } from "@/components/MissingFichaModal";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
   const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
 
 
 function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) => void }) {
-  const { currentUser, usuarios, rutinas, planNutricion, ejerciciosRutina, ejercicios, uiStyle } = useStore();
+  const { currentUser, usuarios, rutinas, planNutricion, ejerciciosRutina, ejercicios, uiStyle, fichasProgreso } = useStore();
   const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
   const todayDay = new Date().getDay();
   const todayRoutine = activeRoutines.find((r) => r.dia_semana === todayDay);
@@ -43,11 +45,19 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
   const [homeUsageModalOpen, setHomeUsageModalOpen] = useState(false);
   const [homeLogModalOpen, setHomeLogModalOpen] = useState(false);
   const [blockedStatus, setBlockedStatus] = useState<RoutineAccessStatus | null>(null);
+  const [missingFichaModalOpen, setMissingFichaModalOpen] = useState(false);
+
+  const ficha = fichasProgreso.find((f) => f.id_cliente === currentUser?.id);
+  const hasFichaInicial = !!ficha;
 
   // General routine access status
   const generalAccess = checkAthleteRoutineAccess(currentUser, usuarios);
 
   const handleTryStartWorkout = (routineId: string) => {
+    if (!hasFichaInicial) {
+      setMissingFichaModalOpen(true);
+      return;
+    }
     const routine = rutinas.find((r) => r.id === routineId);
     const targetDay = routine?.dia_semana;
     const access = checkAthleteRoutineAccess(currentUser, usuarios, targetDay);
@@ -169,8 +179,28 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
           </div>
         )}
 
+        {/* Ficha Inicial notice banner if missing */}
+        {!hasFichaInicial && (
+          <div className="mx-4 mt-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-xs shadow-sm">
+            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block text-xs mb-0.5">Ficha Inicial Requerida</span>
+              Tu entrenador debe registrar tu Ficha Inicial con tus datos de referencia antes de iniciar tus entrenamientos.
+            </div>
+          </div>
+        )}
+
+        {/* Cuenta Regresiva de Siguiente Evaluación Física */}
+        <div className="px-4 pt-3">
+          <EvaluationCountdownCard
+            fechaChequeo={ficha?.fecha_chequeo}
+            fechaInicio={ficha?.fecha_inicio}
+            uiStyle={uiStyle}
+          />
+        </div>
+
         {/* Section Entrenamientos & Exercise Cards */}
-        <div className="px-4 pt-5 pb-6 flex flex-col gap-3.5">
+        <div className="px-4 pt-4 pb-6 flex flex-col gap-3.5">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
               Entrenamientos
@@ -189,7 +219,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
             </button>
           </div>
 
-          {/* Quick Access Badges (Uso Web & Realizados) */}
+          {/* Quick Access Badges (Tiempos de Uso & Realizados) */}
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
@@ -201,7 +231,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
               </div>
               <div>
                 <span className="text-xs font-bold text-slate-900 dark:text-white block leading-tight">
-                  Uso Web
+                  Tiempos de Uso
                 </span>
                 <span className="text-[10px] text-slate-500">
                   Estadísticas y tiempo
@@ -246,7 +276,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                   <div
                     key={er.id}
                     onClick={() => handleTryStartWorkout(displayRoutine.id)}
-                    className="bg-[#F1F5F9] dark:bg-[#1E293B] rounded-[26px] p-4 border border-slate-200/60 dark:border-slate-800 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-amber-400/60 active:scale-[0.99] transition-all"
+                    className="bg-[var(--color-bg-base)] rounded-[26px] p-4 border border-[var(--color-text-muted)]/20 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-[var(--color-accent-blue)]/60 active:scale-[0.99] transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -336,6 +366,11 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
           isOpen={homeLogModalOpen}
           onClose={() => setHomeLogModalOpen(false)}
         />
+
+        <MissingFichaModal
+          isOpen={missingFichaModalOpen}
+          onClose={() => setMissingFichaModalOpen(false)}
+        />
       </div>
     );
   }
@@ -346,9 +381,6 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         <div>
           <h2 className="text-2xl font-light text-[var(--color-text-main)]">Hola,</h2>
           <h3 className="text-3xl font-bold text-[var(--color-accent-blue)]">{currentUser?.nombre || 'Atleta'}</h3>
-          <p className="text-xs text-[var(--color-text-muted)] mt-0.5 font-medium">
-            {activeRoutines.length} días de entrenamiento programados por tu entrenador
-          </p>
         </div>
 
         <div className="flex gap-1.5 pt-1">
@@ -356,13 +388,13 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
             variant="circle"
             className="w-9 h-9 text-[var(--color-accent-blue)]"
             onClick={() => setHomeUsageModalOpen(true)}
-            title="Ver tu ficha de estadísticas de uso web"
+            title="Ver tus tiempos de uso"
           >
             <Clock className="w-4 h-4" />
           </NeuButton>
           <NeuButton
             variant="circle"
-            className="w-9 h-9 text-[#00C9A7]"
+            className="w-9 h-9 text-[var(--color-accent-green)]"
             onClick={() => setHomeLogModalOpen(true)}
             title="Ver registro de ejercicios realizados"
           >
@@ -376,42 +408,16 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         <RoutineAccessBlockedCard status={generalAccess} />
       )}
 
-      {/* Quick Action Cards: Ficha de Uso Web & Ejercicios Realizados */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <button
-          onClick={() => setHomeUsageModalOpen(true)}
-          className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center gap-2.5 text-left"
-        >
-          <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)] shrink-0">
-            <Clock className="w-4 h-4" />
-          </div>
+      {/* Ficha Inicial notice banner if missing */}
+      {!hasFichaInicial && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-xs shadow-neu-flat">
+          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div>
-            <span className="text-xs font-bold text-[var(--color-text-main)] block leading-tight">
-              Ficha de Uso Web
-            </span>
-            <span className="text-[10px] text-[var(--color-text-muted)]">
-              Tiempos y estadísticas
-            </span>
+            <span className="font-bold block text-xs mb-0.5">Ficha Inicial Requerida</span>
+            Tu entrenador debe crear tu Ficha Inicial con tus datos de referencia antes de iniciar tu entrenamiento.
           </div>
-        </button>
-
-        <button
-          onClick={() => setHomeLogModalOpen(true)}
-          className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed transition-all flex items-center gap-2.5 text-left"
-        >
-          <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[#00C9A7] shrink-0">
-            <Check className="w-4 h-4 stroke-[3]" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-[var(--color-text-main)] block leading-tight">
-              Realizados
-            </span>
-            <span className="text-[10px] text-[var(--color-text-muted)]">
-              Historial de series
-            </span>
-          </div>
-        </button>
-      </div>
+        </div>
+      )}
 
       {todayRoutine ? (
         <NeuCard className="flex items-center justify-between py-3 px-4">
@@ -468,7 +474,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
 
       <div className="grid grid-cols-2 gap-3">
         <NeuCard className="flex flex-col items-center justify-center gap-1.5 py-4">
-          <Droplets className="w-7 h-7 text-[#00C9A7]" />
+          <Droplets className="w-7 h-7 text-[var(--color-accent-green)]" />
           <div className="text-center">
             <div className="text-xl font-bold text-[var(--color-text-main)]">{planNutricion?.agua_litros || 2.5} L</div>
             <div className="text-[11px] text-[var(--color-text-muted)]">de {planNutricion?.agua_litros || 2.5} L agua</div>
@@ -485,111 +491,12 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         </NeuCard>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <h4 className="font-bold text-[var(--color-text-main)] text-sm ml-1">Macros Diarios</h4>
-        <NeuCard inset className="p-3.5">
-          <div className="flex justify-between items-center text-xs mb-1.5">
-            <span className="text-[var(--color-text-muted)] font-medium">Calorías</span>
-            <span className="font-bold text-[var(--color-text-main)]">1250 / {planNutricion?.calorias_meta || 1600} kcal</span>
-          </div>
-          <div className="h-2.5 w-full bg-[var(--color-bg-base)] rounded-full shadow-neu-pressed overflow-hidden">
-            <div className="h-full bg-[var(--color-accent-blue)] rounded-full w-[78%]"></div>
-          </div>
-          <div className="flex justify-between mt-2.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
-            <span>Pro: {planNutricion?.proteinas_g || 120}g</span>
-            <span>Car: {planNutricion?.carbohidratos_g || 160}g</span>
-            <span>Gra: {planNutricion?.grasas_g || 53}g</span>
-          </div>
-        </NeuCard>
-      </div>
-
-      {/* Weekly Routine Roadmap (Only active workout days) */}
-      <div className="flex flex-col gap-2.5 mt-1">
-        <div className="flex justify-between items-center ml-1">
-          <h4 className="font-bold text-[var(--color-text-main)] text-sm">Plan Semanal de Entrenamiento</h4>
-          <span className="text-[10px] font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-2 py-0.5 rounded-full shadow-neu-flat">
-            {activeRoutines.length} Días Activos
-          </span>
-        </div>
-
-        <div className="flex flex-col gap-2.5">
-          {activeRoutines.map((routine) => {
-            const routineErs = ejerciciosRutina.filter(er => er.id_rutina === routine.id);
-            const dayName = getDiaSemanaNombre(routine.dia_semana);
-            const isToday = routine.dia_semana === todayDay;
-            const routineAccess = checkAthleteRoutineAccess(currentUser, usuarios, routine.dia_semana);
-
-            return (
-              <NeuCard 
-                key={routine.id} 
-                className={`p-3.5 flex flex-col gap-2 cursor-pointer hover:shadow-neu-pressed transition-all ${
-                  isToday ? 'ring-2 ring-[var(--color-accent-blue)]/30' : ''
-                }`}
-                onClick={() => handleTryStartWorkout(routine.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
-                      isToday 
-                        ? 'bg-[var(--color-accent-blue)] text-white shadow-sm' 
-                        : 'shadow-neu-pressed text-[var(--color-accent-blue)]'
-                    }`}>
-                      {dayName}
-                    </span>
-                    {isToday && (
-                      <span className="text-[9px] font-black uppercase text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] px-1.5 py-0.2 rounded shadow-neu-pressed">
-                        Hoy
-                      </span>
-                    )}
-                    {!routineAccess.allowed && (
-                      <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded flex items-center gap-1 shadow-neu-pressed">
-                        <Lock className="w-2.5 h-2.5" />
-                        <span>{routineAccess.modo === 'solo_hoy' ? 'Solo hoy' : 'Pausado'}</span>
-                      </span>
-                    )}
-                    <span className="font-bold text-xs text-[var(--color-text-main)]">{routine.nombre_sesion}</span>
-                  </div>
-                  <NeuButton 
-                    className="px-2.5 py-1 text-[11px] font-bold text-[var(--color-accent-blue)] h-7 flex items-center gap-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTryStartWorkout(routine.id);
-                    }}
-                  >
-                    {!routineAccess.allowed ? (
-                      <>
-                        <Lock className="w-3 h-3 text-amber-500" />
-                        <span>Restringido</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-3 h-3 fill-current" />
-                        <span>Ver</span>
-                      </>
-                    )}
-                  </NeuButton>
-                </div>
-
-                {routineErs.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {routineErs.map((er) => {
-                      const ex = ejercicios.find(e => e.id === er.id_ejercicio);
-                      return (
-                        <span 
-                          key={er.id} 
-                          className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] font-medium"
-                        >
-                          {ex?.nombre || 'Ejercicio'} ({er.series_objetivo}×{er.reps_objetivo})
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </NeuCard>
-            );
-          })}
-        </div>
-      </div>
+      {/* Cuenta Regresiva de Siguiente Evaluación Física (Reemplaza la lista de Plan Semanal) */}
+      <EvaluationCountdownCard
+        fechaChequeo={ficha?.fecha_chequeo}
+        fechaInicio={ficha?.fecha_inicio}
+        uiStyle={uiStyle}
+      />
 
       {/* Modal dialog when trying to access locked routine in Neumorphic mode */}
       {blockedStatus && (
@@ -620,6 +527,11 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         isOpen={homeLogModalOpen}
         onClose={() => setHomeLogModalOpen(false)}
       />
+
+      <MissingFichaModal
+        isOpen={missingFichaModalOpen}
+        onClose={() => setMissingFichaModalOpen(false)}
+      />
     </div>
   );
 }
@@ -642,8 +554,13 @@ function LiveWorkout({
     guardarProgresoParcial,
     registrarEjercicioCompleto,
     reabrirEjercicioRealizado,
-    uiStyle
+    uiStyle,
+    fichasProgreso
   } = useStore();
+
+  const ficha = fichasProgreso.find((f) => f.id_cliente === currentUser?.id);
+  const hasFichaInicial = !!ficha;
+  const [missingFichaModalOpen, setMissingFichaModalOpen] = useState(false);
 
   const activeRoutines = getClientActiveRoutines(rutinas, currentUser);
   const todayDay = new Date().getDay();
@@ -819,6 +736,12 @@ function LiveWorkout({
 
   // Start training a specific exercise (either fresh or resuming from partial)
   const handleStartExercise = (er: typeof routineExercises[0]) => {
+    // Check if coach has created initial sheet first
+    if (!hasFichaInicial) {
+      setMissingFichaModalOpen(true);
+      return;
+    }
+
     // Check access permission before starting
     const access = checkAthleteRoutineAccess(currentUser, usuarios, currentRoutine?.dia_semana);
     if (!access.allowed) {
@@ -970,7 +893,7 @@ function LiveWorkout({
 
   if (!currentRoutine) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-[#718096]">
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-[var(--color-text-muted)]">
         <Dumbbell className="w-12 h-12 mb-2 opacity-50" />
         <p>No hay rutinas activas programadas.</p>
       </div>
@@ -987,11 +910,11 @@ function LiveWorkout({
 
     return (
       <div className="flex flex-col items-center justify-center h-full gap-5 pb-8 px-2">
-        <div className="w-24 h-24 rounded-full shadow-neu-flat flex items-center justify-center text-[#00C9A7] bg-[var(--color-bg-base)]">
+        <div className="w-24 h-24 rounded-full shadow-neu-flat flex items-center justify-center text-[var(--color-accent-green)] bg-[var(--color-bg-base)]">
           <Check className="w-14 h-14 stroke-[3]" />
         </div>
         <div className="text-center">
-          <span className="text-xs font-bold text-[#00C9A7] uppercase tracking-widest bg-[#00C9A7]/10 px-3 py-1 rounded-full">
+          <span className="text-xs font-bold text-[var(--color-accent-green)] uppercase tracking-widest bg-[var(--color-accent-green)]/10 px-3 py-1 rounded-full">
             ¡Ejercicio Logrado!
           </span>
           <h2 className="text-2xl font-bold text-[var(--color-text-main)] mt-2">{currentEx?.nombre}</h2>
@@ -1034,7 +957,7 @@ function LiveWorkout({
           )}
 
           <NeuButton 
-            className="w-full text-[#00C9A7] font-bold h-12 text-base flex items-center justify-center gap-2"
+            className="w-full text-[var(--color-accent-green)] font-bold h-12 text-base flex items-center justify-center gap-2"
             onClick={() => {
               setIsWorkoutStarted(false);
               setIsExerciseFinished(false);
@@ -1153,7 +1076,7 @@ function LiveWorkout({
                 <NeuButton 
                   variant="circle" 
                   onClick={() => setIsResting(false)} 
-                  className="text-[#00C9A7]"
+                  className="text-[var(--color-accent-green)]"
                   title="Saltar descanso"
                 >
                   <Play className="w-5 h-5 ml-0.5" />
@@ -1207,7 +1130,7 @@ function LiveWorkout({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
                     transition={{ duration: 0.2 }}
-                    className="mt-2 h-14 w-full rounded-2xl flex items-center justify-center gap-2.5 shadow-neu-flat bg-[var(--color-bg-base)] text-[#00C9A7] font-extrabold text-lg tracking-wide border border-[#00C9A7]/40 select-none"
+                    className="mt-2 h-14 w-full rounded-2xl flex items-center justify-center gap-2.5 shadow-neu-flat bg-[var(--color-bg-base)] text-[var(--color-accent-green)] font-extrabold text-lg tracking-wide border border-[var(--color-accent-green)]/40 select-none"
                   >
                     <Check className="w-7 h-7 stroke-[3]" />
                     <span>LOGRADO</span>
@@ -1301,7 +1224,7 @@ function LiveWorkout({
 
       {/* Notice if today is rest day */}
       {!todayRoutine && (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed text-xs text-[var(--color-text-muted)] border border-[#c5cad1]/20">
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed text-xs text-[var(--color-text-muted)] border border-[var(--color-text-muted)]/20">
           <Coffee className="w-4 h-4 text-[var(--color-accent-blue)] flex-shrink-0" />
           <span>
             <strong>Hoy es día de descanso recomendado.</strong> Mostrando sesión de <strong>{getDiaSemanaNombre(currentRoutine.dia_semana)}</strong>.
@@ -1338,7 +1261,7 @@ function LiveWorkout({
               onClick={() => setActiveListTab('realizados')}
               className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
                 activeListTab === 'realizados'
-                  ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[#00C9A7]'
+                  ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-green)]'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
               }`}
             >
@@ -1350,6 +1273,17 @@ function LiveWorkout({
       {/* TAB CONTENT: PENDIENTES */}
       {activeListTab === 'pendientes' && (
         <div className="flex-1 flex flex-col gap-2.5 -mx-4 px-4 overflow-y-visible">
+          {/* Ficha Inicial notice if coach hasn't registered it */}
+          {!hasFichaInicial && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-xs shadow-neu-flat">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block text-xs mb-0.5">Ficha Inicial Requerida</span>
+                Tu entrenador debe crear tu Ficha Inicial con tus datos de referencia antes de que puedas iniciar tu entrenamiento.
+              </div>
+            </div>
+          )}
+
           {pendingExercises.length === 0 ? (
             <NeuCard className="p-6 flex flex-col items-center justify-center gap-3 text-center my-auto">
               {routineExercises.length === 0 ? (
@@ -1362,7 +1296,7 @@ function LiveWorkout({
                 </>
               ) : (
                 <>
-                  <div className="w-16 h-16 rounded-full shadow-neu-flat flex items-center justify-center text-[#00C9A7]">
+                  <div className="w-16 h-16 rounded-full shadow-neu-flat flex items-center justify-center text-[var(--color-accent-green)]">
                     <Check className="w-9 h-9 stroke-[3]" />
                   </div>
                   <h3 className="font-bold text-[var(--color-text-main)] text-base">¡Sesión completada!</h3>
@@ -1370,7 +1304,7 @@ function LiveWorkout({
                     Has completado todos los ejercicios programados para este día. Puedes ver el registro detallado de cada ejercicio en la pestaña de <strong>"Realizados"</strong>.
                   </p>
                   <NeuButton 
-                    className="mt-2 text-[#00C9A7] font-bold text-xs px-4 py-2"
+                    className="mt-2 text-[var(--color-accent-green)] font-bold text-xs px-4 py-2"
                     onClick={() => setActiveListTab('realizados')}
                   >
                     Ver Ejercicios Realizados
@@ -1393,7 +1327,7 @@ function LiveWorkout({
                     <div
                       key={er.id}
                       onClick={() => handleStartExercise(er)}
-                      className="bg-[#F1F5F9] dark:bg-[#1E293B] rounded-[24px] p-4 border border-slate-200/60 dark:border-slate-800 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-amber-400/60 active:scale-[0.99] transition-all"
+                      className="bg-[var(--color-bg-base)] rounded-[24px] p-4 border border-[var(--color-text-muted)]/20 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-[var(--color-accent-blue)]/60 active:scale-[0.99] transition-all"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1536,10 +1470,10 @@ function LiveWorkout({
                 const log = getCompletedLog(er.id);
 
                 return (
-                  <NeuCard key={er.id} className="p-3.5 flex flex-col gap-2 border border-emerald-500/20">
+                  <NeuCard key={er.id} className="p-3.5 flex flex-col gap-2 border border-[var(--color-accent-green)]/20">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 min-w-[2.25rem] rounded-full shadow-neu-pressed flex items-center justify-center text-[#00C9A7]">
+                        <div className="w-9 h-9 min-w-[2.25rem] rounded-full shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-green)]">
                           <Check className="w-5 h-5 stroke-[3]" />
                         </div>
                         <div className="flex flex-col">
@@ -1553,7 +1487,7 @@ function LiveWorkout({
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] font-bold text-[#00C9A7] mt-0.5">
+                          <span className="text-[11px] font-bold text-[var(--color-accent-green)] mt-0.5">
                             ✓ {er.series_objetivo} series completadas • {log?.completado_at ? `Registrado a las ${log.completado_at}` : 'Completado'}
                           </span>
 
@@ -1585,7 +1519,7 @@ function LiveWorkout({
 
                     {/* Series breakdown pills */}
                     {log?.series && log.series.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-1 border-t border-[#c5cad1]/20">
+                      <div className="flex flex-wrap gap-1.5 pt-1 border-t border-[var(--color-text-muted)]/20">
                         {log.series.map((s) => (
                           <span
                             key={s.numero_serie}
@@ -1603,7 +1537,7 @@ function LiveWorkout({
               {/* Action buttons to open comprehensive log and usage sheet */}
               <div className="flex flex-col sm:flex-row gap-2 mt-2">
                 <NeuButton
-                  className="flex-1 py-2 text-xs font-bold text-[#00C9A7] flex items-center justify-center gap-1.5 shadow-neu-flat"
+                  className="flex-1 py-2 text-xs font-bold text-[var(--color-accent-green)] flex items-center justify-center gap-1.5 shadow-neu-flat"
                   onClick={() => setIsExerciseLogModalOpen(true)}
                 >
                   <Check className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -1614,7 +1548,7 @@ function LiveWorkout({
                   onClick={() => setIsUsageModalOpen(true)}
                 >
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Ficha de Uso Web</span>
+                  <span>Tiempos de Uso</span>
                 </NeuButton>
               </div>
             </>
@@ -1633,6 +1567,11 @@ function LiveWorkout({
       <RegistroEjerciciosRealizadosModal
         isOpen={isExerciseLogModalOpen}
         onClose={() => setIsExerciseLogModalOpen(false)}
+      />
+
+      <MissingFichaModal
+        isOpen={missingFichaModalOpen}
+        onClose={() => setMissingFichaModalOpen(false)}
       />
     </div>
   );
@@ -1662,17 +1601,17 @@ function ClientProgress() {
     return (
       <div className="flex flex-col gap-3">
         {/* Toggle sub-view pill */}
-        <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+        <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed">
           <button
             onClick={() => setSubTab("progreso")}
-            className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+            className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
           >
             <Activity className="w-3.5 h-3.5" />
             <span>Tu Progreso</span>
           </button>
           <button
             onClick={() => setSubTab("ficha")}
-            className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[#718096] hover:text-[#2D3748]"
+            className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
           >
             <Scale className="w-3.5 h-3.5" />
             <span>Control Físico & Medidas</span>
@@ -1687,17 +1626,17 @@ function ClientProgress() {
   return (
     <div className="flex flex-col gap-4 h-full pb-10">
       {/* Toggle sub-view pill */}
-      <div className="flex bg-[#E0E5EC] p-1 rounded-2xl shadow-neu-pressed">
+      <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed">
         <button
           onClick={() => setSubTab("progreso")}
-          className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[#718096] hover:text-[#2D3748]"
+          className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
         >
           <Activity className="w-3.5 h-3.5" />
           <span>Tu Progreso</span>
         </button>
         <button
           onClick={() => setSubTab("ficha")}
-          className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 bg-[#E0E5EC] shadow-neu-flat text-[#4D7CFE]"
+          className="flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
         >
           <Scale className="w-3.5 h-3.5" />
           <span>Control Físico & Medidas</span>
@@ -1705,15 +1644,15 @@ function ClientProgress() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-[#2D3748]">Control Físico & Medidas</h2>
-        <span className="text-xs text-[#718096]">Evaluaciones antropométricas y control de chequeos</span>
+        <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Control Físico & Medidas</h2>
+        <span className="text-xs text-[var(--color-text-muted)]">Evaluaciones antropométricas y control de chequeos</span>
       </div>
 
       {/* Ficha de Evaluación del Entrenador */}
       {ficha && (
         <NeuCard className="p-4 flex flex-col gap-3">
-          <div className="flex justify-between items-center border-b border-[#c5cad1]/30 pb-2">
-            <div className="flex items-center gap-2 text-[#4D7CFE] font-bold text-xs uppercase tracking-wider">
+          <div className="flex justify-between items-center border-b border-[var(--color-text-muted)]/20 pb-2">
+            <div className="flex items-center gap-2 text-[var(--color-accent-blue)] font-bold text-xs uppercase tracking-wider">
               <Activity className="w-4 h-4" />
               <span>Control Físico & Chequeos</span>
             </div>
@@ -1737,38 +1676,38 @@ function ClientProgress() {
           </div>
 
           {/* Dates row */}
-          <div className="flex justify-between text-xs text-[#718096] bg-[#E0E5EC] px-3 py-2 rounded-xl shadow-neu-pressed">
+          <div className="flex justify-between text-xs text-[var(--color-text-muted)] bg-[var(--color-bg-base)] px-3 py-2 rounded-xl shadow-neu-pressed">
             <div className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-[#4D7CFE]" />
-              <span>Inicio: <strong className="text-[#2D3748]">{ficha.fecha_inicio}</strong></span>
+              <Calendar className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+              <span>Inicio: <strong className="text-[var(--color-text-main)]">{ficha.fecha_inicio}</strong></span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-[#00C9A7]" />
-              <span>Revisión: <strong className="text-[#2D3748]">{ficha.fecha_chequeo}</strong></span>
+              <Clock className="w-3.5 h-3.5 text-[var(--color-accent-green)]" />
+              <span>Revisión: <strong className="text-[var(--color-text-main)]">{ficha.fecha_chequeo}</strong></span>
             </div>
           </div>
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-4 gap-2 text-center pt-1">
-            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-              <span className="text-[9px] text-[#718096]">Peso</span>
-              <span className="font-bold text-[#2D3748] text-xs">{ficha.peso_kg} kg</span>
+            <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[var(--color-text-muted)]">Peso</span>
+              <span className="font-bold text-[var(--color-text-main)] text-xs">{ficha.peso_kg} kg</span>
             </div>
-            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-              <span className="text-[9px] text-[#718096]">Grasa</span>
-              <span className="font-bold text-[#2D3748] text-xs">
+            <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[var(--color-text-muted)]">Grasa</span>
+              <span className="font-bold text-[var(--color-text-main)] text-xs">
                 {ficha.grasa_porcentaje ? `${ficha.grasa_porcentaje}%` : "--"}
               </span>
             </div>
-            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-              <span className="text-[9px] text-[#718096]">Músculo</span>
-              <span className="font-bold text-[#2D3748] text-xs">
+            <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[var(--color-text-muted)]">Músculo</span>
+              <span className="font-bold text-[var(--color-text-main)] text-xs">
                 {ficha.musculo_porcentaje ? `${ficha.musculo_porcentaje}%` : "--"}
               </span>
             </div>
-            <div className="bg-[#E0E5EC] shadow-neu-pressed p-2 rounded-xl flex flex-col">
-              <span className="text-[9px] text-[#718096]">Cintura</span>
-              <span className="font-bold text-[#2D3748] text-xs">
+            <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-2 rounded-xl flex flex-col">
+              <span className="text-[9px] text-[var(--color-text-muted)]">Cintura</span>
+              <span className="font-bold text-[var(--color-text-main)] text-xs">
                 {ficha.cintura_cm ? `${ficha.cintura_cm} cm` : "--"}
               </span>
             </div>
@@ -1778,23 +1717,23 @@ function ClientProgress() {
           {(ficha.cadera_cm || ficha.pecho_cm || ficha.brazo_cm || ficha.muslo_cm) && (
             <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
               {ficha.cadera_cm && (
-                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
-                  Cadera: <strong className="text-[#2D3748]">{ficha.cadera_cm}cm</strong>
+                <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-1.5 rounded-lg text-[var(--color-text-muted)]">
+                  Cadera: <strong className="text-[var(--color-text-main)]">{ficha.cadera_cm}cm</strong>
                 </div>
               )}
               {ficha.pecho_cm && (
-                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
-                  Pecho: <strong className="text-[#2D3748]">{ficha.pecho_cm}cm</strong>
+                <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-1.5 rounded-lg text-[var(--color-text-muted)]">
+                  Pecho: <strong className="text-[var(--color-text-main)]">{ficha.pecho_cm}cm</strong>
                 </div>
               )}
               {ficha.brazo_cm && (
-                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
-                  Brazo: <strong className="text-[#2D3748]">{ficha.brazo_cm}cm</strong>
+                <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-1.5 rounded-lg text-[var(--color-text-muted)]">
+                  Brazo: <strong className="text-[var(--color-text-main)]">{ficha.brazo_cm}cm</strong>
                 </div>
               )}
               {ficha.muslo_cm && (
-                <div className="bg-[#E0E5EC] shadow-neu-pressed p-1.5 rounded-lg text-[#718096]">
-                  Muslo: <strong className="text-[#2D3748]">{ficha.muslo_cm}cm</strong>
+                <div className="bg-[var(--color-bg-base)] shadow-neu-pressed p-1.5 rounded-lg text-[var(--color-text-muted)]">
+                  Muslo: <strong className="text-[var(--color-text-main)]">{ficha.muslo_cm}cm</strong>
                 </div>
               )}
             </div>
@@ -1802,11 +1741,11 @@ function ClientProgress() {
 
           {/* Coach Notes */}
           {ficha.notas_entrenador && (
-            <div className="bg-[#E0E5EC] p-3 rounded-xl shadow-neu-pressed text-xs">
-              <span className="font-bold text-[#4D7CFE] block mb-1 text-[11px] uppercase tracking-wider">
+            <div className="bg-[var(--color-bg-base)] p-3 rounded-xl shadow-neu-pressed text-xs">
+              <span className="font-bold text-[var(--color-accent-blue)] block mb-1 text-[11px] uppercase tracking-wider">
                 Pauta del Entrenador:
               </span>
-              <p className="text-[#2D3748] leading-relaxed">{ficha.notas_entrenador}</p>
+              <p className="text-[var(--color-text-main)] leading-relaxed">{ficha.notas_entrenador}</p>
             </div>
           )}
         </NeuCard>
@@ -1814,32 +1753,32 @@ function ClientProgress() {
 
       {/* Fuerza y Rendimiento */}
       <NeuCard className="p-4">
-        <h3 className="text-[#718096] font-medium mb-4 text-sm">Progresión de Cargas Estimada (kg)</h3>
+        <h3 className="text-[var(--color-text-muted)] font-medium mb-4 text-sm">Progresión de Cargas Estimada (kg)</h3>
         <div className="h-40 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={mockData}>
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#718096", fontSize: 12 }} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "var(--color-text-muted)", fontSize: 12 }} />
               <YAxis
                 domain={["auto", "auto"]}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "#718096", fontSize: 12 }}
+                tick={{ fill: "var(--color-text-muted)", fontSize: 12 }}
                 width={30}
               />
               <Tooltip
                 contentStyle={{
                   borderRadius: "16px",
                   border: "none",
-                  backgroundColor: "#E0E5EC",
-                  boxShadow: "8px 8px 16px #c5cad1, -8px -8px 16px #ffffff",
+                  backgroundColor: "var(--color-bg-base)",
+                  boxShadow: "var(--neu-flat)",
                 }}
               />
               <Line
                 type="monotone"
                 dataKey="rm"
-                stroke="#4D7CFE"
+                stroke="var(--color-accent-blue)"
                 strokeWidth={4}
-                dot={{ r: 6, fill: "#E0E5EC", strokeWidth: 3 }}
+                dot={{ r: 6, fill: "var(--color-bg-base)", strokeWidth: 3 }}
                 activeDot={{ r: 8 }}
               />
             </LineChart>
@@ -1847,13 +1786,13 @@ function ClientProgress() {
         </div>
       </NeuCard>
 
-      <h3 className="font-bold text-[#2D3748] ml-1 mt-1 text-sm">Bienestar y Adherencia</h3>
+      <h3 className="font-bold text-[var(--color-text-main)] ml-1 mt-1 text-sm">Bienestar y Adherencia</h3>
       <div className="flex flex-col gap-3">
         {["Nivel de Fatiga", "Calidad de Sueño", "Estrés"].map((item, i) => (
           <NeuCard inset key={i} className="flex justify-between items-center py-2.5 px-4 !rounded-2xl">
-            <span className="text-[#718096] text-xs font-medium">{item}</span>
+            <span className="text-[var(--color-text-muted)] text-xs font-medium">{item}</span>
             <div className="flex gap-2">
-              <div className="w-7 h-7 rounded-full shadow-neu-flat flex items-center justify-center text-xs font-bold text-[#2D3748]">
+              <div className="w-7 h-7 rounded-full shadow-neu-flat flex items-center justify-center text-xs font-bold text-[var(--color-text-main)]">
                 {8 - i}
               </div>
             </div>

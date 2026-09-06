@@ -31,16 +31,13 @@ export function RoutineAccessBlockedCard({
 
         {/* Title */}
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-0.5 rounded-full mx-auto">
+          <span className="text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full mx-auto">
             {status.modo === "horario_manual"
               ? "Rutina Pausada"
               : status.modo === "solo_hoy"
               ? "Disponible Solo el Día Programado"
               : "Fuera de Horario"}
           </span>
-          <h3 className="text-xl font-black text-[var(--color-text-main)] mt-1">
-            Acceso no disponible
-          </h3>
         </div>
 
         {/* Required Message */}
@@ -48,9 +45,6 @@ export function RoutineAccessBlockedCard({
           <p className="font-medium text-[var(--color-text-muted)]">
             {status.reasonMessage || "El acceso a las rutinas está restringido actualmente."}
           </p>
-          <div className="pt-2 border-t border-[var(--color-text-muted)]/10 font-bold text-sm text-[var(--color-accent-blue)]">
-            Comunicarse con {status.trainerName}.
-          </div>
         </div>
 
         {/* Actions */}
@@ -60,10 +54,10 @@ export function RoutineAccessBlockedCard({
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-3 px-4 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98]"
+              className="w-full py-3 px-4 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98]"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
-              <span>Contactar a {status.trainerName} por WhatsApp</span>
+              <span>Contactar a {status.trainerName}</span>
             </a>
           )}
 

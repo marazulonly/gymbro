@@ -130,17 +130,17 @@ export function FichaEstadisticasUsoModal({
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="w-full max-w-xl max-h-[92vh] flex flex-col rounded-3xl bg-[var(--color-bg-base)] shadow-2xl overflow-hidden border border-[#c5cad1]/20"
+          className="w-full max-w-xl max-h-[92vh] flex flex-col rounded-3xl bg-[var(--color-bg-base)] shadow-2xl overflow-hidden border border-[var(--color-text-muted)]/20"
         >
           {/* Header */}
-          <div className="p-4 sm:p-5 flex items-center justify-between border-b border-[#c5cad1]/20 bg-[var(--color-bg-base)]">
+          <div className="p-4 sm:p-5 flex items-center justify-between border-b border-[var(--color-text-muted)]/20 bg-[var(--color-bg-base)]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl shadow-neu-flat flex items-center justify-center text-[var(--color-accent-blue)]">
                 <Clock className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-[var(--color-text-main)] leading-tight">
-                  Ficha de Estadísticas de Uso Web
+                  Tiempos de Uso
                 </h2>
                 <p className="text-xs text-[var(--color-text-muted)]">
                   Registro de fechas, horas de conexión y tiempos de permanencia
@@ -325,7 +325,7 @@ export function FichaEstadisticasUsoModal({
                     return (
                       <div
                         key={session.id}
-                        className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat flex items-center justify-between border border-[#c5cad1]/15"
+                        className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat flex items-center justify-between border border-[var(--color-text-muted)]/15"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-text-muted)]">
@@ -365,7 +365,7 @@ export function FichaEstadisticasUsoModal({
           </div>
 
           {/* Footer */}
-          <div className="p-3.5 border-t border-[#c5cad1]/20 flex items-center justify-between bg-[var(--color-bg-base)]">
+          <div className="p-3.5 border-t border-[var(--color-text-muted)]/20 flex items-center justify-between bg-[var(--color-bg-base)]">
             <span className="text-[10px] text-[var(--color-text-muted)] flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
               Sincronizado en tiempo real con Firestore

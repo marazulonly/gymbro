@@ -101,7 +101,7 @@ export function checkAthleteRoutineAccess(
       reasonTitle: "Modo: Solo Hoy",
       reasonMessage: isDayAllowed
         ? "Acceso habilitado para la rutina de hoy."
-        : `Esta rutina está programada para otro día. Tu entrenador ha habilitado el acceso únicamente a la fecha actual. Comunicarse con ${trainerName}.`,
+        : `Esta rutina está programada para otro día. Tu entrenador ha habilitado el acceso únicamente a la fecha actual.`,
       trainerName,
       trainerWhatsapp,
       isTodayOnly: true,
@@ -121,7 +121,7 @@ export function checkAthleteRoutineAccess(
       reasonTitle: allowed ? "Acceso Manual Habilitado" : "Rutina Pausada Temporalmente",
       reasonMessage: allowed
         ? "Acceso habilitado manualmente por tu entrenador."
-        : `Tu rutina está pausada temporalmente. Comunicarse con ${trainerName}.`,
+        : `Tu rutina está pausada temporalmente.`,
       trainerName,
       trainerWhatsapp,
       isTodayOnly: false,
@@ -140,7 +140,7 @@ export function checkAthleteRoutineAccess(
         allowed: false,
         modo: "franja_horaria",
         reasonTitle: "Día no habilitado para entrenamiento",
-        reasonMessage: `Hoy no tienes franja horaria de entrenamiento habilitada. Comunicarse con ${trainerName}.`,
+        reasonMessage: `Hoy no tienes franja horaria de entrenamiento habilitada.`,
         trainerName,
         trainerWhatsapp,
         isTodayOnly: false,
@@ -160,9 +160,9 @@ export function checkAthleteRoutineAccess(
 
     let reasonMessage = "";
     if (currentTotalSeconds < startSeconds) {
-      reasonMessage = `Tu horario de entrenamiento inicia a las ${todayFranja.hora_inicio}. Comunicarse con ${trainerName}.`;
+      reasonMessage = `Tu horario de entrenamiento inicia a las ${todayFranja.hora_inicio}.`;
     } else if (currentTotalSeconds > endSeconds) {
-      reasonMessage = `Tu horario de entrenamiento finalizó a las ${todayFranja.hora_fin}. Comunicarse con ${trainerName}.`;
+      reasonMessage = `Tu horario de entrenamiento finalizó a las ${todayFranja.hora_fin}.`;
     } else {
       reasonMessage = `Entrenamiento habilitado de ${todayFranja.hora_inicio} a ${todayFranja.hora_fin}.`;
     }
@@ -171,7 +171,7 @@ export function checkAthleteRoutineAccess(
       allowed: isWithinTime,
       modo: "franja_horaria",
       reasonTitle: isWithinTime ? "Dentro de la Franja Horaria" : "Fuera de la Franja Horaria",
-      reasonMessage: isWithinTime ? reasonMessage : `${reasonMessage} Comunicarse con ${trainerName}.`,
+      reasonMessage,
       trainerName,
       trainerWhatsapp,
       isTodayOnly: false,

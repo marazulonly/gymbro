@@ -37,48 +37,42 @@ export const AnalogExerciseClock: React.FC<AnalogExerciseClockProps> = ({
   const progress = totalSeconds === 0 ? 0 : (currentSeconds === 0 ? 1 : currentSeconds / 60);
   const strokeDashoffset = circumference * (1 - progress);
 
-  // Style configurations matching each active design
+  // Style configurations matching the unified 4-color palette
   const getClockTheme = (style: UIStyle, dark: boolean) => {
     switch (style) {
       case 'soft_porcelain':
         return {
-          faceBg: dark ? '#151C28' : '#FFFFFF',
+          faceBg: 'var(--color-bg-base)',
           rimTrack: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-          progressBar: dark ? '#38BDF8' : '#00A3FF',
-          minutero: dark ? '#F1F5F9' : '#1E293B',
-          segundero: dark ? '#38BDF8' : '#00A3FF',
-          centerDot: dark ? '#38BDF8' : '#00A3FF',
-          shadowClass: dark 
-            ? 'shadow-[8px_8px_20px_#090d15,-8px_-8px_20px_#1c2536] border border-slate-800/80' 
-            : 'shadow-[8px_8px_22px_#d2dbe5,-8px_-8px_22px_#ffffff] border border-white/90',
-          debossedClass: dark
-            ? 'bg-[#111722] text-sky-400 shadow-[inset_2px_2px_4px_#090d15,inset_-2px_-2px_4px_#1e293b] border border-slate-800/60'
-            : 'bg-[#EEF2F6] text-[#00A3FF] shadow-[inset_2.5px_2.5px_5px_#cfd8e3,inset_-2.5px_-2.5px_5px_#ffffff]',
+          progressBar: 'var(--color-accent-blue)',
+          minutero: 'var(--color-text-main)',
+          segundero: 'var(--color-accent-blue)',
+          centerDot: 'var(--color-accent-blue)',
+          shadowClass: 'shadow-neu-flat border border-white/60 dark:border-slate-800/60',
+          debossedClass: 'bg-[var(--color-bg-base)] text-[var(--color-accent-blue)] shadow-neu-pressed',
         };
       case 'modern_gold':
         return {
-          faceBg: dark ? '#0F172A' : '#FFFFFF',
+          faceBg: 'var(--color-bg-base)',
           rimTrack: dark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.12)',
-          progressBar: dark ? '#FBBF24' : '#F59E0B',
-          minutero: dark ? '#F8FAFC' : '#0F172A',
-          segundero: dark ? '#FBBF24' : '#D97706',
-          centerDot: dark ? '#FBBF24' : '#F59E0B',
+          progressBar: 'var(--color-accent-amber)',
+          minutero: 'var(--color-text-main)',
+          segundero: 'var(--color-accent-amber)',
+          centerDot: 'var(--color-accent-amber)',
           shadowClass: dark
             ? 'shadow-[0_10px_25px_rgba(0,0,0,0.5)] border border-amber-900/40'
             : 'shadow-[0_10px_25px_rgba(245,158,11,0.12),0_2px_8px_rgba(0,0,0,0.04)] border border-amber-100',
-          debossedClass: dark
-            ? 'bg-[#0b111e] text-amber-400 shadow-[inset_2px_2px_4px_#05080f,inset_-2px_-2px_4px_#182337] border border-amber-900/30'
-            : 'bg-[#FAF6ED] text-[#D97706] shadow-[inset_2.5px_2.5px_5px_#e5dcce,inset_-2.5px_-2.5px_5px_#ffffff]',
+          debossedClass: 'bg-[var(--color-bg-base)] text-[var(--color-accent-amber)] shadow-neu-pressed',
         };
       case 'neumorfico':
       default:
         return {
-          faceBg: dark ? '#1b2028' : '#E0E5EC',
+          faceBg: 'var(--color-bg-base)',
           rimTrack: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-          progressBar: dark ? '#60A5FA' : '#4D7CFE',
-          minutero: dark ? '#F1F5F9' : '#2D3748',
-          segundero: dark ? '#60A5FA' : '#4D7CFE',
-          centerDot: dark ? '#60A5FA' : '#4D7CFE',
+          progressBar: 'var(--color-accent-blue)',
+          minutero: 'var(--color-text-main)',
+          segundero: 'var(--color-accent-blue)',
+          centerDot: 'var(--color-accent-blue)',
           shadowClass: dark ? 'shadow-neu-flat' : 'shadow-neu-flat',
           debossedClass: 'bg-[var(--color-bg-base)] text-[var(--color-accent-blue)] shadow-neu-pressed',
         };

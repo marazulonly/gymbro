@@ -46,7 +46,7 @@ function AdminDashboard() {
         </NeuCard>
         
         <NeuCard className="flex flex-col items-center justify-center gap-2 py-4">
-          <Activity className="w-6 h-6 text-[#00C9A7]" />
+          <Activity className="w-6 h-6 text-[var(--color-accent-green)]" />
           <div className="text-center">
             <div className="text-2xl font-bold text-[var(--color-text-main)]">{trainersCount}</div>
             <div className="text-[10px] text-[var(--color-text-muted)] mt-1">Entrenadores</div>
@@ -62,7 +62,7 @@ function AdminDashboard() {
         <div className="flex flex-col gap-3">
           <div className="flex justify-between items-center">
             <span className="text-sm text-[var(--color-text-muted)]">Base de Datos</span>
-            <span className="text-[#00C9A7] font-bold text-xs">Operativa</span>
+            <span className="text-[var(--color-accent-green)] font-bold text-xs">Operativa</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-[var(--color-text-muted)]">Última Copia de Seg.</span>
@@ -559,7 +559,7 @@ function MasterLibrary() {
         <NeuCard className="flex justify-between items-center p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full shadow-neu-pressed flex items-center justify-center">
-              <Database className="w-4 h-4 text-[#00C9A7]" />
+              <Database className="w-4 h-4 text-[var(--color-accent-green)]" />
             </div>
             <div>
               <div className="font-bold text-[var(--color-text-main)] text-base">Alimentos</div>

@@ -294,7 +294,7 @@ export function RoutineAccessControlModal({
                     <span className={`text-[10px] font-semibold px-2 py-0.2 rounded-full ${
                       manualActivo 
                         ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" 
-                        : "text-red-600 dark:text-red-400 bg-red-500/10"
+                        : "text-amber-600 dark:text-amber-400 bg-amber-500/15"
                     }`}>
                       {manualActivo ? "Habilitado (ON)" : "Pausado (OFF)"}
                     </span>
@@ -328,7 +328,7 @@ export function RoutineAccessControlModal({
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-bold text-xs transition-all shadow-neu-flat active:shadow-neu-pressed cursor-pointer ${
                     manualActivo
                       ? "bg-emerald-500 text-white"
-                      : "bg-red-500 text-white"
+                      : "bg-amber-500 text-white"
                   }`}
                 >
                   {manualActivo ? (
@@ -370,7 +370,7 @@ export function RoutineAccessControlModal({
                 <div>
                   <div className="text-sm font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
                     <span>4. Por franja horaria</span>
-                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.2 rounded-full">
+                    <span className="text-[10px] font-semibold text-[var(--color-accent-blue)] bg-[var(--color-accent-blue)]/15 px-2 py-0.2 rounded-full">
                       Días y Horas
                     </span>
                   </div>
