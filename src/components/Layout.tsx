@@ -4,6 +4,7 @@ import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User,
 import { NeuButton } from "./ui/NeuButton";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "./ProfileModal";
+import { GymBroWordmarkLogo } from "./GymBroWordmarkLogo";
 
 
 export function Layout({ children }: { children: (activeTab: number, setActiveTab: (tab: number) => void) => React.ReactNode }) {
@@ -72,10 +73,12 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
                 <path d="M10 20L15.5 9.5H20.5L15 20H10Z" opacity="0.65" />
               </svg>
             </div>
-            <div>
-              <h1 className="text-lg font-black tracking-tight text-[var(--color-text-main)]">
-                GymBro
-              </h1>
+            <div className="flex items-center">
+              <GymBroWordmarkLogo
+                className="h-6 w-auto text-[var(--color-text-main)]"
+                gymColor="currentColor"
+                broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
+              />
             </div>
           </div>
 
@@ -118,9 +121,11 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
             : "bg-[var(--color-bg-base)]/80 backdrop-blur-md"
         }`}>
           <div className="flex items-center gap-2">
-            <h1 className={`text-xl font-black tracking-tight ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}>
-              GymBro
-            </h1>
+            <GymBroWordmarkLogo
+              className={`h-7 w-auto ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}
+              gymColor={isModernGold ? "#020617" : "currentColor"}
+              broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
+            />
           </div>
 
           <div className="flex items-center gap-2">

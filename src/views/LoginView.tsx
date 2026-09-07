@@ -3,10 +3,12 @@ import { useStore } from '../store';
 import { NeuInput } from '../components/ui/NeuInput';
 import { NeuButton } from '../components/ui/NeuButton';
 import { NeuCard } from '../components/ui/NeuCard';
+import { GymBroWordmarkLogo } from '../components/GymBroWordmarkLogo';
 
 
 export function LoginView() {
   const login = useStore((state) => state.login);
+  const accentColor = useStore((state) => state.accentColor);
   const isCloudReady = useStore((state) => state.isCloudReady);
   const [dni, setDni] = useState('');
   const [password, setPassword] = useState('');
@@ -41,7 +43,13 @@ export function LoginView() {
         <div className="w-40 h-40 rounded-full shadow-neu-flat flex items-center justify-center bg-[var(--color-bg-base)] overflow-hidden p-5">
           <img src="/gymbro.svg" alt="GymBro Logo" className="w-full h-full object-contain" />
         </div>
-        <h1 className="text-3xl font-bold text-[var(--color-text-main)]">GymBro</h1>
+        <div className="flex items-center justify-center my-0.5">
+          <GymBroWordmarkLogo
+            className="h-9 w-auto text-[var(--color-text-main)]"
+            gymColor="currentColor"
+            broColor={accentColor || "var(--color-accent-blue)"}
+          />
+        </div>
         <p className="text-[var(--color-text-muted)] text-sm font-medium text-center">
           Tu guía de entrenamiento
         </p>
