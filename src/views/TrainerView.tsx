@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useStore, getClientRoutines, getDiaSemanaNombre, getDiaSemanaCorto, isRutinaDescanso } from "@/store";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
@@ -33,7 +33,10 @@ import {
   Unlock,
   SlidersHorizontal,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  UserPlus,
+  Send,
+  AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "@/components/ProfileModal";
@@ -42,7 +45,9 @@ import { AthleteProgressView } from "@/components/AthleteProgressView";
 import { FichaEstadisticasUsoModal } from "@/components/FichaEstadisticasUsoModal";
 import { RegistroEjerciciosRealizadosModal } from "@/components/RegistroEjerciciosRealizadosModal";
 import { RoutineAccessControlModal } from "@/components/RoutineAccessControlModal";
+import { TrainerInvitePromptModal } from "@/components/TrainerInvitePromptModal";
 import { Rutina, EjercicioRutina, Usuario, Ejercicio, ModoControlAcceso } from "@/types";
+import { isAthleteAssignedOrCreatedByTrainer } from "@/utils/routineAccess";
 
 export function TrainerView({ 
   tab, 
@@ -52,12 +57,24 @@ export function TrainerView({
   onNavigateTab?: (tab: number) => void;
 }) {
   const { usuarios, currentUser } = useStore();
-  const athletes = usuarios
-    .filter((u) => u.rol === "cliente")
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  const isTrainer = currentUser?.rol === "entrenador";
+  const isAdmin = currentUser?.rol === "admin";
 
-  const [selectedAthleteId, setSelectedAthleteId] = useState<string>(athletes[0]?.id || "xb-9988-fit");
+  const athletes = useMemo(() => {
+    return usuarios
+      .filter((u) => u.rol === "cliente")
+      .filter((u) => isAthleteAssignedOrCreatedByTrainer(u, currentUser?.id, isAdmin))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [usuarios, currentUser, isAdmin]);
+
+  const [selectedAthleteId, setSelectedAthleteId] = useState<string>(athletes[0]?.id || "");
   const [routineViewMode, setRoutineViewMode] = useState<"gestionar" | "progreso">("gestionar");
+
+  useEffect(() => {
+    if (athletes.length > 0 && !athletes.some((a) => a.id === selectedAthleteId)) {
+      setSelectedAthleteId(athletes[0].id);
+    }
+  }, [athletes, selectedAthleteId]);
 
   const handleSelectAthleteForRoutines = (athleteId: string, mode: "gestionar" | "progreso" = "gestionar") => {
     setSelectedAthleteId(athleteId);
@@ -194,7 +211,18 @@ function ClearAthleteRoutinesModal({
 }
 
 function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: string, mode?: "gestionar" | "progreso") => void }) {
-  const { currentUser, usuarios, addUsuario, rutinas, fichasProgreso, uiStyle, clearAthleteRoutines } = useStore();
+  const { 
+    currentUser, 
+    usuarios, 
+    addUsuario, 
+    rutinas, 
+    fichasProgreso, 
+    uiStyle, 
+    clearAthleteRoutines,
+    solicitudesEntrenador,
+    enviarSolicitudEntrenamiento,
+    deleteSolicitudEntrenamiento 
+  } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
@@ -203,6 +231,13 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [isClearingRoutines, setIsClearingRoutines] = useState(false);
   const [filterTrainerMode, setFilterTrainerMode] = useState<"mis_atletas" | "todos">("mis_atletas");
   const [expandedAthleteId, setExpandedAthleteId] = useState<string | null>(null);
+
+  // Invitation flow states
+  const [existingAthleteDetected, setExistingAthleteDetected] = useState<Usuario | null>(null);
+  const [invitationAthlete, setInvitationAthlete] = useState<Usuario | null>(null);
+  const [showInvitationModal, setShowInvitationModal] = useState(false);
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+  const [invitationToast, setInvitationToast] = useState<string | null>(null);
 
   // Auto-collapse expanded athlete card when clicking outside anywhere on the screen
   useEffect(() => {
@@ -247,20 +282,57 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [sexo, setSexo] = useState<"masculino" | "femenino" | "otro">("masculino");
   const [contrasena, setContrasena] = useState("0000");
 
+  const isTrainer = currentUser?.rol === "entrenador";
+  const isAdmin = currentUser?.rol === "admin";
+
   // Alphabetically sorted athletes list
-  const athletes = usuarios
-    .filter((u) => u.rol === "cliente")
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  const allGymAthletes = useMemo(() => {
+    return usuarios
+      .filter((u) => u.rol === "cliente")
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [usuarios]);
 
-  // Athletes assigned to this trainer
-  const assignedAthletes = athletes.filter(
-    (u) =>
-      currentUser?.rol === "admin" ||
-      u.id_entrenador === currentUser?.id ||
-      (!u.id_entrenador && currentUser?.id === "entrenador1")
-  );
+  // Athletes assigned to or created by this trainer (or all if admin)
+  const assignedAthletes = useMemo(() => {
+    return usuarios
+      .filter((u) => u.rol === "cliente")
+      .filter((u) => isAthleteAssignedOrCreatedByTrainer(u, currentUser?.id, isAdmin))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [usuarios, currentUser, isAdmin]);
 
-  const displayedAthletes = filterTrainerMode === "mis_atletas" ? assignedAthletes : athletes;
+  // Trainers ONLY have access to their assigned or created athletes, never all athletes
+  const displayedAthletes = isTrainer ? assignedAthletes : (filterTrainerMode === "mis_atletas" ? assignedAthletes : allGymAthletes);
+
+  // Sent invitations by this trainer
+  const trainerInvitations = useMemo(() => {
+    if (!currentUser) return [];
+    return solicitudesEntrenador.filter((s) => s.id_entrenador === currentUser.id);
+  }, [solicitudesEntrenador, currentUser]);
+
+  const isTargetAlreadyAssigned = useMemo(() => {
+    if (!invitationAthlete || !currentUser) return false;
+    return isAthleteAssignedOrCreatedByTrainer(invitationAthlete, currentUser.id, isAdmin);
+  }, [invitationAthlete, currentUser, isAdmin]);
+
+  const targetPendingSolicitud = useMemo(() => {
+    if (!invitationAthlete || !currentUser) return null;
+    return solicitudesEntrenador.find(
+      (s) => (s.id_atleta === invitationAthlete.id || s.dni_atleta === invitationAthlete.dni) &&
+             s.id_entrenador === currentUser.id &&
+             s.estado === "pendiente"
+    );
+  }, [invitationAthlete, currentUser, solicitudesEntrenador]);
+
+  const handleDniChange = (val: string) => {
+    setDni(val);
+    const clean = val.trim().toLowerCase();
+    if (clean.length >= 4) {
+      const found = usuarios.find((u) => u.dni.trim().toLowerCase() === clean);
+      setExistingAthleteDetected(found || null);
+    } else {
+      setExistingAthleteDetected(null);
+    }
+  };
 
   const handleOpenAthleteExercises = (athleteId: string) => {
     setSelectedModalAthleteId(athleteId);
@@ -294,9 +366,51 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
     }
   };
 
+  const handleConfirmSendInvitation = async (customMessage?: string) => {
+    if (!invitationAthlete || !currentUser) return;
+    setIsSendingInvitation(true);
+    try {
+      const res = await enviarSolicitudEntrenamiento({
+        id_atleta: invitationAthlete.id,
+        dni_atleta: invitationAthlete.dni,
+        nombre_atleta: invitationAthlete.nombre,
+        id_entrenador: currentUser.id,
+        nombre_entrenador: currentUser.nombre || "Tu Entrenador",
+        mensaje: customMessage,
+      });
+
+      if (res.success) {
+        setInvitationToast(`¡Solicitud enviada a ${invitationAthlete.nombre}! Le aparecerá en tiempo real si está conectado o al reingresar.`);
+        setShowInvitationModal(false);
+        setIsAdding(false);
+        setDni("");
+        setNombre("");
+        setWhatsapp("");
+        setFecha("");
+        setExistingAthleteDetected(null);
+      } else {
+        alert(res.message || "No se pudo enviar la solicitud");
+      }
+    } finally {
+      setIsSendingInvitation(false);
+    }
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre || !dni) return;
+    if (!dni.trim()) return;
+
+    const cleanDni = dni.trim().toLowerCase();
+    const existing = usuarios.find((u) => u.dni.trim().toLowerCase() === cleanDni);
+
+    if (existing) {
+      // Prompt modal asking if trainer wants to invite this already registered athlete!
+      setInvitationAthlete(existing);
+      setShowInvitationModal(true);
+      return;
+    }
+
+    if (!nombre.trim()) return;
 
     const newUserId = `u_${Date.now()}`;
     await addUsuario({
@@ -310,6 +424,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       estado_suscripcion: "activo",
       rol: "cliente",
       id_entrenador: currentUser?.id || "entrenador1",
+      creado_por: currentUser?.id,
     });
 
     setIsAdding(false);
@@ -318,6 +433,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
     setWhatsapp("");
     setFecha("");
     setContrasena("0000");
+    setExistingAthleteDetected(null);
     
     // Automatically open routine management for the newly created athlete
     onManageRoutines(newUserId);
@@ -335,8 +451,41 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
 
         <NeuCard className="p-4">
           <form onSubmit={handleAdd} className="flex flex-col gap-4">
-            <NeuInput label="DNI / Documento" value={dni} onChange={(e) => setDni(e.target.value)} required />
-            <NeuInput label="Nombre Completo" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+            <div>
+              <NeuInput 
+                label="DNI / Documento" 
+                value={dni} 
+                onChange={(e) => handleDniChange(e.target.value)} 
+                required 
+              />
+              {existingAthleteDetected && (
+                <div className="mt-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-[var(--color-text-main)]">
+                        Atleta ya registrado: <span className="text-[var(--color-accent-blue)]">{existingAthleteDetected.nombre}</span>
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        DNI: {existingAthleteDetected.dni}
+                      </p>
+                    </div>
+                  </div>
+                  <NeuButton
+                    type="button"
+                    className="px-3 py-1.5 text-xs font-bold text-[var(--color-accent-blue)] shrink-0 flex items-center gap-1 shadow-neu-flat"
+                    onClick={() => {
+                      setInvitationAthlete(existingAthleteDetected);
+                      setShowInvitationModal(true);
+                    }}
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Invitar a ser entrenado</span>
+                  </NeuButton>
+                </div>
+              )}
+            </div>
+            <NeuInput label="Nombre Completo" value={nombre} onChange={(e) => setNombre(e.target.value)} required={!existingAthleteDetected} />
             <NeuInput label="WhatsApp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
             <NeuInput label="Fecha de Nacimiento" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
 
@@ -381,7 +530,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           <NeuButton
             className="text-xs font-bold text-[var(--color-accent-green)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
             onClick={handleOpenAllExercises}
-            title="Ver registro de todos los ejercicios realizados"
+            title={isAdmin ? "Ver registro de todos los ejercicios realizados" : "Ver registro de ejercicios de mis atletas"}
           >
             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
             <span className="hidden sm:inline">Ejercicios</span>
@@ -391,7 +540,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           <NeuButton
             className="text-xs font-bold text-[var(--color-accent-blue)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
             onClick={handleOpenAllUsage}
-            title="Ver ficha de estadísticas de uso web de todos los usuarios"
+            title={isAdmin ? "Ver ficha de estadísticas de uso web de todos los usuarios" : "Ver ficha de estadísticas de uso web de mis atletas"}
           >
             <Clock className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Ficha</span>
@@ -404,38 +553,107 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         </div>
       </div>
 
-      {/* Trainer Athletes Filter Tabs */}
-      <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed">
-        <button
-          type="button"
-          onClick={() => setFilterTrainerMode("mis_atletas")}
-          className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-            filterTrainerMode === "mis_atletas"
-              ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
-              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-          }`}
-        >
-          <User className="w-3.5 h-3.5" />
-          <span>Mis Atletas Asignados ({assignedAthletes.length})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilterTrainerMode("todos")}
-          className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-            filterTrainerMode === "todos"
-              ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
-              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-          }`}
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>Todos los Atletas ({athletes.length})</span>
-        </button>
-      </div>
+      {/* Toast Feedback for Sent Invitations */}
+      {invitationToast && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between gap-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold animate-in fade-in">
+          <span>✓ {invitationToast}</span>
+          <button onClick={() => setInvitationToast(null)} className="p-1 hover:opacity-75">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Trainer's Sent Invitations Panel */}
+      {trainerInvitations.length > 0 && (
+        <div className="p-3.5 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/10">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
+              <Send className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+              Invitaciones de entrenamiento ({trainerInvitations.length})
+            </span>
+          </div>
+          <div className="flex flex-col gap-2 max-h-44 overflow-y-auto pr-1">
+            {trainerInvitations.map((inv) => (
+              <div key={inv.id} className="p-2.5 rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed flex items-center justify-between gap-2 text-xs">
+                <div>
+                  <p className="font-bold text-[var(--color-text-main)]">
+                    {inv.nombre_atleta} <span className="font-normal font-mono text-[var(--color-text-muted)]">({inv.dni_atleta})</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--color-text-muted)]">
+                    Enviada: {new Date(inv.fecha_solicitud).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {inv.estado === "pendiente" && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Pendiente
+                    </span>
+                  )}
+                  {inv.estado === "aceptada" && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Aceptada
+                    </span>
+                  )}
+                  {inv.estado === "rechazada" && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 flex items-center gap-1">
+                      <X className="w-3 h-3" />
+                      Rechazada
+                    </span>
+                  )}
+                  {inv.estado === "pendiente" && (
+                    <button
+                      onClick={() => deleteSolicitudEntrenamiento(inv.id)}
+                      className="p-1 text-[var(--color-text-muted)] hover:text-rose-500"
+                      title="Cancelar invitación"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Trainer Athletes Filter Tabs - ONLY visible for Admin */}
+      {isAdmin && (
+        <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed">
+          <button
+            type="button"
+            onClick={() => setFilterTrainerMode("mis_atletas")}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              filterTrainerMode === "mis_atletas"
+                ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+                : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Mis Atletas Asignados ({assignedAthletes.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTrainerMode("todos")}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              filterTrainerMode === "todos"
+                ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+                : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Todos los Atletas ({allGymAthletes.length})</span>
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2.5 pb-8">
         {displayedAthletes.length === 0 ? (
           <p className="text-center text-[var(--color-text-muted)] my-6 text-sm">
-            {filterTrainerMode === "mis_atletas"
+            {isTrainer
+              ? "No tienes atletas asignados o creados actualmente."
+              : filterTrainerMode === "mis_atletas"
               ? "No tienes atletas asignados a tu cuenta actualmente."
               : "No hay atletas registrados en el gimnasio."}
           </p>
@@ -724,6 +942,17 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         onConfirm={handleConfirmClearRoutines}
         isClearing={isClearingRoutines}
       />
+
+      <TrainerInvitePromptModal
+        isOpen={showInvitationModal}
+        athlete={invitationAthlete}
+        onClose={() => setShowInvitationModal(false)}
+        onSend={handleConfirmSendInvitation}
+        isSending={isSendingInvitation}
+        alreadyAssigned={isTargetAlreadyAssigned}
+        alreadyPending={!!targetPendingSolicitud}
+        pendingDate={targetPendingSolicitud?.fecha_solicitud}
+      />
     </div>
   );
 }
@@ -816,13 +1045,20 @@ function RoutineManager({
     }
   }, [initialViewMode, selectedAthleteId]);
 
-  const athletes = usuarios
-    .filter((u) => u.rol === "cliente")
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  const isTrainer = currentUser?.rol === "entrenador";
+  const isAdmin = currentUser?.rol === "admin";
+
+  const athletes = useMemo(() => {
+    return usuarios
+      .filter((u) => u.rol === "cliente")
+      .filter((u) => isAthleteAssignedOrCreatedByTrainer(u, currentUser?.id, isAdmin))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [usuarios, currentUser, isAdmin]);
+
   const currentAthlete = athletes.find((a) => a.id === selectedAthleteId) || athletes[0];
 
   // If no athlete selected or ID invalid, fallback
-  const effectiveAthleteId = currentAthlete?.id || "xb-9988-fit";
+  const effectiveAthleteId = currentAthlete?.id || "";
 
   // Day of week filter state for trainer - defaults to "todos" to show all routine days
   const todayDay = new Date().getDay();
@@ -1479,6 +1715,28 @@ function RoutineManager({
   }
 
   // MAIN ROUTINE MANAGER VIEW
+  if (athletes.length === 0 || !currentAthlete) {
+    return (
+      <div className="flex flex-col gap-4 pb-16">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Rutinas</h2>
+            <span className="text-xs text-[var(--color-text-muted)]">Asignación y edición de ejercicios por atleta</span>
+          </div>
+        </div>
+        <NeuCard className="p-8 flex flex-col items-center justify-center text-center gap-3">
+          <User className="w-10 h-10 text-[var(--color-text-muted)] opacity-50" />
+          <p className="text-sm font-semibold text-[var(--color-text-main)]">
+            No tienes atletas asignados o creados
+          </p>
+          <p className="text-xs text-[var(--color-text-muted)] max-w-sm">
+            Para crear y gestionar rutinas de entrenamiento, primero registra o asigna un atleta en la pestaña de Atletas.
+          </p>
+        </NeuCard>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 pb-16">
       {/* Header */}
@@ -2743,10 +3001,17 @@ function ExercisesLibrary() {
 }
 
 function CheckinsDashboard() {
-  const { usuarios, fichasProgreso } = useStore();
-  const athletes = usuarios
-    .filter((u) => u.rol === "cliente")
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  const { usuarios, fichasProgreso, currentUser } = useStore();
+  const isTrainer = currentUser?.rol === "entrenador";
+  const isAdmin = currentUser?.rol === "admin";
+
+  const athletes = useMemo(() => {
+    return usuarios
+      .filter((u) => u.rol === "cliente")
+      .filter((u) => isAthleteAssignedOrCreatedByTrainer(u, currentUser?.id, isAdmin))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [usuarios, currentUser, isAdmin]);
+
   const [selectedProgressAthlete, setSelectedProgressAthlete] = useState<Usuario | null>(null);
 
   return (
@@ -2757,7 +3022,12 @@ function CheckinsDashboard() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {athletes.map((athlete) => {
+        {athletes.length === 0 ? (
+          <NeuCard className="p-6 text-center text-[var(--color-text-muted)] text-sm">
+            No tienes atletas asignados o creados actualmente.
+          </NeuCard>
+        ) : (
+          athletes.map((athlete) => {
           const ficha = fichasProgreso.find((f) => f.id_cliente === athlete.id);
 
           let diasRestantes: number | null = null;
@@ -2852,7 +3122,7 @@ function CheckinsDashboard() {
               </NeuButton>
             </NeuCard>
           );
-        })}
+        }))}
       </div>
 
       <AthleteProgressModal

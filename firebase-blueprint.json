@@ -98,6 +98,23 @@
         "dispositivo": { "type": "string", "maxLength": 50 }
       },
       "required": ["id_usuario", "nombre_usuario", "rol", "fecha", "hora_inicio"]
+    },
+    "SolicitudEntrenador": {
+      "title": "SolicitudEntrenador",
+      "description": "Training invitation sent by a trainer to an existing athlete.",
+      "type": "object",
+      "properties": {
+        "id_atleta": { "type": "string", "maxLength": 128 },
+        "dni_atleta": { "type": "string", "maxLength": 20 },
+        "nombre_atleta": { "type": "string", "maxLength": 100 },
+        "id_entrenador": { "type": "string", "maxLength": 128 },
+        "nombre_entrenador": { "type": "string", "maxLength": 100 },
+        "fecha_solicitud": { "type": "string", "maxLength": 40 },
+        "estado": { "type": "string", "enum": ["pendiente", "aceptada", "rechazada"] },
+        "mensaje": { "type": "string", "maxLength": 500 },
+        "respondida_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id_atleta", "dni_atleta", "id_entrenador", "nombre_entrenador", "fecha_solicitud", "estado"]
     }
   },
   "firestore": {
@@ -124,6 +141,10 @@
     "sesionesUso/{sesionId}": {
       "schema": { "$ref": "SesionUso" },
       "description": "Web usage timestamps and statistics for athletes and trainers."
+    },
+    "solicitudesEntrenador/{solicitudId}": {
+      "schema": { "$ref": "SolicitudEntrenador" },
+      "description": "Training requests sent by trainers to athletes. Writable by trainers and athletes."
     }
   }
 }

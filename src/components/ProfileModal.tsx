@@ -331,7 +331,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                 </div>
               )}
 
-              {targetUser?.rol === 'cliente' && (currentUser?.rol === 'admin' || currentUser?.rol === 'entrenador') && (
+              {targetUser?.rol === 'cliente' && currentUser?.rol === 'admin' && (
                 <div className="flex flex-col gap-1 w-full">
                   <span className="text-sm font-medium text-[var(--color-text-muted)] pl-2">Entrenador Asignado</span>
                   <select 

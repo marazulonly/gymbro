@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { Usuario, EjercicioRealizadoLog } from '../types';
+import { isAthleteAssignedOrCreatedByTrainer } from '../utils/routineAccess';
 import { NeuCard } from './ui/NeuCard';
 import { NeuButton } from './ui/NeuButton';
 import { NeuInput } from './ui/NeuInput';
@@ -33,25 +34,46 @@ export function RegistroEjerciciosRealizadosModal({
 }: RegistroEjerciciosRealizadosModalProps) {
   const { currentUser, usuarios, ejerciciosRealizados, rutinas, reabrirEjercicioRealizado } = useStore();
   const isTrainer = currentUser?.rol === 'entrenador';
+  const isAdmin = currentUser?.rol === 'admin';
+  const isClient = currentUser?.rol === 'cliente';
+
+  const athletes = useMemo(() => {
+    if (isClient) {
+      return currentUser ? [currentUser] : [];
+    }
+    if (isTrainer) {
+      return usuarios
+        .filter((u) => u.rol === 'cliente')
+        .filter((u) => isAthleteAssignedOrCreatedByTrainer(u, currentUser?.id, false))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+    }
+    return usuarios
+      .filter((u) => u.rol === 'cliente')
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [usuarios, currentUser, isClient, isTrainer]);
 
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>(
-    initialAthleteId || (isTrainer ? 'todos' : (currentUser?.id || ''))
+    initialAthleteId || ((isTrainer || isAdmin) ? 'todos' : (currentUser?.id || ''))
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'todos' | 'hoy' | '7dias'>('todos');
 
   // Synchronize when initialAthleteId changes
   React.useEffect(() => {
-    if (initialAthleteId) {
+    if (initialAthleteId && (isAdmin || athletes.some((a) => a.id === initialAthleteId))) {
       setSelectedAthleteId(initialAthleteId);
-    } else if (!isTrainer && currentUser) {
+    } else if (isClient && currentUser) {
       setSelectedAthleteId(currentUser.id);
     }
-  }, [initialAthleteId, isTrainer, currentUser]);
+  }, [initialAthleteId, isClient, isAdmin, currentUser, athletes]);
 
-  const athletes = useMemo(() => {
-    return usuarios.filter((u) => u.rol === 'cliente');
-  }, [usuarios]);
+  const totalRelevantLogsCount = useMemo(() => {
+    if (isTrainer) {
+      const allowedIds = new Set(athletes.map((a) => a.id));
+      return ejerciciosRealizados.filter((l) => allowedIds.has(l.id_cliente)).length;
+    }
+    return ejerciciosRealizados.length;
+  }, [isTrainer, athletes, ejerciciosRealizados]);
 
   const filteredLogs = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -60,12 +82,21 @@ export function RegistroEjerciciosRealizadosModal({
     const sevenDaysStr = sevenDaysAgo.toISOString().split('T')[0];
 
     return ejerciciosRealizados.filter((log) => {
-      // Filter by athlete
-      if (selectedAthleteId !== 'todos' && log.id_cliente !== selectedAthleteId) {
+      // If athlete viewing, strictly keep only their logs
+      if (isClient && currentUser && log.id_cliente !== currentUser.id) {
         return false;
       }
-      // If athlete viewing, strictly keep only their logs
-      if (!isTrainer && currentUser && log.id_cliente !== currentUser.id) {
+
+      // If trainer viewing, strictly only allow logs of their assigned/created athletes
+      if (isTrainer) {
+        const isAllowed = athletes.some((a) => a.id === log.id_cliente);
+        if (!isAllowed) {
+          return false;
+        }
+      }
+
+      // Filter by selected athlete
+      if (selectedAthleteId !== 'todos' && log.id_cliente !== selectedAthleteId) {
         return false;
       }
 
@@ -87,7 +118,7 @@ export function RegistroEjerciciosRealizadosModal({
 
       return true;
     });
-  }, [ejerciciosRealizados, selectedAthleteId, isTrainer, currentUser, dateFilter, searchTerm]);
+  }, [ejerciciosRealizados, selectedAthleteId, isTrainer, isClient, currentUser, athletes, dateFilter, searchTerm]);
 
   // Total metrics
   const metrics = useMemo(() => {
@@ -160,8 +191,8 @@ export function RegistroEjerciciosRealizadosModal({
 
           {/* Filters Bar */}
           <div className="p-3 sm:p-4 bg-[var(--color-bg-base)] flex flex-col gap-2.5 border-b border-[var(--color-text-muted)]/15">
-            {/* Athlete selector if trainer */}
-            {isTrainer && (
+            {/* Athlete selector if trainer or admin */}
+            {(isTrainer || isAdmin) && (
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                 <span className="text-[10px] font-bold uppercase text-[var(--color-text-muted)] whitespace-nowrap">
                   Atleta:
@@ -174,7 +205,7 @@ export function RegistroEjerciciosRealizadosModal({
                       : 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
                   }`}
                 >
-                  Todos los atletas ({ejerciciosRealizados.length})
+                  {isTrainer ? 'Mis Atletas' : 'Todos los atletas'} ({totalRelevantLogsCount})
                 </button>
                 {athletes.map((a) => {
                   const isSelected = a.id === selectedAthleteId;

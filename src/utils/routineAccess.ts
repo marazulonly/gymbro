@@ -30,6 +30,24 @@ export const DEFAULT_FRANJA_HORARIA = {
 };
 
 /**
+ * Checks whether an athlete belongs to a trainer (assigned or created by them).
+ * Admins have global access.
+ */
+export function isAthleteAssignedOrCreatedByTrainer(
+  athlete: Usuario,
+  trainerId?: string,
+  isAdmin?: boolean
+): boolean {
+  if (isAdmin) return true;
+  if (!trainerId) return false;
+  return (
+    athlete.id_entrenador === trainerId ||
+    athlete.creado_por === trainerId ||
+    (!athlete.id_entrenador && !athlete.creado_por && trainerId === "entrenador1")
+  );
+}
+
+/**
  * Checks the routine access for an athlete based on their trainer's configuration.
  * Always respects the athlete's local device timezone.
  */
@@ -54,9 +72,9 @@ export function checkAthleteRoutineAccess(
     return defaultStatus;
   }
 
-  // Find assigned trainer
-  const trainer = allUsers.find((u) => u.id === athlete.id_entrenador) ||
-    allUsers.find((u) => u.rol === "entrenador");
+  // Find strictly the assigned trainer (or creator), never exposing other trainers
+  const trainerId = athlete.id_entrenador || athlete.creado_por;
+  const trainer = trainerId ? allUsers.find((u) => u.id === trainerId) : undefined;
   const trainerName = trainer?.nombre || "tu entrenador";
   const trainerWhatsapp = trainer?.whatsapp;
 

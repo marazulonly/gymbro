@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { Usuario, SesionUsoWeb } from '../types';
+import { isAthleteAssignedOrCreatedByTrainer } from '../utils/routineAccess';
 import { NeuCard } from './ui/NeuCard';
 import { NeuButton } from './ui/NeuButton';
 import { 
@@ -31,21 +32,41 @@ export function FichaEstadisticasUsoModal({
 }: FichaEstadisticasUsoModalProps) {
   const { currentUser, usuarios, sesionesUso } = useStore();
   
-  // If entrenador, allow switching user; otherwise lock to current user
   const isTrainer = currentUser?.rol === 'entrenador';
-  const defaultSelectedId = initialUserId || currentUser?.id || (usuarios[0]?.id ?? '');
+  const isAdmin = currentUser?.rol === 'admin';
+  const isClient = currentUser?.rol === 'cliente';
+
+  const visibleUsers = useMemo(() => {
+    if (isClient) {
+      return currentUser ? [currentUser] : [];
+    }
+    if (isTrainer) {
+      // Trainer can only see themselves and their assigned/created athletes
+      return usuarios.filter(
+        (u) =>
+          u.id === currentUser?.id ||
+          (u.rol === 'cliente' && isAthleteAssignedOrCreatedByTrainer(u, currentUser?.id, false))
+      );
+    }
+    // Admin can see all
+    return usuarios;
+  }, [usuarios, currentUser, isClient, isTrainer]);
+
+  const defaultSelectedId = initialUserId && visibleUsers.some((u) => u.id === initialUserId)
+    ? initialUserId
+    : (currentUser?.id || visibleUsers[0]?.id || '');
   const [selectedUserId, setSelectedUserId] = useState<string>(defaultSelectedId);
 
   // Sync when initialUserId changes
   React.useEffect(() => {
-    if (initialUserId) {
+    if (initialUserId && visibleUsers.some((u) => u.id === initialUserId)) {
       setSelectedUserId(initialUserId);
     } else if (currentUser) {
       setSelectedUserId(currentUser.id);
     }
-  }, [initialUserId, currentUser]);
+  }, [initialUserId, currentUser, visibleUsers]);
 
-  const targetUser = usuarios.find((u) => u.id === selectedUserId) || currentUser;
+  const targetUser = visibleUsers.find((u) => u.id === selectedUserId) || visibleUsers[0] || currentUser;
 
   // Filter sessions for selected user
   const userSessions = useMemo(() => {
@@ -156,15 +177,15 @@ export function FichaEstadisticasUsoModal({
             </NeuButton>
           </div>
 
-          {/* User selector (trainer only) or user profile badge */}
+          {/* User selector (trainer/admin with multiple users) or user profile badge */}
           <div className="px-4 sm:px-5 pt-3 pb-2 bg-[var(--color-bg-base)]">
-            {isTrainer ? (
+            {(isTrainer || isAdmin) && visibleUsers.length > 1 ? (
               <div className="flex flex-col gap-1">
                 <label className="text-[11px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">
-                  Seleccionar Ficha de Atleta o Entrenador:
+                  {isTrainer ? "Mis Atletas y Mi Ficha:" : "Seleccionar Ficha de Usuario:"}
                 </label>
                 <div className="flex gap-2 items-center overflow-x-auto pb-1 scrollbar-none">
-                  {usuarios.map((u) => {
+                  {visibleUsers.map((u) => {
                     const isSelected = u.id === targetUser?.id;
                     const isSelf = u.id === currentUser?.id;
                     return (
@@ -184,9 +205,11 @@ export function FichaEstadisticasUsoModal({
                             Tú
                           </span>
                         )}
-                        <span className="text-[9px] uppercase font-mono text-[var(--color-text-muted)]">
-                          ({u.rol})
-                        </span>
+                        {!isSelf && (
+                          <span className="text-[9px] uppercase font-mono text-[var(--color-text-muted)]">
+                            ({u.rol === 'cliente' ? 'Atleta' : u.rol})
+                          </span>
+                        )}
                       </button>
                     );
                   })}

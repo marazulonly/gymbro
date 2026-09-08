@@ -30,6 +30,7 @@ export interface Usuario {
   estado_suscripcion: 'activo' | 'inactivo';
   rol: Role;
   id_entrenador?: string;
+  creado_por?: string;
   avatar_url?: string;
   color_acento?: string;
   modo_tema?: 'light' | 'dark';
@@ -181,4 +182,18 @@ export interface SesionUsoWeb {
   ultima_actividad_timestamp: number;
   dispositivo?: string;
 }
+
+export interface SolicitudEntrenador {
+  id: string;
+  id_atleta: string;
+  dni_atleta: string;
+  nombre_atleta: string;
+  id_entrenador: string;
+  nombre_entrenador: string;
+  fecha_solicitud: string;
+  estado: 'pendiente' | 'aceptada' | 'rechazada';
+  mensaje?: string;
+  respondida_at?: string;
+}
+
 

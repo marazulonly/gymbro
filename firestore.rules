@@ -26,6 +26,9 @@ service cloud.firestore {
     match /sesionesUso/{sesionId} {
       allow read, write: if true;
     }
+    match /solicitudesEntrenador/{solicitudId} {
+      allow read, write: if true;
+    }
     match /{document=**} {
       allow read, write: if true;
     }

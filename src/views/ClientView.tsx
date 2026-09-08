@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuInput } from "@/components/ui/NeuInput";
@@ -18,9 +18,21 @@ import { WorkoutTimeExpiredModal } from "@/components/WorkoutTimeExpiredModal";
 import { AnalogExerciseClock } from "@/components/AnalogExerciseClock";
 import { EvaluationCountdownCard } from "@/components/EvaluationCountdownCard";
 import { MissingFichaModal } from "@/components/MissingFichaModal";
+import { AthleteInvitationModal } from "@/components/AthleteInvitationModal";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
+  const { currentUser, solicitudesEntrenador, responderSolicitudEntrenamiento } = useStore();
   const [selectedDayRoutineId, setSelectedDayRoutineId] = useState<string | null>(null);
+
+  // Filter pending invitations for the current logged-in athlete
+  const pendingInvitations = useMemo(() => {
+    if (!currentUser) return [];
+    return solicitudesEntrenador.filter(
+      (s) =>
+        (s.id_atleta === currentUser.id || (currentUser.dni && s.dni_atleta === currentUser.dni)) &&
+        s.estado === "pendiente"
+    );
+  }, [solicitudesEntrenador, currentUser]);
 
   const handleStartWorkout = (routineId: string) => {
     setSelectedDayRoutineId(routineId);
@@ -29,10 +41,22 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
     }
   };
 
-  if (tab === 0) return <ClientHome onStartWorkout={handleStartWorkout} />;
-  if (tab === 1) return <LiveWorkout initialRoutineId={selectedDayRoutineId} onClearInitialRoutine={() => setSelectedDayRoutineId(null)} />;
-  if (tab === 2) return <ClientProgress />;
-  return null;
+  return (
+    <>
+      <AthleteInvitationModal
+        solicitudes={pendingInvitations}
+        onAccept={async (solicitudId) => {
+          await responderSolicitudEntrenamiento(solicitudId, "aceptada");
+        }}
+        onReject={async (solicitudId) => {
+          await responderSolicitudEntrenamiento(solicitudId, "rechazada");
+        }}
+      />
+      {tab === 0 && <ClientHome onStartWorkout={handleStartWorkout} />}
+      {tab === 1 && <LiveWorkout initialRoutineId={selectedDayRoutineId} onClearInitialRoutine={() => setSelectedDayRoutineId(null)} />}
+      {tab === 2 && <ClientProgress />}
+    </>
+  );
 }
 
 
@@ -360,11 +384,13 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
         <FichaEstadisticasUsoModal
           isOpen={homeUsageModalOpen}
           onClose={() => setHomeUsageModalOpen(false)}
+          initialUserId={currentUser?.id}
         />
 
         <RegistroEjerciciosRealizadosModal
           isOpen={homeLogModalOpen}
           onClose={() => setHomeLogModalOpen(false)}
+          initialAthleteId={currentUser?.id}
         />
 
         <MissingFichaModal
@@ -521,11 +547,13 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
       <FichaEstadisticasUsoModal
         isOpen={homeUsageModalOpen}
         onClose={() => setHomeUsageModalOpen(false)}
+        initialUserId={currentUser?.id}
       />
 
       <RegistroEjerciciosRealizadosModal
         isOpen={homeLogModalOpen}
         onClose={() => setHomeLogModalOpen(false)}
+        initialAthleteId={currentUser?.id}
       />
 
       <MissingFichaModal

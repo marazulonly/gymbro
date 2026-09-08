@@ -23,10 +23,11 @@ import {
   EjercicioRealizadoLog, 
   ProgresoParcialEjercicio, 
   SesionUsoWeb,
+  SolicitudEntrenador,
   UIStyle 
 } from './types';
 
-export type { SerieLograda, EjercicioRealizadoLog, ProgresoParcialEjercicio, SesionUsoWeb, UIStyle };
+export type { SerieLograda, EjercicioRealizadoLog, ProgresoParcialEjercicio, SesionUsoWeb, SolicitudEntrenador, UIStyle };
 
 interface AppState {
   isCloudReady: boolean;
@@ -80,6 +81,17 @@ interface AppState {
   sesionesUso: SesionUsoWeb[];
   registrarSesionUso: (sesion: SesionUsoWeb) => Promise<void>;
   actualizarSesionUso: (id: string, updates: Partial<SesionUsoWeb>) => Promise<void>;
+  solicitudesEntrenador: SolicitudEntrenador[];
+  enviarSolicitudEntrenamiento: (data: {
+    id_atleta: string;
+    dni_atleta: string;
+    nombre_atleta: string;
+    id_entrenador: string;
+    nombre_entrenador: string;
+    mensaje?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
+  responderSolicitudEntrenamiento: (solicitudId: string, respuesta: 'aceptada' | 'rechazada') => Promise<void>;
+  deleteSolicitudEntrenamiento: (solicitudId: string) => Promise<void>;
 }
 
 function cleanObject<T extends Record<string, any>>(obj: T): T {
@@ -243,6 +255,7 @@ export const UI_STYLE_STORAGE_KEY = 'gymbro_ui_style';
 const EJERCICIOS_REALIZADOS_KEY = 'gymbro_ejercicios_realizados_v1';
 const PROGRESOS_PARCIALES_KEY = 'gymbro_progresos_parciales_v1';
 export const SESIONES_USO_STORAGE_KEY = 'gymbro_sesiones_uso_v1';
+export const SOLICITUDES_ENTRENADOR_KEY = 'gymbro_solicitudes_entrenador_v1';
 
 export const getUserAccentKey = (userId: string) => `gymbro_user_accent_${userId}`;
 export const getUserThemeKey = (userId: string) => `gymbro_user_theme_${userId}`;
@@ -521,6 +534,7 @@ export const useStore = create<AppState>((set, get) => ({
   ejerciciosRealizados: getStoredItem<EjercicioRealizadoLog[]>(EJERCICIOS_REALIZADOS_KEY, []),
   progresosParciales: getStoredItem<Record<string, ProgresoParcialEjercicio>>(PROGRESOS_PARCIALES_KEY, {}),
   sesionesUso: getStoredItem<SesionUsoWeb[]>(SESIONES_USO_STORAGE_KEY, []),
+  solicitudesEntrenador: getStoredItem<SolicitudEntrenador[]>(SOLICITUDES_ENTRENADOR_KEY, []),
 
   login: async (dni, contrasena) => {
     const trimmedDni = dni.trim();
@@ -1195,6 +1209,102 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Error updating sesion de uso in Firestore:', e);
     }
   },
+
+  enviarSolicitudEntrenamiento: async (data) => {
+    // Check if there is already a pending request
+    const existing = get().solicitudesEntrenador.find(
+      (s) => s.id_atleta === data.id_atleta && s.id_entrenador === data.id_entrenador && s.estado === 'pendiente'
+    );
+    if (existing) {
+      return { success: false, message: 'Ya existe una solicitud pendiente enviada a este atleta.' };
+    }
+
+    const newSolicitud: SolicitudEntrenador = {
+      id: `sol_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      id_atleta: data.id_atleta,
+      dni_atleta: data.dni_atleta,
+      nombre_atleta: data.nombre_atleta,
+      id_entrenador: data.id_entrenador,
+      nombre_entrenador: data.nombre_entrenador,
+      fecha_solicitud: new Date().toISOString(),
+      estado: 'pendiente',
+      mensaje: data.mensaje || 'Te invito a formar parte de mis atletas en GymBro para gestionar tu plan y tus rutinas.',
+    };
+
+    const updated = [newSolicitud, ...get().solicitudesEntrenador];
+    set({ solicitudesEntrenador: updated });
+    setStoredItem(SOLICITUDES_ENTRENADOR_KEY, updated);
+
+    try {
+      await setDoc(doc(db, 'solicitudesEntrenador', newSolicitud.id), cleanObject(newSolicitud));
+    } catch (err) {
+      console.warn('Error saving solicitud to Firestore:', err);
+    }
+
+    return { success: true, message: 'Solicitud enviada correctamente.' };
+  },
+
+  responderSolicitudEntrenamiento: async (solicitudId, respuesta) => {
+    const solicitud = get().solicitudesEntrenador.find((s) => s.id === solicitudId);
+    if (!solicitud) return;
+
+    const respondidaAt = new Date().toISOString();
+    const updatedSolicitud: SolicitudEntrenador = {
+      ...solicitud,
+      estado: respuesta,
+      respondida_at: respondidaAt,
+    };
+
+    const updatedList = get().solicitudesEntrenador.map((s) => (s.id === solicitudId ? updatedSolicitud : s));
+    set({ solicitudesEntrenador: updatedList });
+    setStoredItem(SOLICITUDES_ENTRENADOR_KEY, updatedList);
+
+    try {
+      await setDoc(doc(db, 'solicitudesEntrenador', solicitudId), cleanObject(updatedSolicitud), { merge: true });
+    } catch (err) {
+      console.warn('Error updating solicitud in Firestore:', err);
+    }
+
+    // If accepted, update the athlete's assigned trainer in Firestore and local state!
+    if (respuesta === 'aceptada') {
+      const athlete = get().usuarios.find((u) => u.id === solicitud.id_atleta);
+      if (athlete) {
+        const updatedAthlete: Usuario = {
+          ...athlete,
+          id_entrenador: solicitud.id_entrenador,
+        };
+        const updatedUsers = get().usuarios.map((u) => (u.id === athlete.id ? updatedAthlete : u));
+        
+        // Also update currentUser if the current user is this athlete
+        const current = get().currentUser;
+        const newCurrentUser = current && current.id === athlete.id ? { ...current, id_entrenador: solicitud.id_entrenador } : current;
+
+        set({ usuarios: updatedUsers, currentUser: newCurrentUser });
+        setStoredItem(USERS_STORAGE_KEY, updatedUsers);
+        if (newCurrentUser) {
+          setStoredItem(CURRENT_USER_KEY, newCurrentUser);
+        }
+
+        try {
+          await setDoc(doc(db, 'usuarios', athlete.id), { id_entrenador: solicitud.id_entrenador }, { merge: true });
+        } catch (err) {
+          console.warn('Error updating athlete assigned trainer in Firestore:', err);
+        }
+      }
+    }
+  },
+
+  deleteSolicitudEntrenamiento: async (solicitudId) => {
+    const updated = get().solicitudesEntrenador.filter((s) => s.id !== solicitudId);
+    set({ solicitudesEntrenador: updated });
+    setStoredItem(SOLICITUDES_ENTRENADOR_KEY, updated);
+
+    try {
+      await deleteDoc(doc(db, 'solicitudesEntrenador', solicitudId));
+    } catch (err) {
+      console.warn('Error deleting solicitud from Firestore:', err);
+    }
+  },
 }));
 
 
@@ -1491,6 +1601,22 @@ export function initFirestoreSync() {
     }
   }, (error) => {
     console.error('Firestore sesionesUso subscription error:', error);
+  });
+
+  // 9. SolicitudesEntrenador listener - real-time invitations for athletes and trainers
+  onSnapshot(collection(db, 'solicitudesEntrenador'), async (snapshot) => {
+    let requests: SolicitudEntrenador[] = [];
+    if (!snapshot.empty) {
+      snapshot.forEach((docSnap) => {
+        requests.push({ id: docSnap.id, ...docSnap.data() } as SolicitudEntrenador);
+      });
+      // Sort newest first
+      requests.sort((a, b) => new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime());
+      setStoredItem(SOLICITUDES_ENTRENADOR_KEY, requests);
+      useStore.setState({ solicitudesEntrenador: requests });
+    }
+  }, (error) => {
+    console.error('Firestore solicitudesEntrenador subscription error:', error);
   });
 
   // Automatically begin web usage session if a user is already authenticated
