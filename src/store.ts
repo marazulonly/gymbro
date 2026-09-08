@@ -370,35 +370,38 @@ export function isXiomaraBallon(user?: { id?: string; dni?: string; nombre?: str
   );
 }
 
-export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | null): Rutina[] {
-  if (!rutinas || rutinas.length === 0) return mockRutinas;
+export function isAthleteRoutine(
+  r: Rutina,
+  athlete?: Usuario | { id?: string; dni?: string; nombre?: string } | string | null
+): boolean {
+  if (!r || !athlete) return false;
+  const athleteId = (typeof athlete === 'string' ? athlete : (athlete.id || '')).trim();
+  const athleteDni = (typeof athlete === 'string' ? '' : (athlete.dni || '')).trim().toLowerCase();
+  const athleteNombre = (typeof athlete === 'string' ? '' : (athlete.nombre || '')).trim().toLowerCase();
+  
+  const isXiomara = typeof athlete === 'string'
+    ? (athlete === 'u1' || athlete === 'xb-9988-fit' || athlete === 'cliente1' || athlete === '10101010' || athlete === '11111111')
+    : isXiomaraBallon(athlete);
 
-  // Filter for matching client
-  let matched: Rutina[] = [];
-
-  if (!currentUser) {
-    matched = rutinas;
-  } else if (isXiomaraBallon(currentUser)) {
-    // For Xiomara Ballón: include all routines configured for her by the trainer
-    const u1Routines = rutinas.filter((r) => r.id_cliente === 'u1');
-    if (u1Routines.length > 0) {
-      matched = u1Routines;
-    } else {
-      matched = rutinas.filter(
-        (r) =>
-          r.id_cliente === currentUser.id ||
-          r.id_cliente === 'xb-9988-fit' ||
-          r.id_cliente === 'u1' ||
-          !r.id_cliente
-      );
-    }
-  } else {
-    matched = rutinas.filter((r) => r.id_cliente === currentUser.id);
+  if (athleteId && r.id_cliente && r.id_cliente.trim() === athleteId) return true;
+  if (athleteDni && r.id_cliente && r.id_cliente.trim().toLowerCase() === athleteDni) return true;
+  if (isXiomara && (r.id_cliente === 'u1' || r.id_cliente === 'xb-9988-fit' || r.id_cliente === 'cliente1')) {
+    return true;
   }
+  return false;
+}
 
-  // If nothing matched, use all rutinas
+export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | null): Rutina[] {
+  if (!rutinas || rutinas.length === 0) return [];
+  if (!currentUser) return rutinas;
+
+  // Filter strictly for this specific athlete
+  const matched = rutinas.filter((r) => isAthleteRoutine(r, currentUser));
+
+  // If currentUser is provided, and matched is empty, the athlete has NO routines assigned!
+  // Do NOT fallback to all rutinas or mock routines!
   if (matched.length === 0) {
-    matched = rutinas;
+    return [];
   }
 
   // Deduplicate strictly by day of week: at most ONE routine per day, max 7 days, no repeating days
@@ -409,7 +412,6 @@ export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | nul
         dayMap.set(r.dia_semana, r);
       } else {
         const existing = dayMap.get(r.dia_semana);
-        // If current routine explicitly belongs to client and existing doesn't, prefer it
         if (r.id_cliente && !existing?.id_cliente) {
           dayMap.set(r.dia_semana, r);
         }
@@ -424,7 +426,8 @@ export function getClientRoutines(rutinas: Rutina[], currentUser?: Usuario | nul
     if (orderA !== orderB) return orderA - orderB;
     return (a.nombre_sesion || '').localeCompare(b.nombre_sesion || '');
   }).slice(0, 7);
-  return sorted.length > 0 ? sorted : mockRutinas;
+
+  return sorted;
 }
 
 export function getClientActiveRoutines(rutinas: Rutina[], currentUser?: Usuario | null): Rutina[] {
@@ -451,8 +454,8 @@ const initialUIStyle = initialCurrentUser ? getUserUIStyle(initialCurrentUser) :
 applyThemeToDocument(initialThemeMode, initialAccentColor, initialUIStyle);
 
 const initialEjercicios = mergeWithMock(getStoredItem<Ejercicio[]>(EJERCICIOS_STORAGE_KEY, mockEjercicios), mockEjercicios);
-const initialRutinas = mergeWithMock(getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas), mockRutinas);
-const initialEjerciciosRutina = mergeWithMock(getStoredItem<EjercicioRutina[]>(EJERCICIOS_RUTINA_STORAGE_KEY, mockEjerciciosRutina), mockEjerciciosRutina);
+const initialRutinas = getStoredItem<Rutina[]>(RUTINAS_STORAGE_KEY, mockRutinas);
+const initialEjerciciosRutina = getStoredItem<EjercicioRutina[]>(EJERCICIOS_RUTINA_STORAGE_KEY, mockEjerciciosRutina);
 const initialPlanNutricion = getStoredItem<PlanNutricion>(PLAN_NUTRICION_STORAGE_KEY, mockPlanNutricion);
 const initialFichasProgreso = mergeWithMock(getStoredItem<FichaProgreso[]>(FICHAS_PROGRESO_STORAGE_KEY, mockFichasProgreso), mockFichasProgreso);
 
@@ -861,29 +864,90 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   clearAthleteRoutines: async (athleteId: string) => {
-    const athleteRoutines = get().rutinas.filter((r) => r.id_cliente === athleteId);
-    if (athleteRoutines.length === 0) return;
+    const allUsers = get().usuarios;
+    const athleteUser = allUsers.find((u) => u.id === athleteId || u.dni === athleteId);
+    const athleteOrId = athleteUser || athleteId;
+    const isXiomara = typeof athleteOrId === 'string'
+      ? (athleteOrId === 'u1' || athleteOrId === 'xb-9988-fit' || athleteOrId === 'cliente1' || athleteOrId === '10101010' || athleteOrId === '11111111')
+      : isXiomaraBallon(athleteOrId);
 
-    const routineIds = new Set(athleteRoutines.map((r) => r.id));
-    const updatedRutinas = get().rutinas.filter((r) => r.id_cliente !== athleteId);
-    const toDeleteErs = get().ejerciciosRutina.filter((er) => routineIds.has(er.id_rutina));
-    const updatedErs = get().ejerciciosRutina.filter((er) => !routineIds.has(er.id_rutina));
+    // Identify all routines in state belonging to this athlete across all days
+    const currentRutinas = get().rutinas;
+    const athleteRoutines = currentRutinas.filter((r) => isAthleteRoutine(r, athleteOrId));
+
+    const routineIdsToDelete = new Set(athleteRoutines.map((r) => r.id));
+    if (isXiomara) {
+      ['r1', 'r2', 'r3', 'r4', 'r5'].forEach((id) => routineIdsToDelete.add(id));
+    }
+
+    // Find all ejerciciosRutina belonging to these routines
+    const currentErs = get().ejerciciosRutina;
+    const toDeleteErs = currentErs.filter((er) => routineIdsToDelete.has(er.id_rutina));
+    const toDeleteErIds = new Set(toDeleteErs.map((er) => er.id));
+
+    if (isXiomara) {
+      mockEjerciciosRutina.forEach((er) => {
+        if (routineIdsToDelete.has(er.id_rutina)) {
+          toDeleteErIds.add(er.id);
+        }
+      });
+    }
+
+    // Filter updated in-memory and local storage state immediately
+    const updatedRutinas = currentRutinas.filter((r) => !routineIdsToDelete.has(r.id) && !isAthleteRoutine(r, athleteOrId));
+    const updatedErs = currentErs.filter((er) => !toDeleteErIds.has(er.id) && !routineIdsToDelete.has(er.id_rutina));
 
     set({ rutinas: updatedRutinas, ejerciciosRutina: updatedErs });
     setStoredItem(RUTINAS_STORAGE_KEY, updatedRutinas);
     setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updatedErs);
 
+    // Also delete from Firestore comprehensively
     try {
-      const batch = writeBatch(db);
-      for (const r of athleteRoutines) {
-        batch.delete(doc(db, 'rutinas', r.id));
+      // Find any rutinas in Firestore matching athleteId or dni or aliases
+      const q = query(collection(db, 'rutinas'), where('id_cliente', '==', athleteId));
+      const snap = await getDocs(q);
+      snap.forEach((d) => routineIdsToDelete.add(d.id));
+
+      if (athleteUser?.dni) {
+        const qDni = query(collection(db, 'rutinas'), where('id_cliente', '==', athleteUser.dni));
+        const snapDni = await getDocs(qDni);
+        snapDni.forEach((d) => routineIdsToDelete.add(d.id));
       }
-      for (const er of toDeleteErs) {
-        batch.delete(doc(db, 'ejerciciosRutina', er.id));
+
+      if (isXiomara) {
+        const qXb = query(collection(db, 'rutinas'), where('id_cliente', '==', 'xb-9988-fit'));
+        const snapXb = await getDocs(qXb);
+        snapXb.forEach((d) => routineIdsToDelete.add(d.id));
+        const qU1 = query(collection(db, 'rutinas'), where('id_cliente', '==', 'u1'));
+        const snapU1 = await getDocs(qU1);
+        snapU1.forEach((d) => routineIdsToDelete.add(d.id));
       }
-      await batch.commit();
+
+      // Query for ejerciciosRutina with any of these routineIds
+      for (const rId of Array.from(routineIdsToDelete)) {
+        const qEr = query(collection(db, 'ejerciciosRutina'), where('id_rutina', '==', rId));
+        const snapEr = await getDocs(qEr);
+        snapEr.forEach((d) => toDeleteErIds.add(d.id));
+      }
+
+      const docRefsToDelete: any[] = [];
+      routineIdsToDelete.forEach((rId) => {
+        docRefsToDelete.push(doc(db, 'rutinas', rId));
+      });
+      toDeleteErIds.forEach((erId) => {
+        docRefsToDelete.push(doc(db, 'ejerciciosRutina', erId));
+      });
+
+      for (let i = 0; i < docRefsToDelete.length; i += 400) {
+        const batch = writeBatch(db);
+        const chunk = docRefsToDelete.slice(i, i + 400);
+        for (const ref of chunk) {
+          batch.delete(ref);
+        }
+        await batch.commit();
+      }
     } catch (err) {
-      console.error('Error clearing athlete routines from Firestore:', err);
+      console.error('Error clearing athlete routines and exercises from Firestore:', err);
     }
   },
 
@@ -1267,7 +1331,11 @@ export const useStore = create<AppState>((set, get) => ({
 
     // If accepted, update the athlete's assigned trainer in Firestore and local state!
     if (respuesta === 'aceptada') {
-      const athlete = get().usuarios.find((u) => u.id === solicitud.id_atleta);
+      const athlete = get().usuarios.find(
+        (u) =>
+          u.id === solicitud.id_atleta ||
+          (u.dni && solicitud.dni_atleta && u.dni.trim().toLowerCase() === solicitud.dni_atleta.trim().toLowerCase())
+      );
       if (athlete) {
         const updatedAthlete: Usuario = {
           ...athlete,
@@ -1277,7 +1345,10 @@ export const useStore = create<AppState>((set, get) => ({
         
         // Also update currentUser if the current user is this athlete
         const current = get().currentUser;
-        const newCurrentUser = current && current.id === athlete.id ? { ...current, id_entrenador: solicitud.id_entrenador } : current;
+        const newCurrentUser =
+          current && (current.id === athlete.id || (current.dni && current.dni.trim().toLowerCase() === athlete.dni.trim().toLowerCase()))
+            ? { ...current, id_entrenador: solicitud.id_entrenador }
+            : current;
 
         set({ usuarios: updatedUsers, currentUser: newCurrentUser });
         setStoredItem(USERS_STORAGE_KEY, updatedUsers);
@@ -1612,9 +1683,9 @@ export function initFirestoreSync() {
       });
       // Sort newest first
       requests.sort((a, b) => new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime());
-      setStoredItem(SOLICITUDES_ENTRENADOR_KEY, requests);
-      useStore.setState({ solicitudesEntrenador: requests });
     }
+    setStoredItem(SOLICITUDES_ENTRENADOR_KEY, requests);
+    useStore.setState({ solicitudesEntrenador: requests });
   }, (error) => {
     console.error('Firestore solicitudesEntrenador subscription error:', error);
   });

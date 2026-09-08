@@ -15,9 +15,11 @@ import {
   X, 
   ChevronDown, 
   ChevronUp, 
-  UserCheck 
+  UserCheck,
+  FileText
 } from "lucide-react";
 import { ProfileModal } from "@/components/ProfileModal";
+import { AthleteProgressModal } from "@/components/AthleteProgressModal";
 import { Usuario } from "@/types";
 
 export function AdminView({ tab }: { tab: number }) {
@@ -79,9 +81,10 @@ function AdminDashboard() {
 }
 
 function AccountManagement() {
-  const { usuarios, assignAthleteToTrainer, addUsuario } = useStore();
+  const { usuarios, assignAthleteToTrainer, addUsuario, clearAthleteRoutines } = useStore();
   const [filterRole, setFilterRole] = useState<'cliente' | 'entrenador'>('cliente');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedAthleteForProgress, setSelectedAthleteForProgress] = useState<Usuario | null>(null);
   
   // Reassignment state
   const [reassigningAthlete, setReassigningAthlete] = useState<Usuario | null>(null);
@@ -173,6 +176,10 @@ function AccountManagement() {
         id_entrenador: createRole === 'cliente' ? (initialTrainerId || undefined) : undefined,
       });
 
+      if (createRole === 'cliente') {
+        await clearAthleteRoutines(newId);
+      }
+
       showNotification(`${createRole === 'cliente' ? 'Atleta' : 'Entrenador'} ${nombre} registrado exitosamente en la nube`);
       setIsCreatingUser(false);
     } catch (err: any) {
@@ -240,12 +247,21 @@ function AccountManagement() {
                         </span>
                       </div>
                     </div>
-                    <NeuButton 
-                      className="px-2.5 py-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" 
-                      onClick={() => setSelectedUserId(u.id)}
-                    >
-                      Gestionar
-                    </NeuButton>
+                    <div className="flex items-center gap-1.5">
+                      <NeuButton 
+                        className="px-2.5 py-1 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1" 
+                        onClick={() => setSelectedAthleteForProgress(u)}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Ficha</span>
+                      </NeuButton>
+                      <NeuButton 
+                        className="px-2.5 py-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" 
+                        onClick={() => setSelectedUserId(u.id)}
+                      >
+                        Gestionar
+                      </NeuButton>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-[var(--color-text-muted)]/10 text-xs">
@@ -330,13 +346,22 @@ function AccountManagement() {
                                 <span className="font-medium text-[var(--color-text-main)]">{ath.nombre}</span>
                                 <span className="text-[10px] text-[var(--color-text-muted)] ml-2">DNI: {ath.dni}</span>
                               </div>
-                              <button
-                                onClick={() => handleStartReassign(ath)}
-                                className="flex items-center gap-1 text-[11px] font-bold text-[var(--color-accent-blue)] hover:underline cursor-pointer"
-                              >
-                                <ArrowRightLeft className="w-3 h-3" />
-                                <span>Reasignar</span>
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setSelectedAthleteForProgress(ath)}
+                                  className="flex items-center gap-1 text-[11px] font-bold text-[var(--color-accent-blue)] hover:underline cursor-pointer"
+                                >
+                                  <FileText className="w-3 h-3" />
+                                  <span>Ficha</span>
+                                </button>
+                                <button
+                                  onClick={() => handleStartReassign(ath)}
+                                  className="flex items-center gap-1 text-[11px] font-bold text-[var(--color-text-muted)] hover:underline cursor-pointer"
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                  <span>Reasignar</span>
+                                </button>
+                              </div>
                             </div>
                           ))
                         )}
@@ -530,6 +555,12 @@ function AccountManagement() {
         isOpen={!!selectedUserId} 
         onClose={() => setSelectedUserId(null)} 
         userId={selectedUserId || undefined} 
+      />
+
+      <AthleteProgressModal
+        isOpen={!!selectedAthleteForProgress}
+        onClose={() => setSelectedAthleteForProgress(null)}
+        athlete={selectedAthleteForProgress}
       />
     </div>
   );

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useStore } from "@/store";
+import { useStore, isAthleteRoutine } from "@/store";
 import { Usuario, FichaProgreso } from "@/types";
 import { NeuCard } from "./ui/NeuCard";
 import { NeuInput } from "./ui/NeuInput";
 import { NeuButton } from "./ui/NeuButton";
-import { X, Calendar, Activity, Ruler, Target, CheckCircle2, Clock, FileText } from "lucide-react";
+import { X, Calendar, Activity, Ruler, Target, CheckCircle2, Clock, FileText, Trash2, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface Props {
@@ -14,8 +14,19 @@ interface Props {
 }
 
 export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
-  const { currentUser, fichasProgreso, addFichaProgreso, updateFichaProgreso } = useStore();
+  const { 
+    currentUser, 
+    fichasProgreso, 
+    rutinas, 
+    ejerciciosRutina, 
+    clearAthleteRoutines, 
+    addFichaProgreso, 
+    updateFichaProgreso 
+  } = useStore();
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+  const [isClearingRoutines, setIsClearingRoutines] = useState(false);
+  const [clearSuccessMsg, setClearSuccessMsg] = useState<string | null>(null);
 
   // Form states
   const [fechaInicio, setFechaInicio] = useState("");
@@ -142,6 +153,29 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
       setSavedSuccess(false);
       onClose();
     }, 1200);
+  };
+
+  const athleteRoutines = athlete ? rutinas.filter((r) => isAthleteRoutine(r, athlete)) : [];
+  const isXiomara = athlete?.dni === '10101010' || athlete?.dni === '11111111' || athlete?.id === 'u1' || athlete?.id === 'xb-9988-fit' || (athlete?.nombre || '').toLowerCase().includes('xiomara');
+  const routineIds = new Set(athleteRoutines.map((r) => r.id));
+  if (isXiomara) {
+    ['r1', 'r2', 'r3', 'r4', 'r5'].forEach((id) => routineIds.add(id));
+  }
+  const athleteExercisesCount = ejerciciosRutina.filter((er) => routineIds.has(er.id_rutina)).length;
+
+  const handleClearRoutines = async () => {
+    if (!athlete) return;
+    setIsClearingRoutines(true);
+    try {
+      await clearAthleteRoutines(athlete.id);
+      setClearSuccessMsg(`Se han borrado todas las rutinas y ejercicios de todos los días de ${athlete.nombre}.`);
+      setIsConfirmClearOpen(false);
+      setTimeout(() => setClearSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Error clearing routines from athlete ficha:', err);
+    } finally {
+      setIsClearingRoutines(false);
+    }
   };
 
   if (!athlete) return null;
@@ -406,6 +440,77 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
                   placeholder="Indica pautas nutricionales, control de sobrecarga progresiva, descansos o sensaciones..."
                 />
               </div>
+            </NeuCard>
+
+            {/* Gestión de Rutinas: Limpiar Rutinas */}
+            <NeuCard className="p-4 flex flex-col gap-3 border border-red-500/20 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-red-500 font-bold text-xs uppercase tracking-wider">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <span>Gestión de Rutinas</span>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
+                  {athleteRoutines.length} {athleteRoutines.length === 1 ? "día" : "días"} ({athleteExercisesCount} {athleteExercisesCount === 1 ? "ejercicio" : "ejercicios"})
+                </span>
+              </div>
+
+              {clearSuccessMsg ? (
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                  <span>{clearSuccessMsg}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                  Al pulsar <strong>Limpiar Rutinas</strong> se borrarán <strong>TODOS</strong> los ejercicios y rutinas de todos los días para este atleta, permitiéndole empezar desde cero o reasignar un nuevo plan. Los demás datos de la ficha permanecerán intactos.
+                </p>
+              )}
+
+              {isConfirmClearOpen ? (
+                <div className="p-3.5 rounded-2xl bg-red-500/5 border border-red-500/30 flex flex-col gap-2.5 animate-fadeIn">
+                  <div className="flex items-center gap-2 text-xs font-bold text-red-600 dark:text-red-400">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                    <span>¿Confirmar eliminación total de rutinas?</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--color-text-muted)]">
+                    Se borrarán las {athleteRoutines.length} rutinas y {athleteExercisesCount} ejercicios de {athlete?.nombre} de todos los días. Esta acción no se puede deshacer.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <NeuButton
+                      type="button"
+                      onClick={() => setIsConfirmClearOpen(false)}
+                      className="flex-1 h-9 text-xs font-medium text-[var(--color-text-muted)]"
+                      disabled={isClearingRoutines}
+                    >
+                      Cancelar
+                    </NeuButton>
+                    <NeuButton
+                      type="button"
+                      onClick={handleClearRoutines}
+                      disabled={isClearingRoutines}
+                      className="flex-1 h-9 text-xs font-bold text-white bg-red-600 hover:bg-red-700 flex items-center justify-center gap-1.5"
+                    >
+                      {isClearingRoutines ? (
+                        <span>Borrando...</span>
+                      ) : (
+                        <>
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Sí, Limpiar Rutinas</span>
+                        </>
+                      )}
+                    </NeuButton>
+                  </div>
+                </div>
+              ) : (
+                <NeuButton
+                  type="button"
+                  onClick={() => setIsConfirmClearOpen(true)}
+                  disabled={athleteRoutines.length === 0 && athleteExercisesCount === 0}
+                  className="h-10 text-red-600 dark:text-red-400 font-bold text-xs flex items-center justify-center gap-2 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <span>Limpiar Rutinas</span>
+                </NeuButton>
+              )}
             </NeuCard>
 
             {/* Save Button */}
