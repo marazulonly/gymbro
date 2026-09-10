@@ -79,8 +79,9 @@ export function AthleteSubscriptionModal({
   const [isSavingSub, setIsSavingSub] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
-  // Form states for New Payment Registration
+  // Form states for Payment Registration & Editing
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [paymentFecha, setPaymentFecha] = useState<string>(todayStr);
   const [paymentMonto, setPaymentMonto] = useState<number>(precioPen || 300);
   const [paymentMetodo, setPaymentMetodo] = useState<string>("Yape/Plin");
@@ -181,24 +182,53 @@ export function AthleteSubscriptionModal({
     }
   };
 
-  // Add new payment
+  // Start editing a payment
+  const handleStartEditPayment = (pago: PagoSuscripcion) => {
+    setEditingPaymentId(pago.id);
+    setPaymentFecha(pago.fecha_pago || todayStr);
+    setPaymentMonto(pago.monto_pen);
+    setPaymentMetodo(pago.metodo_pago || "Efectivo");
+    setPaymentEstado(pago.estado);
+    setPaymentReferencia(pago.referencia || "");
+    setPaymentNotas(pago.notas || "");
+    setPaymentProjectedEnd(athlete?.suscripcion?.fecha_fin || todayStr);
+    setShowAddPayment(true);
+  };
+
+  // Reset payment form
+  const handleCancelPaymentForm = () => {
+    setShowAddPayment(false);
+    setEditingPaymentId(null);
+    setPaymentReferencia("");
+    setPaymentNotas("");
+    setPaymentSuggestedPlanId(null);
+    setPaymentSuggestedPlanName("");
+    setPaymentMonto(precioPen || 300);
+    setPaymentFecha(todayStr);
+  };
+
+  // Add or update payment
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!athlete || !paymentMonto || paymentMonto <= 0) return;
 
     setIsSavingPayment(true);
     try {
-      const newPayment: PagoSuscripcion = {
-        id: `pay_${Date.now()}`,
+      const existingPay = editingPaymentId
+        ? athlete.suscripcion?.historial_pagos?.find((p) => p.id === editingPaymentId)
+        : null;
+
+      const paymentToSave: PagoSuscripcion = {
+        id: editingPaymentId || `pay_${Date.now()}`,
         fecha_pago: paymentFecha,
         monto_pen: Number(paymentMonto),
         metodo_pago: paymentMetodo,
         estado: paymentEstado,
         referencia: paymentReferencia.trim(),
         notas: paymentNotas.trim(),
-        registrado_at: new Date().toISOString(),
+        registrado_at: existingPay?.registrado_at || new Date().toISOString(),
       };
-      await registrarPagoSuscripcion(athlete.id, newPayment);
+      await registrarPagoSuscripcion(athlete.id, paymentToSave);
 
       // Auto update athlete subscription end date if requested and completed
       if (paymentEstado === "completado" && paymentAutoUpdateEnd && paymentProjectedEnd) {
@@ -218,11 +248,9 @@ export function AthleteSubscriptionModal({
         setFechaFin(paymentProjectedEnd);
       }
 
-      setShowAddPayment(false);
-      setPaymentReferencia("");
-      setPaymentNotas("");
+      handleCancelPaymentForm();
     } catch (err) {
-      console.error("Error adding payment:", err);
+      console.error("Error saving payment:", err);
     } finally {
       setIsSavingPayment(false);
     }
@@ -232,6 +260,9 @@ export function AthleteSubscriptionModal({
   const handleDeletePayment = async (paymentId: string) => {
     if (!athlete) return;
     if (!confirm("¿Deseas eliminar este registro de pago?")) return;
+    if (editingPaymentId === paymentId) {
+      handleCancelPaymentForm();
+    }
     await eliminarPagoSuscripcion(athlete.id, paymentId);
   };
 
@@ -377,8 +408,8 @@ export function AthleteSubscriptionModal({
 
           {/* Content Area */}
           <div className="p-4 sm:p-5 overflow-y-auto space-y-5 flex-1">
-            {activeTab === "suscripcion" ? (
-              <>
+            {activeTab === "suscripcion" && (
+              <div className="space-y-4">
                 {/* Resumen del Plan y Estatus del Atleta */}
                 <div className="bg-[var(--color-bg-base)] rounded-2xl p-3.5 shadow-neu-pressed border border-[var(--color-text-muted)]/15 flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5">
@@ -408,115 +439,8 @@ export function AthleteSubscriptionModal({
                   </button>
                 </div>
 
-                {/* Formulario de Configuración de Suscripción */}
-                <div className="space-y-4">
-                  {/* Period and Price Inputs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                    <div>
-                      <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
-                        Nombre del Plan
-                      </label>
-                      <input
-                        type="text"
-                        value={nombrePlan}
-                        onChange={(e) => setNombrePlan(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none"
-                        placeholder="Ej: Plan 3 meses"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
-                        Precio en Soles (PEN)
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2 text-xs font-bold text-[var(--color-text-muted)]">
-                          S/
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="10"
-                          value={precioPen}
-                          onChange={(e) => setPrecioPen(Number(e.target.value))}
-                          className="w-full pl-8 pr-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-xs font-bold text-[var(--color-text-muted)]">
-                          Fecha de Inicio
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => handleStartDateChange(todayStr)}
-                          className="text-[10px] text-[var(--color-accent-blue)] hover:underline font-semibold"
-                        >
-                          Hoy
-                        </button>
-                      </div>
-                      <input
-                        type="date"
-                        value={fechaInicio}
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-xs font-bold text-[var(--color-text-muted)]">
-                          Fecha Final (Límite de Pago)
-                        </label>
-                        <span className="text-[10px] text-[var(--color-text-muted)]">
-                          {semaforoInfo.label}
-                        </span>
-                      </div>
-                      <input
-                        type="date"
-                        value={fechaFin}
-                        onChange={(e) => setFechaFin(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
-                      Notas de la Membresía / Observaciones
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={notasSub}
-                      onChange={(e) => setNotasSub(e.target.value)}
-                      placeholder="Ej: Descuento aplicado por pronto pago, modalidad presencial..."
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none resize-none"
-                    />
-                  </div>
-
-                  {saveSuccessMessage && (
-                    <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                      <Check className="w-4 h-4" />
-                      <span>{saveSuccessMessage}</span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end">
-                    <NeuButton
-                      onClick={handleSaveSubscription}
-                      disabled={isSavingSub}
-                      className="px-4 py-2 text-xs font-bold text-[var(--color-accent-blue)] shadow-neu-flat flex items-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{isSavingSub ? "Guardando..." : "Guardar Cambios de Suscripción"}</span>
-                    </NeuButton>
-                  </div>
-                </div>
-
-                {/* 3. Historial de Pagos y Registrar Nuevo Pago */}
-                <div className="pt-3 border-t border-[var(--color-text-muted)]/20 space-y-3">
+                {/* Historial de Pagos y Registrar / Editar Pago */}
+                <div className="pt-2 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)] flex items-center gap-1.5">
@@ -530,7 +454,13 @@ export function AthleteSubscriptionModal({
 
                     <button
                       type="button"
-                      onClick={() => setShowAddPayment(!showAddPayment)}
+                      onClick={() => {
+                        if (showAddPayment) {
+                          handleCancelPaymentForm();
+                        } else {
+                          setShowAddPayment(true);
+                        }
+                      }}
                       className="px-3 py-1.5 rounded-full text-xs font-bold bg-[var(--color-accent-blue)] text-white flex items-center gap-1 shadow-sm active:scale-95 transition-all"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -538,15 +468,25 @@ export function AthleteSubscriptionModal({
                     </button>
                   </div>
 
-                  {/* Formulario colapsable para añadir pago */}
+                  {/* Formulario colapsable para añadir / editar pago */}
                   {showAddPayment && (
                     <form
                       onSubmit={handleAddPayment}
                       className="bg-[var(--color-bg-base)] p-4 rounded-2xl shadow-neu-pressed border border-[var(--color-accent-blue)]/30 space-y-3.5"
                     >
                       <div className="flex items-center justify-between pb-1 border-b border-[var(--color-text-muted)]/15">
-                        <span className="text-xs font-bold text-[var(--color-text-main)]">
-                          Nuevo Registro de Pago
+                        <span className="text-xs font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
+                          {editingPaymentId ? (
+                            <>
+                              <Edit3 className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+                              <span>Editar Registro de Pago</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+                              <span>Nuevo Registro de Pago</span>
+                            </>
+                          )}
                         </span>
                         <span className="text-[10px] text-[var(--color-text-muted)]">
                           Comprobante para {athlete.nombre}
@@ -631,14 +571,9 @@ export function AthleteSubscriptionModal({
                         </div>
 
                         <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="text-xs font-bold text-[var(--color-text-muted)]">
-                              Monto Pagado (PEN)
-                            </label>
-                            <span className="text-[10px] text-[var(--color-text-muted)]">
-                              (editable manual)
-                            </span>
-                          </div>
+                          <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
+                            Monto Pagado (PEN)
+                          </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1.5 text-xs font-bold text-[var(--color-text-muted)]">
                               S/
@@ -699,7 +634,7 @@ export function AthleteSubscriptionModal({
                             onChange={(e) => setPaymentAutoUpdateEnd(e.target.checked)}
                             className="w-4 h-4 rounded text-[var(--color-accent-blue)]"
                           />
-                          <span>Actualizar la Fecha Final del atleta a esta fecha al registrar el pago</span>
+                          <span>Actualizar la Fecha Final del atleta a esta fecha al guardar el pago</span>
                         </label>
                       </div>
 
@@ -749,7 +684,7 @@ export function AthleteSubscriptionModal({
                       <div className="flex justify-end gap-2 pt-1">
                         <button
                           type="button"
-                          onClick={() => setShowAddPayment(false)}
+                          onClick={handleCancelPaymentForm}
                           className="px-3 py-1.5 text-xs text-[var(--color-text-muted)] font-semibold hover:underline"
                         >
                           Cancelar
@@ -759,7 +694,11 @@ export function AthleteSubscriptionModal({
                           disabled={isSavingPayment}
                           className="px-4 py-1.5 text-xs font-bold bg-[var(--color-accent-blue)] text-white rounded-xl shadow-sm active:scale-95 transition-all"
                         >
-                          {isSavingPayment ? "Guardando..." : "Registrar Pago"}
+                          {isSavingPayment
+                            ? "Guardando..."
+                            : editingPaymentId
+                            ? "Guardar Cambios de Pago"
+                            : "Registrar Pago"}
                         </button>
                       </div>
                     </form>
@@ -837,22 +776,35 @@ export function AthleteSubscriptionModal({
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeletePayment(pago.id)}
-                              className="p-1.5 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                              title="Eliminar este pago"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditPayment(pago)}
+                                className="p-1.5 text-[var(--color-accent-blue)] hover:text-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                                title="Editar este pago"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePayment(pago.id)}
+                                className="p-1.5 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                title="Eliminar este pago"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   )}
                 </div>
-              </>
-            ) : (
+              </div>
+            )}
+
+            {activeTab === "planes" && (
               /* TAB 2: Catálogo de Planes Editables */
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
