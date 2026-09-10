@@ -27,11 +27,17 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
   // Filter pending invitations for the current logged-in athlete
   const pendingInvitations = useMemo(() => {
     if (!currentUser) return [];
-    return solicitudesEntrenador.filter(
-      (s) =>
-        (s.id_atleta === currentUser.id || (currentUser.dni && s.dni_atleta === currentUser.dni)) &&
-        s.estado === "pendiente"
-    );
+    const currentId = (currentUser.id || "").trim();
+    const currentDni = (currentUser.dni || "").trim().toLowerCase();
+    return solicitudesEntrenador.filter((s) => {
+      if (s.estado !== "pendiente") return false;
+      const targetId = (s.id_atleta || "").trim();
+      const targetDni = (s.dni_atleta || "").trim().toLowerCase();
+      return (
+        (currentId && (targetId === currentId || targetDni === currentId)) ||
+        (currentDni && (targetDni === currentDni || targetId === currentDni))
+      );
+    });
   }, [solicitudesEntrenador, currentUser]);
 
   const handleStartWorkout = (routineId: string) => {
@@ -94,7 +100,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
 
   // Modern Gold view matching the user's uploaded photo exactly
   if (uiStyle === 'modern_gold') {
-    const displayRoutine = todayRoutine || activeRoutines[0] || rutinas[0];
+    const displayRoutine = todayRoutine || activeRoutines[0] || null;
     const routineExercises = displayRoutine ? ejerciciosRutina.filter(er => er.id_rutina === displayRoutine.id) : [];
 
     return (
@@ -105,23 +111,32 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
             <h2 className="text-xl font-black tracking-tight text-slate-950">
               Rutinas de Entrenamiento
             </h2>
-            <button
-              type="button"
-              onClick={() => {
-                if (displayRoutine) {
+            {displayRoutine && (
+              <button
+                type="button"
+                onClick={() => {
                   handleTryStartWorkout(displayRoutine.id);
-                }
-              }}
-              className="bg-white hover:bg-slate-50 text-slate-950 text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1 shadow-sm active:scale-95 transition-all"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Añadir</span>
-            </button>
+                }}
+                className="bg-white hover:bg-slate-50 text-slate-950 text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Añadir</span>
+              </button>
+            )}
           </div>
 
           {/* Horizontal Carousel of Routine Cards */}
           <div className="flex gap-3 overflow-x-auto pb-1 pt-1 px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x">
-            {(activeRoutines.length > 0 ? activeRoutines : rutinas.slice(0, 3)).map((routine) => {
+            {activeRoutines.length === 0 ? (
+              <div className="w-full py-5 px-4 bg-white/90 dark:bg-slate-900/90 rounded-[28px] text-center border border-amber-200/60 dark:border-slate-800 shadow-sm">
+                <Dumbbell className="w-7 h-7 mx-auto mb-1.5 text-amber-600 dark:text-amber-400 opacity-80" />
+                <p className="text-xs font-bold text-slate-900 dark:text-white">Aún no tienes rutinas asignadas</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                  Tu entrenador las programará en tu plan de entrenamiento.
+                </p>
+              </div>
+            ) : (
+              activeRoutines.map((routine) => {
               const routineErs = ejerciciosRutina.filter(er => er.id_rutina === routine.id);
               const isToday = routine.dia_semana === todayDay;
               const thumbImg = getRoutineThumbnail(routine.nombre_sesion);
@@ -192,7 +207,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                   </button>
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
 
@@ -299,7 +314,7 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
                 return (
                   <div
                     key={er.id}
-                    onClick={() => handleTryStartWorkout(displayRoutine.id)}
+                    onClick={() => displayRoutine && handleTryStartWorkout(displayRoutine.id)}
                     className="bg-[var(--color-bg-base)] rounded-[26px] p-4 border border-[var(--color-text-muted)]/20 shadow-sm flex flex-col gap-2.5 cursor-pointer hover:border-[var(--color-accent-blue)]/60 active:scale-[0.99] transition-all"
                   >
                     <div className="flex items-center justify-between">
@@ -595,7 +610,7 @@ function LiveWorkout({
 
   // Find routine matching today's day of week, or fallback to first active routine
   const todayRoutine = activeRoutines.find((r) => r.dia_semana === todayDay);
-  const defaultRoutineId = initialRoutineId || todayRoutine?.id || activeRoutines[0]?.id || 'r1';
+  const defaultRoutineId = initialRoutineId || todayRoutine?.id || activeRoutines[0]?.id || '';
 
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>(defaultRoutineId);
   const [activeListTab, setActiveListTab] = useState<'pendientes' | 'realizados'>('pendientes');

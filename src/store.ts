@@ -24,10 +24,14 @@ import {
   ProgresoParcialEjercicio, 
   SesionUsoWeb,
   SolicitudEntrenador,
-  UIStyle 
+  UIStyle,
+  PlanSuscripcion,
+  PagoSuscripcion,
+  SuscripcionAtleta
 } from './types';
+import { DEFAULT_PLANES_SUSCRIPCION } from './utils/subscriptionUtils';
 
-export type { SerieLograda, EjercicioRealizadoLog, ProgresoParcialEjercicio, SesionUsoWeb, SolicitudEntrenador, UIStyle };
+export type { SerieLograda, EjercicioRealizadoLog, ProgresoParcialEjercicio, SesionUsoWeb, SolicitudEntrenador, UIStyle, PlanSuscripcion, PagoSuscripcion, SuscripcionAtleta };
 
 interface AppState {
   isCloudReady: boolean;
@@ -92,6 +96,14 @@ interface AppState {
   }) => Promise<{ success: boolean; message?: string }>;
   responderSolicitudEntrenamiento: (solicitudId: string, respuesta: 'aceptada' | 'rechazada') => Promise<void>;
   deleteSolicitudEntrenamiento: (solicitudId: string) => Promise<void>;
+  planesSuscripcion: PlanSuscripcion[];
+  addPlanSuscripcion: (plan: PlanSuscripcion) => Promise<void>;
+  updatePlanSuscripcion: (plan: PlanSuscripcion) => Promise<void>;
+  deletePlanSuscripcion: (planId: string) => Promise<void>;
+  resetPlanesSuscripcionDefaults: () => Promise<void>;
+  updateUsuarioSuscripcion: (athleteId: string, suscripcion: SuscripcionAtleta) => Promise<void>;
+  registrarPagoSuscripcion: (athleteId: string, pago: PagoSuscripcion) => Promise<void>;
+  eliminarPagoSuscripcion: (athleteId: string, pagoId: string) => Promise<void>;
 }
 
 function cleanObject<T extends Record<string, any>>(obj: T): T {
@@ -111,7 +123,38 @@ function cleanObject<T extends Record<string, any>>(obj: T): T {
 const mockUsuarios: Usuario[] = [
   { id: 'admin1', nombre: 'Admin GymBro', dni: '12345678', whatsapp: '999999999', fecha_nacimiento: '1990-01-01', sexo: 'masculino', contrasena: '0000', estado_suscripcion: 'activo', rol: 'admin' },
   { id: 'entrenador1', nombre: 'Coach Roberto', dni: '87654321', whatsapp: '988888888', fecha_nacimiento: '1985-05-15', sexo: 'masculino', contrasena: '0000', estado_suscripcion: 'activo', rol: 'entrenador' },
-  { id: 'u1', nombre: 'Xiomara Ballón', dni: '10101010', whatsapp: '977777777', fecha_nacimiento: '1998-03-20', sexo: 'femenino', contrasena: '0000', estado_suscripcion: 'activo', rol: 'cliente', id_entrenador: 'entrenador1' },
+  { 
+    id: 'u1', 
+    nombre: 'Xiomara Ballón', 
+    dni: '10101010', 
+    whatsapp: '977777777', 
+    fecha_nacimiento: '1998-03-20', 
+    sexo: 'femenino', 
+    contrasena: '0000', 
+    estado_suscripcion: 'activo', 
+    rol: 'cliente', 
+    id_entrenador: 'entrenador1',
+    suscripcion: {
+      id_plan: 'plan_1m',
+      nombre_plan: 'Plan 1 mes',
+      duracion_meses: 1,
+      precio_pen: 300,
+      fecha_inicio: '2026-09-01',
+      fecha_fin: '2026-10-01',
+      historial_pagos: [
+        {
+          id: 'pago_init_1',
+          fecha_pago: '2026-09-01',
+          monto_pen: 300,
+          metodo_pago: 'Yape/Plin',
+          referencia: 'YAP-981245',
+          estado: 'completado',
+          notas: 'Pago mensualidad inicial setiembre',
+        }
+      ],
+      notas: 'Plan 1 mes regular acordado.'
+    }
+  },
 ];
 
 const mockEjercicios: Ejercicio[] = [
@@ -256,6 +299,7 @@ const EJERCICIOS_REALIZADOS_KEY = 'gymbro_ejercicios_realizados_v1';
 const PROGRESOS_PARCIALES_KEY = 'gymbro_progresos_parciales_v1';
 export const SESIONES_USO_STORAGE_KEY = 'gymbro_sesiones_uso_v1';
 export const SOLICITUDES_ENTRENADOR_KEY = 'gymbro_solicitudes_entrenador_v1';
+export const PLANES_SUSCRIPCION_STORAGE_KEY = 'gymbro_planes_suscripcion_v1';
 
 export const getUserAccentKey = (userId: string) => `gymbro_user_accent_${userId}`;
 export const getUserThemeKey = (userId: string) => `gymbro_user_theme_${userId}`;
@@ -538,6 +582,7 @@ export const useStore = create<AppState>((set, get) => ({
   progresosParciales: getStoredItem<Record<string, ProgresoParcialEjercicio>>(PROGRESOS_PARCIALES_KEY, {}),
   sesionesUso: getStoredItem<SesionUsoWeb[]>(SESIONES_USO_STORAGE_KEY, []),
   solicitudesEntrenador: getStoredItem<SolicitudEntrenador[]>(SOLICITUDES_ENTRENADOR_KEY, []),
+  planesSuscripcion: getStoredItem<PlanSuscripcion[]>(PLANES_SUSCRIPCION_STORAGE_KEY, DEFAULT_PLANES_SUSCRIPCION),
 
   login: async (dni, contrasena) => {
     const trimmedDni = dni.trim();
@@ -896,10 +941,13 @@ export const useStore = create<AppState>((set, get) => ({
     // Filter updated in-memory and local storage state immediately
     const updatedRutinas = currentRutinas.filter((r) => !routineIdsToDelete.has(r.id) && !isAthleteRoutine(r, athleteOrId));
     const updatedErs = currentErs.filter((er) => !toDeleteErIds.has(er.id) && !routineIdsToDelete.has(er.id_rutina));
+    const currentLogs = get().ejerciciosRealizados;
+    const updatedLogs = currentLogs.filter((log) => !routineIdsToDelete.has(log.id_rutina));
 
-    set({ rutinas: updatedRutinas, ejerciciosRutina: updatedErs });
+    set({ rutinas: updatedRutinas, ejerciciosRutina: updatedErs, ejerciciosRealizados: updatedLogs });
     setStoredItem(RUTINAS_STORAGE_KEY, updatedRutinas);
     setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, updatedErs);
+    setStoredItem(EJERCICIOS_REALIZADOS_KEY, updatedLogs);
 
     // Also delete from Firestore comprehensively
     try {
@@ -1376,6 +1424,106 @@ export const useStore = create<AppState>((set, get) => ({
       console.warn('Error deleting solicitud from Firestore:', err);
     }
   },
+
+  addPlanSuscripcion: async (plan) => {
+    const current = get().planesSuscripcion;
+    const updated = [...current.filter((p) => p.id !== plan.id), plan];
+    set({ planesSuscripcion: updated });
+    setStoredItem(PLANES_SUSCRIPCION_STORAGE_KEY, updated);
+    try {
+      await setDoc(doc(db, 'planesSuscripcion', plan.id), cleanObject(plan));
+    } catch (err) {
+      console.warn('Error saving plan to Firestore:', err);
+    }
+  },
+
+  updatePlanSuscripcion: async (updatedPlan) => {
+    const current = get().planesSuscripcion;
+    const updated = current.map((p) => (p.id === updatedPlan.id ? updatedPlan : p));
+    set({ planesSuscripcion: updated });
+    setStoredItem(PLANES_SUSCRIPCION_STORAGE_KEY, updated);
+    try {
+      await setDoc(doc(db, 'planesSuscripcion', updatedPlan.id), cleanObject(updatedPlan));
+    } catch (err) {
+      console.warn('Error updating plan in Firestore:', err);
+    }
+  },
+
+  deletePlanSuscripcion: async (planId) => {
+    const current = get().planesSuscripcion;
+    const updated = current.filter((p) => p.id !== planId);
+    set({ planesSuscripcion: updated });
+    setStoredItem(PLANES_SUSCRIPCION_STORAGE_KEY, updated);
+    try {
+      await deleteDoc(doc(db, 'planesSuscripcion', planId));
+    } catch (err) {
+      console.warn('Error deleting plan from Firestore:', err);
+    }
+  },
+
+  resetPlanesSuscripcionDefaults: async () => {
+    set({ planesSuscripcion: DEFAULT_PLANES_SUSCRIPCION });
+    setStoredItem(PLANES_SUSCRIPCION_STORAGE_KEY, DEFAULT_PLANES_SUSCRIPCION);
+    try {
+      for (const p of DEFAULT_PLANES_SUSCRIPCION) {
+        await setDoc(doc(db, 'planesSuscripcion', p.id), cleanObject(p));
+      }
+    } catch (err) {
+      console.warn('Error resetting default plans in Firestore:', err);
+    }
+  },
+
+  updateUsuarioSuscripcion: async (athleteId, suscripcion) => {
+    const athlete = get().usuarios.find((u) => u.id === athleteId);
+    if (!athlete) return;
+    const updatedUser: Usuario = {
+      ...athlete,
+      suscripcion: {
+        ...suscripcion,
+        historial_pagos: suscripcion.historial_pagos || athlete.suscripcion?.historial_pagos || [],
+        ultima_actualizacion: new Date().toISOString(),
+      },
+    };
+    await get().updateUsuario(updatedUser);
+  },
+
+  registrarPagoSuscripcion: async (athleteId, pago) => {
+    const athlete = get().usuarios.find((u) => u.id === athleteId);
+    if (!athlete) return;
+    const existingSuscripcion = athlete.suscripcion || {
+      nombre_plan: 'Plan personalizado',
+      precio_pen: pago.monto_pen,
+      fecha_inicio: pago.fecha_pago,
+      fecha_fin: pago.fecha_pago,
+    };
+    const historial = existingSuscripcion.historial_pagos || [];
+    const updatedHistorial = [pago, ...historial.filter((p) => p.id !== pago.id)];
+
+    const updatedUser: Usuario = {
+      ...athlete,
+      suscripcion: {
+        ...existingSuscripcion,
+        historial_pagos: updatedHistorial,
+        ultima_actualizacion: new Date().toISOString(),
+      },
+    };
+    await get().updateUsuario(updatedUser);
+  },
+
+  eliminarPagoSuscripcion: async (athleteId, pagoId) => {
+    const athlete = get().usuarios.find((u) => u.id === athleteId);
+    if (!athlete || !athlete.suscripcion?.historial_pagos) return;
+    const updatedHistorial = athlete.suscripcion.historial_pagos.filter((p) => p.id !== pagoId);
+    const updatedUser: Usuario = {
+      ...athlete,
+      suscripcion: {
+        ...athlete.suscripcion,
+        historial_pagos: updatedHistorial,
+        ultima_actualizacion: new Date().toISOString(),
+      },
+    };
+    await get().updateUsuario(updatedUser);
+  },
 }));
 
 
@@ -1688,6 +1836,22 @@ export function initFirestoreSync() {
     useStore.setState({ solicitudesEntrenador: requests });
   }, (error) => {
     console.error('Firestore solicitudesEntrenador subscription error:', error);
+  });
+
+  // 10. PlanesSuscripcion listener - real-time editable subscription plans
+  onSnapshot(collection(db, 'planesSuscripcion'), async (snapshot) => {
+    if (!snapshot.empty) {
+      const plans: PlanSuscripcion[] = [];
+      snapshot.forEach((docSnap) => {
+        plans.push({ id: docSnap.id, ...docSnap.data() } as PlanSuscripcion);
+      });
+      if (plans.length > 0) {
+        setStoredItem(PLANES_SUSCRIPCION_STORAGE_KEY, plans);
+        useStore.setState({ planesSuscripcion: plans });
+      }
+    }
+  }, (error) => {
+    console.error('Firestore planesSuscripcion subscription error:', error);
   });
 
   // Automatically begin web usage session if a user is already authenticated

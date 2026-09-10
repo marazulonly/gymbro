@@ -32,11 +32,11 @@ export function RoutineAccessBlockedCard({
         {/* Title */}
         <div className="flex flex-col gap-1">
           <span className="text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full mx-auto">
-            {status.modo === "horario_manual"
+            {status.reasonTitle || (status.modo === "horario_manual"
               ? "Rutina Pausada"
               : status.modo === "solo_hoy"
               ? "Disponible Solo el Día Programado"
-              : "Fuera de Horario"}
+              : "Suscripción Vencida")}
           </span>
         </div>
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useStore } from "@/store";
-import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Heart, Calendar, Search, Plus } from "lucide-react";
+import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Heart, Calendar, Search, Plus, CreditCard } from "lucide-react";
 import { NeuButton } from "./ui/NeuButton";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "./ProfileModal";
@@ -26,6 +26,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
           { icon: <ClipboardList className="w-5 h-5" />, label: "Rutinas" },
           { icon: <Database className="w-5 h-5" />, label: "Ejercicios" },
           { icon: <Activity className="w-5 h-5" />, label: "Revisiones" },
+          { icon: <CreditCard className="w-5 h-5" />, label: "", title: "Membresía" },
         ];
       case 'cliente':
       default:
@@ -199,7 +200,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
       {/* Bottom Navigation */}
       {isSoftPorcelain ? (
         <nav className="absolute bottom-3 left-0 right-0 px-4 z-30 pointer-events-none">
-          <div className="pointer-events-auto max-w-[340px] mx-auto bg-[var(--color-bg-base)] rounded-[28px] px-5 py-2 shadow-neu-flat border border-white/60 dark:border-slate-800/60 flex justify-between items-center">
+          <div className="pointer-events-auto max-w-[370px] mx-auto bg-[var(--color-bg-base)] rounded-[28px] px-4 py-2 shadow-neu-flat border border-white/60 dark:border-slate-800/60 flex justify-between items-center">
             {navItems.map((item, idx) => {
               const isActive = activeTab === idx;
               return (
@@ -207,7 +208,8 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
                   key={idx}
                   onClick={() => setActiveTab(idx)}
                   className="relative flex flex-col items-center justify-center w-11 h-11"
-                  title={item.label}
+                  title={item.title || item.label}
+                  aria-label={item.title || item.label || `Tab ${idx + 1}`}
                 >
                   <div
                     className={`flex items-center justify-center w-9 h-9 rounded-full transition-all duration-300 ${
@@ -224,24 +226,28 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
           </div>
         </nav>
       ) : isModernGold ? (
-        <nav className="absolute bottom-3 left-0 right-0 px-6 z-30 pointer-events-none">
-          <div className="pointer-events-auto max-w-[320px] mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg rounded-full px-6 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 dark:border-slate-800 flex justify-between items-center">
+        <nav className="absolute bottom-3 left-0 right-0 px-4 z-30 pointer-events-none">
+          <div className="pointer-events-auto max-w-[360px] mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg rounded-full px-4 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 dark:border-slate-800 flex justify-between items-center">
             {navItems.map((item, idx) => {
               const isActive = activeTab === idx;
               return (
                 <button
                   key={idx}
                   onClick={() => setActiveTab(idx)}
-                  className={`flex flex-col items-center justify-center w-12 h-11 transition-transform ${
-                    isActive ? "scale-110 text-[var(--color-accent-amber)] font-bold" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  className={`flex flex-col items-center justify-center min-w-[40px] h-11 transition-transform ${
+                    isActive ? "scale-105 text-[var(--color-accent-amber)] font-bold" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                   }`}
+                  title={item.title || item.label}
+                  aria-label={item.title || item.label || `Tab ${idx + 1}`}
                 >
                   <div className="flex items-center justify-center">
                     {item.icon}
                   </div>
-                  <span className={`text-[10px] tracking-tight mt-0.5 ${isActive ? "font-bold text-[var(--color-accent-amber)]" : "font-normal"}`}>
-                    {item.label}
-                  </span>
+                  {item.label && (
+                    <span className={`text-[10px] tracking-tight mt-0.5 ${isActive ? "font-bold text-[var(--color-accent-amber)]" : "font-normal"}`}>
+                      {item.label}
+                    </span>
+                  )}
                 </button>
               );
             })}

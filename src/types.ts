@@ -36,6 +36,41 @@ export interface Usuario {
   modo_tema?: 'light' | 'dark';
   estilo_diseno?: UIStyle;
   control_acceso?: ControlAccesoRutinas;
+  suscripcion?: SuscripcionAtleta;
+}
+
+export type SemaforoPago = 'verde' | 'ambar' | 'rojo' | 'negro';
+
+export interface PlanSuscripcion {
+  id: string;
+  nombre: string;
+  duracion_meses: number;
+  precio_pen: number;
+  descripcion?: string;
+  activo?: boolean;
+}
+
+export interface PagoSuscripcion {
+  id: string;
+  fecha_pago: string; // "YYYY-MM-DD"
+  monto_pen: number;
+  metodo_pago?: string; // "Efectivo" | "Yape/Plin" | "Transferencia" | "Tarjeta" | "Otro"
+  referencia?: string;
+  estado: 'completado' | 'pendiente' | 'anulado';
+  notas?: string;
+  registrado_at?: string;
+}
+
+export interface SuscripcionAtleta {
+  id_plan?: string;
+  nombre_plan: string;
+  duracion_meses?: number;
+  precio_pen: number;
+  fecha_inicio: string; // "YYYY-MM-DD"
+  fecha_fin: string;    // "YYYY-MM-DD"
+  historial_pagos?: PagoSuscripcion[];
+  notas?: string;
+  ultima_actualizacion?: string;
 }
 
 export interface Ejercicio {

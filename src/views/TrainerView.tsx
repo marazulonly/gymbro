@@ -36,7 +36,8 @@ import {
   ChevronUp,
   UserPlus,
   Send,
-  AlertCircle
+  AlertCircle,
+  CreditCard
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "@/components/ProfileModal";
@@ -45,9 +46,12 @@ import { AthleteProgressView } from "@/components/AthleteProgressView";
 import { FichaEstadisticasUsoModal } from "@/components/FichaEstadisticasUsoModal";
 import { RegistroEjerciciosRealizadosModal } from "@/components/RegistroEjerciciosRealizadosModal";
 import { RoutineAccessControlModal } from "@/components/RoutineAccessControlModal";
+import { AthleteSubscriptionModal } from "@/components/AthleteSubscriptionModal";
 import { TrainerInvitePromptModal } from "@/components/TrainerInvitePromptModal";
+import { TrainerMembershipsModule } from "@/views/TrainerMembershipsModule";
 import { Rutina, EjercicioRutina, Usuario, Ejercicio, ModoControlAcceso } from "@/types";
 import { isAthleteAssignedOrCreatedByTrainer } from "@/utils/routineAccess";
+import { calcularSemaforoPago } from "@/utils/subscriptionUtils";
 
 export function TrainerView({ 
   tab, 
@@ -98,6 +102,7 @@ export function TrainerView({
   }
   if (tab === 2) return <ExercisesLibrary />;
   if (tab === 3) return <CheckinsDashboard />;
+  if (tab === 4) return <TrainerMembershipsModule />;
   return null;
 }
 
@@ -278,6 +283,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [isExerciseLogModalOpen, setIsExerciseLogModalOpen] = useState(false);
   const [selectedModalAthleteId, setSelectedModalAthleteId] = useState<string | undefined>(undefined);
+  const [subscriptionModalAthlete, setSubscriptionModalAthlete] = useState<Usuario | null>(null);
 
   const [nombre, setNombre] = useState("");
   const [dni, setDni] = useState("");
@@ -431,6 +437,9 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       creado_por: currentUser?.id,
     });
 
+    // Ensure newly created athlete starts completely blank without any default or inherited routines
+    await clearAthleteRoutines(newUserId);
+
     setIsAdding(false);
     setNombre("");
     setDni("");
@@ -544,11 +553,11 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           <NeuButton
             className="text-xs font-bold text-[var(--color-accent-blue)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
             onClick={handleOpenAllUsage}
-            title={isAdmin ? "Ver ficha de estadísticas de uso web de todos los usuarios" : "Ver ficha de estadísticas de uso web de mis atletas"}
+            title={isAdmin ? "Ver ficha de estadísticas de tiempo de uso de todos los usuarios" : "Ver ficha de estadísticas de tiempo de uso de mis atletas"}
           >
             <Clock className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Ficha</span>
-            <span>Uso Web</span>
+            <span>Tiempo</span>
           </NeuButton>
 
           <NeuButton variant="circle" className="w-9 h-9 shadow-neu-flat" onClick={() => setIsAdding(true)} title="Registrar Atleta">
@@ -679,6 +688,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
             }
 
             const isExpanded = expandedAthleteId === athlete.id;
+            const semaforoPago = calcularSemaforoPago(athlete.suscripcion?.fecha_fin);
 
             return (
               <NeuCard 
@@ -705,18 +715,34 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedAthleteId(athlete.id);
-                      }}
-                      className="w-8 h-8 rounded-full shadow-neu-flat hover:shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)] transition-all shrink-0 active:scale-95"
-                      title="Expandir vista completa"
-                      aria-label="Expandir vista completa"
-                    >
-                      <ChevronDown className="w-4 h-4 stroke-[2.5]" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Botón semáforo: solo el círculo de color en forma de botón, sin texto */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSubscriptionModalAthlete(athlete);
+                        }}
+                        className={`w-7 h-7 rounded-full shadow-neu-flat hover:shadow-neu-pressed flex items-center justify-center transition-all active:scale-95 border ${semaforoPago.badgeBorder} ${semaforoPago.badgeBg}`}
+                        title={`Control de Membresía (${semaforoPago.label}) - Vence: ${athlete.suscripcion?.fecha_fin || 'Sin fecha'}`}
+                        aria-label="Control de Membresía"
+                      >
+                        <span className={`w-3 h-3 rounded-full ${semaforoPago.dotColor} shadow-sm`} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedAthleteId(athlete.id);
+                        }}
+                        className="w-8 h-8 rounded-full shadow-neu-flat hover:shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)] transition-all shrink-0 active:scale-95"
+                        title="Expandir vista completa"
+                        aria-label="Expandir vista completa"
+                      >
+                        <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   /* Vista expandida tal cual como está actualmente con botón para contraer */
@@ -738,6 +764,18 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                             >
                               {athlete.estado_suscripcion === "inactivo" ? "Inactivo" : "Activo"}
                             </span>
+
+                            {/* Botón semáforo: solo el círculo de color en forma de botón, sin texto */}
+                            <button
+                              type="button"
+                              onClick={() => setSubscriptionModalAthlete(athlete)}
+                              className={`w-5 h-5 rounded-full shadow-neu-flat hover:shadow-neu-pressed flex items-center justify-center transition-all active:scale-95 border ${semaforoPago.badgeBorder} ${semaforoPago.badgeBg}`}
+                              title={`Control de Membresía (${semaforoPago.label}) - Vence: ${athlete.suscripcion?.fecha_fin || 'Sin fecha'}`}
+                              aria-label="Control de Membresía"
+                            >
+                              <span className={`w-2.5 h-2.5 rounded-full ${semaforoPago.dotColor} shadow-sm`} />
+                            </button>
+
                             {/* Access Mode Badge */}
                             <span
                               className={`px-2 py-0.2 rounded-md font-bold flex items-center gap-1 ${
@@ -820,10 +858,10 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                         <NeuButton
                           className="px-2 py-1 text-[11px] text-[var(--color-accent-blue)] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
                           onClick={() => handleOpenAthleteUsage(athlete.id)}
-                          title="Ver ficha de tiempos de uso web de esta atleta"
+                          title="Ver ficha de tiempos de uso de esta atleta"
                         >
                           <Clock className="w-3 h-3" />
-                          <span>Uso Web</span>
+                          <span>Tiempo</span>
                         </NeuButton>
 
                         <NeuButton
@@ -913,6 +951,12 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         isOpen={!!accessModalAthlete}
         athlete={accessModalAthlete}
         onClose={() => setAccessModalAthlete(null)}
+      />
+
+      <AthleteSubscriptionModal
+        isOpen={!!subscriptionModalAthlete}
+        athlete={subscriptionModalAthlete}
+        onClose={() => setSubscriptionModalAthlete(null)}
       />
 
       <ProfileModal
@@ -1005,6 +1049,7 @@ function RoutineManager({
   const [viewMode, setViewMode] = useState<"gestionar" | "progreso">(initialViewMode);
   const [progressModalAthlete, setProgressModalAthlete] = useState<Usuario | null>(null);
   const [accessModalAthlete, setAccessModalAthlete] = useState<Usuario | null>(null);
+  const [subscriptionModalAthlete, setSubscriptionModalAthlete] = useState<Usuario | null>(null);
   const [isClearAthleteRoutinesOpen, setIsClearAthleteRoutinesOpen] = useState(false);
   const [isClearingAthleteRoutines, setIsClearingAthleteRoutines] = useState(false);
 
@@ -1858,6 +1903,71 @@ function RoutineManager({
           )}
         </div>
       </NeuCard>
+
+      {/* Control de Membresía y Semáforo de Pagos Card */}
+      {currentAthlete && (() => {
+        const semaforoPago = calcularSemaforoPago(currentAthlete.suscripcion?.fecha_fin);
+        return (
+          <NeuCard className="p-3.5 flex flex-col gap-2.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-xs font-bold text-[var(--color-text-main)]">Control de Membresía</h3>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${semaforoPago.badgeBg} ${semaforoPago.badgeText} ${semaforoPago.badgeBorder}`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${semaforoPago.dotColor}`} />
+                      <span>{semaforoPago.label}</span>
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--color-text-muted)]">
+                    {currentAthlete.suscripcion?.nombre_plan ? (
+                      <>Plan: <strong className="text-[var(--color-text-main)]">{currentAthlete.suscripcion.nombre_plan}</strong> • </>
+                    ) : (
+                      <span className="italic">Sin plan asignado • </span>
+                    )}
+                    Vence:{" "}
+                    <strong className="text-[var(--color-text-main)]">
+                      {currentAthlete.suscripcion?.fecha_fin || "No definida"}
+                    </strong>{" "}
+                    ({semaforoPago.diasDiferencia > 0 ? `${semaforoPago.diasDiferencia} días restantes` : semaforoPago.diasDiferencia === 0 ? 'Vence hoy' : `${Math.abs(semaforoPago.diasDiferencia)} días de mora`})
+                  </span>
+                </div>
+              </div>
+
+              <NeuButton
+                className="px-3 py-1 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1.5 h-7 shadow-neu-flat"
+                onClick={() => setSubscriptionModalAthlete(currentAthlete)}
+                title="Gestionar membresía, pagos y planes del atleta"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>Gestionar Suscripción</span>
+              </NeuButton>
+            </div>
+
+            {/* Aviso de bloqueo si semáforo está en Negro */}
+            {semaforoPago.bloqueado && (
+              <div className="p-2.5 rounded-xl bg-slate-950 text-white text-xs flex items-center gap-2.5 border border-red-500/40 shadow-sm">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                <span className="flex-1 font-medium text-[11px] leading-snug">
+                  <strong className="text-red-400">Acceso restringido:</strong> El atleta supera los 2 días de mora. El acceso a sus rutinas se encuentra bloqueado automáticamente hasta regularizar su pago.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSubscriptionModalAthlete(currentAthlete)}
+                  className="px-2.5 py-1 text-[11px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shrink-0 transition-colors"
+                >
+                  Registrar Pago
+                </button>
+              </div>
+            )}
+          </NeuCard>
+        );
+      })()}
 
       {/* Control de Acceso a Rutinas Card */}
       {currentAthlete && (
@@ -2721,6 +2831,12 @@ function RoutineManager({
         isOpen={!!accessModalAthlete}
         athlete={accessModalAthlete}
         onClose={() => setAccessModalAthlete(null)}
+      />
+
+      <AthleteSubscriptionModal
+        isOpen={!!subscriptionModalAthlete}
+        athlete={subscriptionModalAthlete}
+        onClose={() => setSubscriptionModalAthlete(null)}
       />
 
       <ClearAthleteRoutinesModal

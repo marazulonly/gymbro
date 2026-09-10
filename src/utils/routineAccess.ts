@@ -1,4 +1,5 @@
 import { Usuario, ControlAccesoRutinas, ModoControlAcceso } from "@/types";
+import { calcularSemaforoPago } from "@/utils/subscriptionUtils";
 
 export interface RoutineAccessStatus {
   allowed: boolean;
@@ -83,6 +84,26 @@ export function checkAthleteRoutineAccess(
   };
 
   const modo = config.modo || "siempre_visible";
+
+  // Verificación de Estado de Suscripción (Semáforo de pagos):
+  // Estado 'negro': Han pasado más de 2 días de la fecha límite de pago.
+  // Bloqueo automático que restringe el acceso del atleta a sus rutinas.
+  if (athlete.suscripcion?.fecha_fin) {
+    const semaforoInfo = calcularSemaforoPago(athlete.suscripcion.fecha_fin);
+    if (semaforoInfo.bloqueado) {
+      return {
+        allowed: false,
+        modo,
+        reasonTitle: "Suscripción Vencida",
+        reasonMessage: `Su suscripción ha superado la fecha límite de pago. Por favor comunícate con ${trainerName} para renovar tu membresía y reactivar el acceso a tus rutinas.`,
+        trainerName,
+        trainerWhatsapp,
+        isTodayOnly: false,
+        isDayAllowed: false,
+        secondsRemainingToday: null,
+      };
+    }
+  }
 
   // Athlete's local time
   const now = new Date();
