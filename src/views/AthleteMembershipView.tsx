@@ -139,11 +139,8 @@ export function AthleteMembershipView() {
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-black text-[var(--color-text-main)] tracking-tight">
-                Mi Membresía
+                Membresía
               </h1>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                {suscripcion?.nombre_plan || "Plan de Entrenamiento"}
-              </p>
             </div>
           </div>
 
@@ -162,7 +159,7 @@ export function AthleteMembershipView() {
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-[var(--color-accent-blue)]" />
-                {countdown.isExpired ? "Suscripción Finalizada" : "Tiempo Restante de Membresía"}
+                {countdown.isExpired ? "Suscripción Finalizada" : "Tiempo Restante"}
               </span>
               <span className="text-[11px] text-[var(--color-text-muted)] font-medium">
                 Vence: <strong>{formatDateDisplay(fechaFin)}</strong>
@@ -225,16 +222,6 @@ export function AthleteMembershipView() {
                 </div>
               </div>
             )}
-
-            {/* Fechas de vigencia */}
-            <div className="pt-2 border-t border-[var(--color-text-muted)]/10 flex items-center justify-between text-[11px] text-[var(--color-text-muted)]">
-              <div>
-                Inicio: <strong className="text-[var(--color-text-main)]">{formatDateDisplay(fechaInicio)}</strong>
-              </div>
-              <div>
-                Fin: <strong className="text-[var(--color-text-main)]">{formatDateDisplay(fechaFin)}</strong>
-              </div>
-            </div>
           </div>
         ) : (
           <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center space-y-2">
@@ -286,7 +273,7 @@ export function AthleteMembershipView() {
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-black uppercase tracking-wider text-[var(--color-text-muted)] flex items-center gap-1.5">
             <DollarSign className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
-            Historial de Pagos Registrados ({pagos.length})
+            Pagos Registrados ({pagos.length})
           </h2>
           {suscripcion?.precio_pen ? (
             <span className="text-[11px] font-bold text-[var(--color-text-muted)]">

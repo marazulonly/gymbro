@@ -1218,10 +1218,13 @@ export function TrainerMembershipsModule() {
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step="any"
                       required
                       value={modalMonto}
-                      onChange={(e) => setModalMonto(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setModalMonto(val === "" ? 0 : Number(val));
+                      }}
                       className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold text-[var(--color-accent-blue)]"
                     />
                   </div>
@@ -1508,10 +1511,13 @@ export function TrainerMembershipsModule() {
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step="any"
                       required
                       value={planFormPrecio}
-                      onChange={(e) => setPlanFormPrecio(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPlanFormPrecio(val === "" ? 0 : Number(val));
+                      }}
                       className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold text-[var(--color-accent-blue)]"
                     />
                   </div>

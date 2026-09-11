@@ -50,6 +50,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
   const [permisoCambiarLogo, setPermisoCambiarLogo] = useState(false);
   const [logoPersonalizadoUrl, setLogoPersonalizadoUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'estilo' | 'tema' | 'color' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -176,7 +177,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
           className="absolute inset-0 z-50 bg-[var(--color-bg-base)] flex flex-col p-4 overflow-y-auto"
         >
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-[var(--color-text-main)]">{isEditingOther ? 'Editar Usuario' : 'Ajustes & Personalización'}</h2>
+            <h2 className="text-2xl font-bold text-[var(--color-text-main)]">{isEditingOther ? 'Editar Usuario' : 'Ajustes'}</h2>
             <NeuButton variant="circle" className="w-10 h-10 shadow-neu-flat" onClick={onClose}>
               <X className="w-5 h-5 text-[var(--color-text-muted)]" />
             </NeuButton>
@@ -184,177 +185,262 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
 
           {/* Theme & Color Settings Section */}
           {!isEditingOther && (
-            <NeuCard className="p-4 mb-4 flex flex-col gap-4">
-              {/* Design Style Selector */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-[var(--color-accent-blue)]" />
-                    <h3 className="font-bold text-sm text-[var(--color-text-main)]">Estilo de Diseño Visual</h3>
+            <NeuCard className="p-4 mb-4 flex flex-col gap-3">
+              {/* Selector de 3 columnas en forma de botón */}
+              <div className="grid grid-cols-3 gap-2.5">
+                {/* Botón Estilo */}
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingsTab(activeSettingsTab === 'estilo' ? null : 'estilo')}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center border cursor-pointer ${
+                    activeSettingsTab === 'estilo'
+                      ? 'shadow-neu-pressed border-[var(--color-accent-blue)] bg-[var(--color-bg-base)] text-[var(--color-accent-blue)]'
+                      : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] text-[var(--color-text-main)] hover:text-[var(--color-accent-blue)]'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                    activeSettingsTab === 'estilo'
+                      ? 'bg-[var(--color-accent-blue)] text-white shadow-sm'
+                      : 'shadow-neu-flat text-[var(--color-accent-blue)]'
+                  }`}>
+                    <Layers className="w-4 h-4" />
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                    Nuevo estilo
-                  </span>
-                </div>
+                  <span className="font-bold text-xs">Estilo</span>
+                </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setUIStyle('soft_porcelain')}
-                    className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border ${
-                      uiStyle === 'soft_porcelain'
-                        ? 'shadow-neu-pressed border-[var(--color-accent-blue)] bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
-                        : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-[var(--color-accent-blue)] text-white flex items-center justify-center shadow-sm">
-                        <Layers className="w-4 h-4" />
-                      </div>
-                      <span className="font-bold text-xs text-[var(--color-text-main)]">Soft Porcelain 3D</span>
-                    </div>
-                    {uiStyle === 'soft_porcelain' && (
-                      <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shrink-0">
-                        <Check className="w-3 h-3 stroke-[3]" />
-                      </div>
-                    )}
-                  </button>
+                {/* Botón Tema */}
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingsTab(activeSettingsTab === 'tema' ? null : 'tema')}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center border cursor-pointer ${
+                    activeSettingsTab === 'tema'
+                      ? 'shadow-neu-pressed border-[var(--color-accent-blue)] bg-[var(--color-bg-base)] text-[var(--color-accent-blue)]'
+                      : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] text-[var(--color-text-main)] hover:text-[var(--color-accent-blue)]'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                    activeSettingsTab === 'tema'
+                      ? 'bg-[var(--color-accent-blue)] text-white shadow-sm'
+                      : 'shadow-neu-flat text-[var(--color-accent-blue)]'
+                  }`}>
+                    {themeMode === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                  </div>
+                  <span className="font-bold text-xs">Tema</span>
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setUIStyle('neumorfico')}
-                    className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border ${
-                      uiStyle === 'neumorfico'
-                        ? 'shadow-neu-pressed border-[var(--color-accent-blue)]/50 bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
-                        : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl shadow-neu-flat flex items-center justify-center text-[var(--color-accent-blue)]">
-                        <Layers className="w-4 h-4" />
-                      </div>
-                      <span className="font-bold text-xs text-[var(--color-text-main)]">Neumórfico Clásico</span>
-                    </div>
-                    {uiStyle === 'neumorfico' && (
-                      <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shrink-0">
-                        <Check className="w-3 h-3 stroke-[3]" />
-                      </div>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setUIStyle('modern_gold')}
-                    className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border ${
-                      uiStyle === 'modern_gold'
-                        ? 'shadow-neu-pressed border-amber-500/60 bg-[var(--color-bg-base)] ring-2 ring-amber-500/30'
-                        : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-sm">
-                        <Sparkles className="w-4 h-4 fill-current" />
-                      </div>
-                      <span className="font-bold text-xs text-[var(--color-text-main)]">Fitness Gold</span>
-                    </div>
-                    {uiStyle === 'modern_gold' && (
-                      <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
-                        <Check className="w-3 h-3 stroke-[3]" />
-                      </div>
-                    )}
-                  </button>
-                </div>
+                {/* Botón Color */}
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingsTab(activeSettingsTab === 'color' ? null : 'color')}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center border cursor-pointer ${
+                    activeSettingsTab === 'color'
+                      ? 'shadow-neu-pressed border-[var(--color-accent-blue)] bg-[var(--color-bg-base)] text-[var(--color-accent-blue)]'
+                      : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] text-[var(--color-text-main)] hover:text-[var(--color-accent-blue)]'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                    activeSettingsTab === 'color'
+                      ? 'bg-[var(--color-accent-blue)] text-white shadow-sm'
+                      : 'shadow-neu-flat text-[var(--color-accent-blue)]'
+                  }`}>
+                    <Palette className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold text-xs">Color</span>
+                </button>
               </div>
 
-              {/* Day / Night Theme */}
-              <div className="pt-2 border-t border-[var(--color-text-muted)]/15">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sun className="w-4 h-4 text-[var(--color-accent-blue)]" />
-                  <h3 className="font-bold text-sm text-[var(--color-text-main)]">Tema de Pantalla</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setThemeMode('light')}
-                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold transition-all ${
-                      themeMode === 'light'
-                        ? 'shadow-neu-pressed text-[var(--color-accent-blue)] ring-1 ring-[var(--color-accent-blue)]/30'
-                        : 'shadow-neu-flat text-[var(--color-text-muted)]'
-                    }`}
+              {/* Opciones desplegables según la columna seleccionada */}
+              <AnimatePresence>
+                {activeSettingsTab === 'estilo' && (
+                  <motion.div
+                    key="tab-estilo"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed flex flex-col gap-2.5"
                   >
-                    <Sun className="w-4 h-4" />
-                    <span>Modo Día</span>
-                  </button>
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Opciones de Estilo</h3>
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setThemeMode('dark')}
-                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold transition-all ${
-                      themeMode === 'dark'
-                        ? 'shadow-neu-pressed text-[var(--color-accent-blue)] ring-1 ring-[var(--color-accent-blue)]/30'
-                        : 'shadow-neu-flat text-[var(--color-text-muted)]'
-                    }`}
-                  >
-                    <Moon className="w-4 h-4" />
-                    <span>Modo Noche</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Accent Color Picker */}
-              <div className="pt-2 border-t border-[var(--color-text-muted)]/15">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <Palette className="w-4 h-4 text-[var(--color-accent-blue)]" />
-                    <h3 className="font-bold text-sm text-[var(--color-text-main)]">Color de Acento</h3>
-                  </div>
-                  <span className="text-[10px] text-[var(--color-text-muted)] font-medium">
-                    (Solo afecta elementos azules)
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-5 gap-2.5 my-2">
-                  {ACCENT_PRESETS.map((color) => {
-                    const isSelected = accentColor.toLowerCase() === color.value.toLowerCase();
-                    return (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <button
-                        key={color.value}
                         type="button"
-                        onClick={() => setAccentColor(color.value)}
-                        title={color.name}
-                        className={`group flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
-                          isSelected ? 'shadow-neu-pressed' : 'shadow-neu-flat'
+                        onClick={() => setUIStyle('soft_porcelain')}
+                        className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border cursor-pointer ${
+                          uiStyle === 'soft_porcelain'
+                            ? 'shadow-neu-pressed border-[var(--color-accent-blue)] bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
+                            : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
                         }`}
                       >
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-transform group-hover:scale-105"
-                          style={{ backgroundColor: color.value }}
-                        >
-                          {isSelected && <Check className="w-4 h-4 text-white stroke-[3]" />}
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-[var(--color-accent-blue)] text-white flex items-center justify-center shadow-sm">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <span className="font-bold text-xs text-[var(--color-text-main)]">Soft Porcelain 3D</span>
                         </div>
+                        {uiStyle === 'soft_porcelain' && (
+                          <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shrink-0">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
                       </button>
-                    );
-                  })}
-                </div>
 
-                <div className="flex items-center justify-between mt-2 pt-2 text-xs text-[var(--color-text-muted)]">
-                  <label htmlFor="custom-color-input" className="cursor-pointer font-medium hover:text-[var(--color-text-main)]">
-                    Color Personalizado:
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="custom-color-input"
-                      type="color"
-                      value={accentColor}
-                      onChange={(e) => setAccentColor(e.target.value)}
-                      className="w-7 h-7 rounded-lg border-0 cursor-pointer bg-transparent shadow-neu-flat"
-                    />
-                    <span className="font-mono text-[11px] font-bold text-[var(--color-text-main)] uppercase">
-                      {accentColor}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => setUIStyle('neumorfico')}
+                        className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border cursor-pointer ${
+                          uiStyle === 'neumorfico'
+                            ? 'shadow-neu-pressed border-[var(--color-accent-blue)]/50 bg-[var(--color-bg-base)] ring-2 ring-[var(--color-accent-blue)]/30'
+                            : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl shadow-neu-flat flex items-center justify-center text-[var(--color-accent-blue)]">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <span className="font-bold text-xs text-[var(--color-text-main)]">Neumórfico Clásico</span>
+                        </div>
+                        {uiStyle === 'neumorfico' && (
+                          <div className="w-5 h-5 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shrink-0">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setUIStyle('modern_gold')}
+                        className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border cursor-pointer ${
+                          uiStyle === 'modern_gold'
+                            ? 'shadow-neu-pressed border-amber-500/60 bg-[var(--color-bg-base)] ring-2 ring-amber-500/30'
+                            : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-sm">
+                            <Sparkles className="w-4 h-4 fill-current" />
+                          </div>
+                          <span className="font-bold text-xs text-[var(--color-text-main)]">Fitness Gold</span>
+                        </div>
+                        {uiStyle === 'modern_gold' && (
+                          <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeSettingsTab === 'tema' && (
+                  <motion.div
+                    key="tab-tema"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed flex flex-col gap-2.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sun className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Opciones de Tema</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('light')}
+                        className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                          themeMode === 'light'
+                            ? 'shadow-neu-pressed text-[var(--color-accent-blue)] ring-1 ring-[var(--color-accent-blue)]/30'
+                            : 'shadow-neu-flat text-[var(--color-text-muted)]'
+                        }`}
+                      >
+                        <Sun className="w-4 h-4" />
+                        <span>Modo Día</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('dark')}
+                        className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                          themeMode === 'dark'
+                            ? 'shadow-neu-pressed text-[var(--color-accent-blue)] ring-1 ring-[var(--color-accent-blue)]/30'
+                            : 'shadow-neu-flat text-[var(--color-text-muted)]'
+                        }`}
+                      >
+                        <Moon className="w-4 h-4" />
+                        <span>Modo Noche</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeSettingsTab === 'color' && (
+                  <motion.div
+                    key="tab-color"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed flex flex-col gap-2.5"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Palette className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                        <h3 className="font-bold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Opciones de Color</h3>
+                      </div>
+                      <span className="text-[10px] text-[var(--color-text-muted)] font-medium">
+                        (Solo afecta elementos azules)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-2.5 my-1">
+                      {ACCENT_PRESETS.map((color) => {
+                        const isSelected = accentColor.toLowerCase() === color.value.toLowerCase();
+                        return (
+                          <button
+                            key={color.value}
+                            type="button"
+                            onClick={() => setAccentColor(color.value)}
+                            title={color.name}
+                            className={`group flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all cursor-pointer ${
+                              isSelected ? 'shadow-neu-pressed ring-1 ring-[var(--color-accent-blue)]/30' : 'shadow-neu-flat'
+                            }`}
+                          >
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-transform group-hover:scale-105"
+                              style={{ backgroundColor: color.value }}
+                            >
+                              {isSelected && <Check className="w-4 h-4 text-white stroke-[3]" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-[var(--color-text-muted)]/10 text-xs text-[var(--color-text-muted)]">
+                      <label htmlFor="custom-color-input" className="cursor-pointer font-medium hover:text-[var(--color-text-main)]">
+                        Color Personalizado:
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="custom-color-input"
+                          type="color"
+                          value={accentColor}
+                          onChange={(e) => setAccentColor(e.target.value)}
+                          className="w-7 h-7 rounded-lg border-0 cursor-pointer bg-transparent shadow-neu-flat"
+                        />
+                        <span className="font-mono text-[11px] font-bold text-[var(--color-text-main)] uppercase">
+                          {accentColor}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Botón Cambiar Logo (Solo aparece cuando el administrador lo autoriza) */}
               {canTrainerChangeLogo && (

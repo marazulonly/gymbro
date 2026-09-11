@@ -93,7 +93,7 @@ export function AthleteSubscriptionModal({
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [paymentFecha, setPaymentFecha] = useState<string>(todayStr);
-  const [paymentMonto, setPaymentMonto] = useState<number>(precioPen || 300);
+  const [paymentMonto, setPaymentMonto] = useState<number | string>(precioPen || 300);
   const [paymentMetodo, setPaymentMetodo] = useState<string>("Yape/Plin");
   const [paymentEstado, setPaymentEstado] = useState<"completado" | "pendiente" | "anulado">("completado");
   const [paymentReferencia, setPaymentReferencia] = useState<string>("");
@@ -220,7 +220,8 @@ export function AthleteSubscriptionModal({
   // Add or update payment
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!athlete || !paymentMonto || paymentMonto <= 0) return;
+    const numMonto = Number(paymentMonto);
+    if (!athlete || !paymentMonto || isNaN(numMonto) || numMonto <= 0) return;
 
     setIsSavingPayment(true);
     try {
@@ -231,7 +232,7 @@ export function AthleteSubscriptionModal({
       const paymentToSave: PagoSuscripcion = {
         id: editingPaymentId || `pay_${Date.now()}`,
         fecha_pago: paymentFecha,
-        monto_pen: Number(paymentMonto),
+        monto_pen: numMonto,
         metodo_pago: paymentMetodo,
         estado: paymentEstado,
         referencia: paymentReferencia.trim(),
@@ -247,7 +248,7 @@ export function AthleteSubscriptionModal({
             id_plan: paymentSuggestedPlanId || selectedPlanId,
             nombre_plan: paymentSuggestedPlanName || nombrePlan,
             duracion_meses: duracionMeses,
-            precio_pen: Number(paymentMonto),
+            precio_pen: numMonto,
             fecha_inicio: fechaInicio,
             fecha_fin: paymentProjectedEnd,
             historial_pagos: [],
@@ -593,10 +594,13 @@ export function AthleteSubscriptionModal({
                             <input
                               type="number"
                               required
-                              min="1"
-                              step="5"
+                              min="0"
+                              step="any"
                               value={paymentMonto}
-                              onChange={(e) => setPaymentMonto(Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setPaymentMonto(val === "" ? "" : Number(val));
+                              }}
                               className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold"
                             />
                           </div>
@@ -916,7 +920,7 @@ export function AthleteSubscriptionModal({
                           <input
                             type="number"
                             min="0"
-                            step="10"
+                            step="any"
                             value={editPlanPrecio}
                             onChange={(e) => setEditPlanPrecio(Number(e.target.value))}
                             className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-black"
