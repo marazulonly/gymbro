@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useStore } from "@/store";
-import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Heart, Calendar, Search, Plus, CreditCard } from "lucide-react";
+import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Heart, Calendar, Search, CreditCard } from "lucide-react";
 import { NeuButton } from "./ui/NeuButton";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "./ProfileModal";
@@ -8,9 +8,20 @@ import { GymBroWordmarkLogo } from "./GymBroWordmarkLogo";
 
 
 export function Layout({ children }: { children: (activeTab: number, setActiveTab: (tab: number) => void) => React.ReactNode }) {
-  const { currentRole, logout, currentUser, isCloudReady, uiStyle } = useStore();
+  const { currentRole, logout, currentUser, isCloudReady, uiStyle, usuarios } = useStore();
   const [activeTab, setActiveTab] = useState(0);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Logo personalizado: si el usuario es entrenador y tiene logo, o si es atleta y su entrenador asignado tiene logo
+  const customLogoUrl = useMemo(() => {
+    if (!currentUser) return null;
+    if (currentUser.logo_personalizado_url) return currentUser.logo_personalizado_url;
+    if (currentUser.rol === 'cliente' && currentUser.id_entrenador) {
+      const trainer = usuarios.find(u => u.id === currentUser.id_entrenador);
+      if (trainer?.logo_personalizado_url) return trainer.logo_personalizado_url;
+    }
+    return null;
+  }, [currentUser, usuarios]);
 
   const getNavItems = () => {
     switch (currentRole) {
@@ -75,11 +86,19 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
               </svg>
             </div>
             <div className="flex items-center">
-              <GymBroWordmarkLogo
-                className="h-6 w-auto text-[var(--color-text-main)]"
-                gymColor="currentColor"
-                broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
-              />
+              {customLogoUrl ? (
+                <img
+                  src={customLogoUrl}
+                  alt="Logo"
+                  className="h-7 max-h-8 w-auto max-w-[140px] object-contain"
+                />
+              ) : (
+                <GymBroWordmarkLogo
+                  className="h-6 w-auto text-[var(--color-text-main)]"
+                  gymColor="currentColor"
+                  broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
+                />
+              )}
             </div>
           </div>
 
@@ -103,7 +122,7 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
               title="Personalizar Estilo"
               className="w-9 h-9 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shadow-sm hover:opacity-90 active:scale-95 transition-all"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <Settings className="w-4 h-4" />
             </button>
             <button
               type="button"
@@ -122,11 +141,19 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
             : "bg-[var(--color-bg-base)]/80 backdrop-blur-md"
         }`}>
           <div className="flex items-center gap-2">
-            <GymBroWordmarkLogo
-              className={`h-7 w-auto ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}
-              gymColor={isModernGold ? "#020617" : "currentColor"}
-              broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
-            />
+            {customLogoUrl ? (
+              <img
+                src={customLogoUrl}
+                alt="Logo"
+                className="h-7 max-h-8 w-auto max-w-[140px] object-contain"
+              />
+            ) : (
+              <GymBroWordmarkLogo
+                className={`h-7 w-auto ${isModernGold ? "text-slate-950" : "text-[var(--color-text-main)]"}`}
+                gymColor={isModernGold ? "#020617" : "currentColor"}
+                broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-2">

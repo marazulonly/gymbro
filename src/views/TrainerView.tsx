@@ -49,7 +49,7 @@ import { RoutineAccessControlModal } from "@/components/RoutineAccessControlModa
 import { AthleteSubscriptionModal } from "@/components/AthleteSubscriptionModal";
 import { TrainerInvitePromptModal } from "@/components/TrainerInvitePromptModal";
 import { TrainerMembershipsModule } from "@/views/TrainerMembershipsModule";
-import { Rutina, EjercicioRutina, Usuario, Ejercicio, ModoControlAcceso } from "@/types";
+import { Rutina, EjercicioRutina, Usuario, Ejercicio, ModoControlAcceso, SemaforoPago } from "@/types";
 import { isAthleteAssignedOrCreatedByTrainer } from "@/utils/routineAccess";
 import { calcularSemaforoPago } from "@/utils/subscriptionUtils";
 
@@ -310,8 +310,32 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
   }, [usuarios, currentUser, isAdmin]);
 
-  // Trainers ONLY have access to their assigned or created athletes, never all athletes
-  const displayedAthletes = isTrainer ? assignedAthletes : (filterTrainerMode === "mis_atletas" ? assignedAthletes : allGymAthletes);
+  // State for traffic light (Semáforo de Pagos) filtering: null (todos), 'verde', 'ambar', 'rojo', 'negro'
+  const [selectedSemaforoFilter, setSelectedSemaforoFilter] = useState<SemaforoPago | null>(null);
+
+  // Athletes base pool depending on role and filterTrainerMode
+  const baseAthletes = isTrainer ? assignedAthletes : (filterTrainerMode === "mis_atletas" ? assignedAthletes : allGymAthletes);
+
+  // Counts of athletes per semáforo status for tooltip counters
+  const semaforoCounts = useMemo(() => {
+    const counts: Record<string, number> = { verde: 0, ambar: 0, rojo: 0, negro: 0 };
+    baseAthletes.forEach((ath) => {
+      const s = calcularSemaforoPago(ath.suscripcion?.fecha_fin);
+      if (s.semaforo in counts) {
+        counts[s.semaforo]++;
+      }
+    });
+    return counts;
+  }, [baseAthletes]);
+
+  // Filtered displayed athletes
+  const displayedAthletes = useMemo(() => {
+    if (!selectedSemaforoFilter) return baseAthletes;
+    return baseAthletes.filter((athlete) => {
+      const semaforoInfo = calcularSemaforoPago(athlete.suscripcion?.fecha_fin);
+      return semaforoInfo.semaforo === selectedSemaforoFilter;
+    });
+  }, [baseAthletes, selectedSemaforoFilter]);
 
   // Sent invitations by this trainer
   const trainerInvitations = useMemo(() => {
@@ -540,15 +564,68 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           <span className="text-xs text-[var(--color-text-muted)]">Gestión de rutinas, ejercicios y control físico</span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <NeuButton
-            className="text-xs font-bold text-[var(--color-accent-green)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
-            onClick={handleOpenAllExercises}
-            title={isAdmin ? "Ver registro de todos los ejercicios realizados" : "Ver registro de ejercicios de mis atletas"}
-          >
-            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span className="hidden sm:inline">Ejercicios</span>
-            <span>Realizados</span>
-          </NeuButton>
+          {/* 4 Botones con los colores del Semáforo de Pagos (sin textos) */}
+          <div className="flex items-center gap-1 bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed">
+            {/* 1. Verde: Al día */}
+            <button
+              type="button"
+              onClick={() => setSelectedSemaforoFilter(selectedSemaforoFilter === "verde" ? null : "verde")}
+              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all ${
+                selectedSemaforoFilter === "verde"
+                  ? "bg-emerald-500/25 shadow-neu-pressed ring-2 ring-emerald-500 scale-105"
+                  : "shadow-neu-flat hover:shadow-neu-pressed active:scale-95 opacity-85 hover:opacity-100"
+              }`}
+              title={`Filtrar: Al día (Verde) - ${semaforoCounts.verde || 0} atletas`}
+              aria-label="Filtrar atletas al día (Verde)"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-sm" />
+            </button>
+
+            {/* 2. Ámbar: Por vencer */}
+            <button
+              type="button"
+              onClick={() => setSelectedSemaforoFilter(selectedSemaforoFilter === "ambar" ? null : "ambar")}
+              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all ${
+                selectedSemaforoFilter === "ambar"
+                  ? "bg-amber-500/25 shadow-neu-pressed ring-2 ring-amber-500 scale-105"
+                  : "shadow-neu-flat hover:shadow-neu-pressed active:scale-95 opacity-85 hover:opacity-100"
+              }`}
+              title={`Filtrar: Por vencer (Ámbar) - ${semaforoCounts.ambar || 0} atletas`}
+              aria-label="Filtrar atletas por vencer (Ámbar)"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-amber-500 shadow-sm" />
+            </button>
+
+            {/* 3. Rojo: Vencido */}
+            <button
+              type="button"
+              onClick={() => setSelectedSemaforoFilter(selectedSemaforoFilter === "rojo" ? null : "rojo")}
+              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all ${
+                selectedSemaforoFilter === "rojo"
+                  ? "bg-rose-500/25 shadow-neu-pressed ring-2 ring-rose-500 scale-105"
+                  : "shadow-neu-flat hover:shadow-neu-pressed active:scale-95 opacity-85 hover:opacity-100"
+              }`}
+              title={`Filtrar: Vencidos (Rojo) - ${semaforoCounts.rojo || 0} atletas`}
+              aria-label="Filtrar atletas vencidos (Rojo)"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-sm" />
+            </button>
+
+            {/* 4. Negro: Bloqueado por mora */}
+            <button
+              type="button"
+              onClick={() => setSelectedSemaforoFilter(selectedSemaforoFilter === "negro" ? null : "negro")}
+              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all ${
+                selectedSemaforoFilter === "negro"
+                  ? "bg-slate-900/50 shadow-neu-pressed ring-2 ring-slate-700 dark:ring-slate-300 scale-105"
+                  : "shadow-neu-flat hover:shadow-neu-pressed active:scale-95 opacity-85 hover:opacity-100"
+              }`}
+              title={`Filtrar: Bloqueados por mora (Negro) - ${semaforoCounts.negro || 0} atletas`}
+              aria-label="Filtrar atletas bloqueados por mora (Negro)"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-slate-950 ring-1 ring-slate-400 dark:ring-slate-500 shadow-sm" />
+            </button>
+          </div>
 
           <NeuButton
             className="text-xs font-bold text-[var(--color-accent-blue)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
@@ -661,15 +738,89 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         </div>
       )}
 
+      {/* Indicador de Filtro de Semáforo Activo */}
+      {selectedSemaforoFilter && (
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-3 h-3 rounded-full shadow-sm ${
+                selectedSemaforoFilter === "verde"
+                  ? "bg-emerald-500"
+                  : selectedSemaforoFilter === "ambar"
+                  ? "bg-amber-500"
+                  : selectedSemaforoFilter === "rojo"
+                  ? "bg-rose-500"
+                  : "bg-slate-950 ring-1 ring-slate-400"
+              }`}
+            />
+            <span className="font-bold text-[var(--color-text-main)]">
+              Mostrando atletas:{" "}
+              <span className={
+                selectedSemaforoFilter === "verde"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : selectedSemaforoFilter === "ambar"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : selectedSemaforoFilter === "rojo"
+                  ? "text-rose-600 dark:text-rose-400"
+                  : "text-slate-900 dark:text-white"
+              }>
+                {selectedSemaforoFilter === "verde"
+                  ? "Al día (Verde)"
+                  : selectedSemaforoFilter === "ambar"
+                  ? "Por vencer (Ámbar)"
+                  : selectedSemaforoFilter === "rojo"
+                  ? "Vencidos (Rojo)"
+                  : "Bloqueados por mora (Negro)"}
+              </span>
+            </span>
+            <span className="text-[var(--color-text-muted)] font-medium">
+              ({displayedAthletes.length})
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedSemaforoFilter(null)}
+            className="text-[11px] font-bold text-[var(--color-accent-blue)] hover:underline flex items-center gap-1 p-1"
+            title="Quitar filtro de semáforo"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Ver todos</span>
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2.5 pb-8">
         {displayedAthletes.length === 0 ? (
-          <p className="text-center text-[var(--color-text-muted)] my-6 text-sm">
-            {isTrainer
-              ? "No tienes atletas asignados o creados actualmente."
-              : filterTrainerMode === "mis_atletas"
-              ? "No tienes atletas asignados a tu cuenta actualmente."
-              : "No hay atletas registrados en el gimnasio."}
-          </p>
+          <div className="p-8 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15 text-center flex flex-col items-center justify-center gap-2.5 my-2">
+            <CreditCard className="w-10 h-10 text-[var(--color-text-muted)] stroke-1" />
+            <p className="text-xs font-bold text-[var(--color-text-main)]">
+              {selectedSemaforoFilter
+                ? `No hay atletas con el estado ${
+                    selectedSemaforoFilter === "verde"
+                      ? "Al día (Verde)"
+                      : selectedSemaforoFilter === "ambar"
+                      ? "Por vencer (Ámbar)"
+                      : selectedSemaforoFilter === "rojo"
+                      ? "Vencido (Rojo)"
+                      : "Bloqueado por mora (Negro)"
+                  }`
+                : isTrainer
+                ? "No tienes atletas asignados o creados actualmente."
+                : filterTrainerMode === "mis_atletas"
+                ? "No tienes atletas asignados a tu cuenta actualmente."
+                : "No hay atletas registrados en el gimnasio."}
+            </p>
+            {selectedSemaforoFilter && (
+              <button
+                type="button"
+                onClick={() => setSelectedSemaforoFilter(null)}
+                className="mt-1 px-3 py-1.5 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90"
+              >
+                Mostrar Todos los Atletas
+              </button>
+            )}
+          </div>
         ) : (
           displayedAthletes.map((athlete) => {
             const ficha = fichasProgreso.find((f) => f.id_cliente === athlete.id);

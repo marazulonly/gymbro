@@ -1527,6 +1527,14 @@ export const useStore = create<AppState>((set, get) => ({
 }));
 
 
+const logFirestoreListenerError = (collectionName: string, error: any) => {
+  if (error?.code === 'unavailable') {
+    // Normal offline / reconnecting state in Firestore SDK
+    return;
+  }
+  console.warn(`Firestore ${collectionName} subscription:`, error?.message || error);
+};
+
 // Setup Firestore real-time synchronization
 // Strictly respects user changes in the cloud and keeps local storage updated
 export function initFirestoreSync() {
@@ -1617,11 +1625,11 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving initial users to Firestore:', e);
+        console.warn('Initial users sync note:', e);
       }
     }
   }, (error) => {
-    console.error('Firestore usuarios subscription error:', error);
+    logFirestoreListenerError('usuarios', error);
   });
 
   // 2. Ejercicios listener
@@ -1643,7 +1651,7 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving missing ejercicios to Firestore:', e);
+        console.warn('Ejercicios sync note:', e);
       }
       ejs = mergeWithMock(ejs, mockEjercicios);
     }
@@ -1651,7 +1659,7 @@ export function initFirestoreSync() {
     setStoredItem(EJERCICIOS_STORAGE_KEY, ejs);
     useStore.setState({ ejercicios: ejs });
   }, (error) => {
-    console.error('Firestore ejercicios subscription error:', error);
+    logFirestoreListenerError('ejercicios', error);
   });
 
   // 3. Rutinas listener
@@ -1670,7 +1678,7 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving initial rutinas to Firestore:', e);
+        console.warn('Initial rutinas sync note:', e);
       }
       ruts = [...mockRutinas];
     }
@@ -1693,7 +1701,7 @@ export function initFirestoreSync() {
     setStoredItem(RUTINAS_STORAGE_KEY, ruts);
     useStore.setState({ rutinas: ruts });
   }, (error) => {
-    console.error('Firestore rutinas subscription error:', error);
+    logFirestoreListenerError('rutinas', error);
   });
 
   // 4. EjerciciosRutina listener
@@ -1712,7 +1720,7 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving initial ejerciciosRutina to Firestore:', e);
+        console.warn('Initial ejerciciosRutina sync note:', e);
       }
       ers = [...mockEjerciciosRutina];
     }
@@ -1735,7 +1743,7 @@ export function initFirestoreSync() {
     setStoredItem(EJERCICIOS_RUTINA_STORAGE_KEY, ers);
     useStore.setState({ ejerciciosRutina: ers });
   }, (error) => {
-    console.error('Firestore ejerciciosRutina subscription error:', error);
+    logFirestoreListenerError('ejerciciosRutina', error);
   });
 
   // 5. PlanNutricion listener
@@ -1750,11 +1758,11 @@ export function initFirestoreSync() {
       try {
         await setDoc(doc(db, 'planesNutricion', mockPlanNutricion.id), cleanObject(mockPlanNutricion));
       } catch (e) {
-        console.error('Error saving initial planNutricion:', e);
+        console.warn('Initial planNutricion note:', e);
       }
     }
   }, (error) => {
-    console.error('Firestore planesNutricion subscription error:', error);
+    logFirestoreListenerError('planesNutricion', error);
   });
 
   // 6. FichasProgreso listener
@@ -1775,7 +1783,7 @@ export function initFirestoreSync() {
         });
         await batch.commit();
       } catch (e) {
-        console.error('Error saving missing fichasProgreso:', e);
+        console.warn('Missing fichasProgreso note:', e);
       }
       fps = mergeWithMock(fps, mockFichasProgreso);
     }
@@ -1783,7 +1791,7 @@ export function initFirestoreSync() {
     setStoredItem(FICHAS_PROGRESO_STORAGE_KEY, fps);
     useStore.setState({ fichasProgreso: fps });
   }, (error) => {
-    console.error('Firestore fichasProgreso subscription error:', error);
+    logFirestoreListenerError('fichasProgreso', error);
   });
 
   // 7. EjerciciosRealizados listener - real-time sync for athlete and trainer
@@ -1803,7 +1811,7 @@ export function initFirestoreSync() {
       useStore.setState({ ejerciciosRealizados: logs });
     }
   }, (error) => {
-    console.error('Firestore ejerciciosRealizados subscription error:', error);
+    logFirestoreListenerError('ejerciciosRealizados', error);
   });
 
   // 8. SesionesUso listener - real-time web usage dates and duration sync
@@ -1819,7 +1827,7 @@ export function initFirestoreSync() {
       useStore.setState({ sesionesUso: sessions });
     }
   }, (error) => {
-    console.error('Firestore sesionesUso subscription error:', error);
+    logFirestoreListenerError('sesionesUso', error);
   });
 
   // 9. SolicitudesEntrenador listener - real-time invitations for athletes and trainers
@@ -1835,7 +1843,7 @@ export function initFirestoreSync() {
     setStoredItem(SOLICITUDES_ENTRENADOR_KEY, requests);
     useStore.setState({ solicitudesEntrenador: requests });
   }, (error) => {
-    console.error('Firestore solicitudesEntrenador subscription error:', error);
+    logFirestoreListenerError('solicitudesEntrenador', error);
   });
 
   // 10. PlanesSuscripcion listener - real-time editable subscription plans
@@ -1851,7 +1859,7 @@ export function initFirestoreSync() {
       }
     }
   }, (error) => {
-    console.error('Firestore planesSuscripcion subscription error:', error);
+    logFirestoreListenerError('planesSuscripcion', error);
   });
 
   // Automatically begin web usage session if a user is already authenticated

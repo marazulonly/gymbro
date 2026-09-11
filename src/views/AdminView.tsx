@@ -16,7 +16,10 @@ import {
   ChevronDown, 
   ChevronUp, 
   UserCheck,
-  FileText
+  FileText,
+  Image as ImageIcon,
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { ProfileModal } from "@/components/ProfileModal";
 import { AthleteProgressModal } from "@/components/AthleteProgressModal";
@@ -81,7 +84,7 @@ function AdminDashboard() {
 }
 
 function AccountManagement() {
-  const { usuarios, assignAthleteToTrainer, addUsuario, clearAthleteRoutines } = useStore();
+  const { usuarios, assignAthleteToTrainer, addUsuario, updateUsuario, clearAthleteRoutines } = useStore();
   const [filterRole, setFilterRole] = useState<'cliente' | 'entrenador'>('cliente');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedAthleteForProgress, setSelectedAthleteForProgress] = useState<Usuario | null>(null);
@@ -122,6 +125,23 @@ function AccountManagement() {
     setTimeout(() => {
       setNotification(null);
     }, 4000);
+  };
+
+  const handleToggleLogoPermission = async (trainer: Usuario) => {
+    const newPermiso = !trainer.permiso_cambiar_logo;
+    try {
+      await updateUsuario({
+        ...trainer,
+        permiso_cambiar_logo: newPermiso
+      });
+      showNotification(
+        newPermiso
+          ? `Autorización para subir logo activada para ${trainer.nombre}`
+          : `Autorización para subir logo desactivada para ${trainer.nombre}`
+      );
+    } catch (err) {
+      console.error('Error toggling logo permission:', err);
+    }
   };
 
   const handleStartReassign = (athlete: Usuario) => {
@@ -321,6 +341,51 @@ function AccountManagement() {
                       >
                         Gestionar
                       </NeuButton>
+                    </div>
+                  </div>
+
+                  {/* Check autorización subir PNG / SVG para reemplazar GymBro */}
+                  <div className="p-2.5 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-[var(--color-accent-blue)] shrink-0" />
+                      <div>
+                        <span className="font-bold text-[var(--color-text-main)] block text-xs">
+                          Autorizar subir PNG o SVG (Logo)
+                        </span>
+                        <span className="text-[10px] text-[var(--color-text-muted)]">
+                          Reemplaza la palabra "GymBro" en la cabecera
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {trainer.logo_personalizado_url && (
+                        <div className="h-6 px-1.5 rounded-lg bg-white/60 dark:bg-black/40 border border-[var(--color-text-muted)]/20 flex items-center justify-center">
+                          <img src={trainer.logo_personalizado_url} alt="Logo" className="max-h-4 w-auto max-w-[60px] object-contain" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLogoPermission(trainer)}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          trainer.permiso_cambiar_logo
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                            : "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)]"
+                        }`}
+                        title="Activar / desactivar permiso para subir logo PNG/SVG"
+                      >
+                        {trainer.permiso_cambiar_logo ? (
+                          <>
+                            <CheckSquare className="w-3.5 h-3.5 fill-current" />
+                            <span>Autorizado</span>
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-3.5 h-3.5" />
+                            <span>No autorizado</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 

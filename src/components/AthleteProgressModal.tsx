@@ -4,8 +4,23 @@ import { Usuario, FichaProgreso } from "@/types";
 import { NeuCard } from "./ui/NeuCard";
 import { NeuInput } from "./ui/NeuInput";
 import { NeuButton } from "./ui/NeuButton";
-import { X, Calendar, Activity, Ruler, Target, CheckCircle2, Clock, FileText, Trash2, AlertTriangle } from "lucide-react";
+import { 
+  X, 
+  Calendar, 
+  Activity, 
+  Ruler, 
+  Target, 
+  CheckCircle2, 
+  Clock, 
+  FileText, 
+  Trash2, 
+  AlertTriangle, 
+  Upload, 
+  Eye, 
+  Image as ImageIcon 
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { optimizeImageTo72Dpi } from "@/utils/imageOptimizer";
 
 interface Props {
   isOpen: boolean;
@@ -46,6 +61,12 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
   const [adherencia, setAdherencia] = useState("95");
   const [notas, setNotas] = useState("");
 
+  // Foto de progreso (conversión automática 72 DPI)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
+  const [fotoNombre, setFotoNombre] = useState<string | null>(null);
+  const [isProcessingFoto, setIsProcessingFoto] = useState(false);
+  const [previewFotoUrl, setPreviewFotoUrl] = useState<string | null>(null);
+
   const existingFicha = fichasProgreso.find((f) => f.id_cliente === athlete?.id);
 
   useEffect(() => {
@@ -67,6 +88,8 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
         setNivel(existingFicha.nivel || "Intermedio");
         setAdherencia(existingFicha.adherencia_porcentaje ? String(existingFicha.adherencia_porcentaje) : "95");
         setNotas(existingFicha.notas_entrenador || "");
+        setFotoUrl(existingFicha.foto_url || null);
+        setFotoNombre(existingFicha.foto_nombre || null);
       } else {
         // Defaults
         const today = new Date().toISOString().split("T")[0];
@@ -87,10 +110,32 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
         setNivel("Intermedio");
         setAdherencia("95");
         setNotas("Excelente progreso en técnica y constancia. Seguir progresión de cargas en tren inferior.");
+        setFotoUrl(null);
+        setFotoNombre(null);
       }
       setSavedSuccess(false);
     }
   }, [athlete, isOpen, existingFicha]);
+
+  // Handle Photo Upload with 72 DPI optimization
+  const handleFotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingFoto(true);
+    try {
+      // 72 DPI client-side optimization
+      const result = await optimizeImageTo72Dpi(file, 1200, 0.82);
+      setFotoUrl(result.dataUrl);
+      setFotoNombre(file.name);
+    } catch (error) {
+      console.error("Error optimizando imagen a 72 DPI:", error);
+      alert("No se pudo procesar la imagen. Intenta con otra imagen.");
+    } finally {
+      setIsProcessingFoto(false);
+      e.target.value = "";
+    }
+  };
 
   // Compute BMI
   const numPeso = parseFloat(pesoKg);
@@ -139,6 +184,8 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
       nivel,
       adherencia_porcentaje: adherencia ? parseFloat(adherencia) : 90,
       notas_entrenador: notas,
+      foto_url: fotoUrl || undefined,
+      foto_nombre: fotoNombre || undefined,
       fecha_actualizacion: new Date().toISOString().split("T")[0],
     };
 
@@ -442,6 +489,79 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
               </div>
             </NeuCard>
 
+            {/* Foto de Progreso / Chequeo Visual (Resolución 72 DPI automática para la nube) */}
+            <NeuCard className="p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[var(--color-accent-blue)] font-bold text-xs uppercase tracking-wider">
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Foto de Progreso / Chequeo Visual</span>
+                </div>
+                <span className="text-[10px] text-[var(--color-text-muted)] font-normal px-2 py-0.5 rounded-lg bg-[var(--color-bg-base)] shadow-neu-pressed">
+                  72 DPI Automático
+                </span>
+              </div>
+
+              {fotoUrl ? (
+                <div className="p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-emerald-500/30 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={fotoUrl}
+                      alt="Foto de progreso"
+                      onClick={() => setPreviewFotoUrl(fotoUrl)}
+                      className="w-14 h-14 object-cover rounded-xl shadow-neu-flat cursor-pointer border border-emerald-500/40 hover:opacity-90 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block truncate">
+                        {fotoNombre || "Foto de progreso adjunta"}
+                      </span>
+                      <span className="text-[11px] text-[var(--color-text-muted)] block">
+                        Optimizada a 72 DPI lista para guardar
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFotoUrl(fotoUrl)}
+                      className="p-2 text-xs font-bold text-[var(--color-accent-blue)] rounded-xl shadow-neu-flat hover:shadow-neu-pressed active:scale-95 transition-all"
+                      title="Ver imagen completa"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFotoUrl(null);
+                        setFotoNombre(null);
+                      }}
+                      className="p-2 text-xs font-bold text-red-500 rounded-xl shadow-neu-flat hover:shadow-neu-pressed active:scale-95 transition-all"
+                      title="Eliminar foto"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed active:scale-95 transition-all border border-[var(--color-accent-blue)]/30">
+                    <Upload className="w-4 h-4" />
+                    <span>{isProcessingFoto ? "Optimizando a 72 DPI..." : "Adjuntar Imagen"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFotoUpload}
+                      disabled={isProcessingFoto}
+                    />
+                  </label>
+                  <span className="block text-[11px] text-[var(--color-text-muted)] mt-1.5 leading-relaxed">
+                    Adjunta una fotografía de control físico o chequeo. Al pulsar "Guardar Ficha de Progreso" o "Crear Ficha Inicial", se convierte automáticamente a resolución 72 DPI antes de guardarse en la nube.
+                  </span>
+                </div>
+              )}
+            </NeuCard>
+
             {/* Gestión de Rutinas: Limpiar Rutinas */}
             <NeuCard className="p-4 flex flex-col gap-3 border border-red-500/20 shadow-sm">
               <div className="flex items-center justify-between">
@@ -530,6 +650,49 @@ export function AthleteProgressModal({ isOpen, onClose, athlete }: Props) {
               )}
             </NeuButton>
           </form>
+
+          {/* Modal de Vista Previa de Foto de Progreso */}
+          <AnimatePresence>
+            {previewFotoUrl && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+                onClick={() => setPreviewFotoUrl(null)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0.9 }}
+                  className="bg-[var(--color-bg-base)] p-3.5 rounded-3xl max-w-lg w-full shadow-2xl border border-[var(--color-text-muted)]/20 overflow-hidden flex flex-col gap-3"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-2 pt-1">
+                    <span className="text-xs font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                      Foto de Progreso (72 DPI) - {athlete.nombre}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFotoUrl(null)}
+                      className="p-1.5 rounded-full shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="rounded-2xl overflow-hidden bg-black/5 flex items-center justify-center max-h-[70vh]">
+                    <img
+                      src={previewFotoUrl}
+                      alt="Foto de progreso completa"
+                      className="max-h-[70vh] w-auto object-contain rounded-xl"
+                    />
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>

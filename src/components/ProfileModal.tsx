@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useStore } from "@/store";
 import { NeuCard } from "./ui/NeuCard";
 import { NeuInput } from "./ui/NeuInput";
 import { NeuButton } from "./ui/NeuButton";
-import { X, Sun, Moon, Palette, Check, Sparkles, Layers } from "lucide-react";
+import { X, Sun, Moon, Palette, Check, Sparkles, Layers, Image as ImageIcon, Upload, Trash2, CheckSquare, Square } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UIStyle } from "@/types";
 
@@ -47,7 +47,11 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
   const [id_entrenador, setIdEntrenador] = useState('');
   const [estado_suscripcion, setEstadoSuscripcion] = useState<'activo' | 'inactivo'>('activo');
   const [targetUIStyle, setTargetUIStyle] = useState<UIStyle>('neumorfico');
+  const [permisoCambiarLogo, setPermisoCambiarLogo] = useState(false);
+  const [logoPersonalizadoUrl, setLogoPersonalizadoUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (targetUser) {
@@ -60,8 +64,62 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
       setIdEntrenador(targetUser.id_entrenador || '');
       setEstadoSuscripcion(targetUser.estado_suscripcion || 'activo');
       setTargetUIStyle(targetUser.estilo_diseno || 'neumorfico');
+      setPermisoCambiarLogo(!!targetUser.permiso_cambiar_logo);
+      setLogoPersonalizadoUrl(targetUser.logo_personalizado_url || '');
     }
   }, [targetUser, isOpen]);
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const result = ev.target?.result as string;
+        setLogoPersonalizadoUrl(result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 480;
+          const MAX_HEIGHT = 160;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/png', 0.92);
+            setLogoPersonalizadoUrl(dataUrl);
+          } else {
+            setLogoPersonalizadoUrl(ev.target?.result as string);
+          }
+        };
+        img.src = ev.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPersonalizadoUrl('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +140,8 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
         color_acento: isEditingOther ? targetUser.color_acento : accentColor,
         modo_tema: isEditingOther ? targetUser.modo_tema : themeMode,
         estilo_diseno: isEditingOther ? targetUIStyle : uiStyle,
+        permiso_cambiar_logo: currentUser?.rol === 'admin' ? permisoCambiarLogo : targetUser.permiso_cambiar_logo,
+        logo_personalizado_url: logoPersonalizadoUrl || undefined,
       });
 
       if (targetUser.rol === 'cliente' && id_entrenador && id_entrenador !== targetUser.id_entrenador) {
@@ -102,6 +162,9 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
       onClose();
     }
   };
+
+  // Solo mostrar la opción de cambiar logo si el usuario es entrenador y tiene permiso autorizado por el admin (o es admin)
+  const canTrainerChangeLogo = (targetUser?.rol === 'entrenador' && targetUser.permiso_cambiar_logo) || (currentUser?.rol === 'admin' && targetUser?.rol === 'entrenador');
 
   return (
     <AnimatePresence>
@@ -292,6 +355,66 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                   </div>
                 </div>
               </div>
+
+              {/* Botón Cambiar Logo (Solo aparece cuando el administrador lo autoriza) */}
+              {canTrainerChangeLogo && (
+                <div className="pt-2 border-t border-[var(--color-text-muted)]/15">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-[var(--color-accent-blue)]" />
+                      <h3 className="font-bold text-sm text-[var(--color-text-main)]">Logo de Marca</h3>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      Autorizado por Admin
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--color-text-muted)] mb-3">
+                    Sube un archivo PNG o SVG para reemplazar la palabra "GymBro" en la esquina superior izquierda.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3 p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed">
+                    <div className="w-full sm:w-36 h-12 rounded-xl bg-white/40 dark:bg-black/30 border border-[var(--color-text-muted)]/20 flex items-center justify-center p-2 overflow-hidden">
+                      {logoPersonalizadoUrl ? (
+                        <img src={logoPersonalizadoUrl} alt="Logo preview" className="max-h-full max-w-full object-contain" />
+                      ) : (
+                        <span className="text-[10px] text-[var(--color-text-muted)] font-medium text-center">
+                          Logo: GymBro
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/svg+xml,.png,.svg"
+                        className="hidden"
+                        onChange={handleLogoFileChange}
+                      />
+                      <NeuButton
+                        type="button"
+                        className="px-3.5 py-2 text-xs font-bold text-[var(--color-accent-blue)] flex items-center gap-1.5 shadow-neu-flat flex-1 sm:flex-initial"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>cambiar logo</span>
+                      </NeuButton>
+
+                      {logoPersonalizadoUrl && (
+                        <NeuButton
+                          type="button"
+                          className="px-2.5 py-2 text-xs font-bold text-rose-500 flex items-center gap-1 shadow-neu-flat"
+                          onClick={handleRemoveLogo}
+                          title="Restaurar logo predeterminado"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Quitar</span>
+                        </NeuButton>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </NeuCard>
           )}
 
@@ -346,6 +469,54 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {/* Si el administrador está editando la ficha del entrenador */}
+              {targetUser?.rol === 'entrenador' && currentUser?.rol === 'admin' && (
+                <div className="flex flex-col gap-2 p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-[var(--color-text-muted)]/15">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-[var(--color-text-main)] block">
+                        Autorizar a subir archivo PNG o SVG
+                      </span>
+                      <span className="text-[10px] text-[var(--color-text-muted)]">
+                        Reemplazará la palabra "GymBro" en la esquina superior izquierda
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPermisoCambiarLogo(!permisoCambiarLogo)}
+                      className="text-[var(--color-accent-blue)] p-1 transition-transform active:scale-95"
+                    >
+                      {permisoCambiarLogo ? (
+                        <CheckSquare className="w-5 h-5 text-[var(--color-accent-blue)] fill-current" />
+                      ) : (
+                        <Square className="w-5 h-5 text-[var(--color-text-muted)]" />
+                      )}
+                    </button>
+                  </div>
+
+                  {permisoCambiarLogo && (
+                    <div className="pt-2 border-t border-[var(--color-text-muted)]/10 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {logoPersonalizadoUrl ? (
+                          <img src={logoPersonalizadoUrl} alt="Logo" className="h-6 w-auto max-w-[80px] object-contain" />
+                        ) : (
+                          <span className="text-[10px] text-[var(--color-text-muted)] italic">Sin logo subido todavía</span>
+                        )}
+                      </div>
+                      {logoPersonalizadoUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="text-[11px] font-bold text-rose-500 hover:underline"
+                        >
+                          Eliminar logo
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

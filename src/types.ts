@@ -37,6 +37,8 @@ export interface Usuario {
   estilo_diseno?: UIStyle;
   control_acceso?: ControlAccesoRutinas;
   suscripcion?: SuscripcionAtleta;
+  permiso_cambiar_logo?: boolean;
+  logo_personalizado_url?: string;
 }
 
 export type SemaforoPago = 'verde' | 'ambar' | 'rojo' | 'negro';
@@ -58,6 +60,8 @@ export interface PagoSuscripcion {
   referencia?: string;
   estado: 'completado' | 'pendiente' | 'anulado';
   notas?: string;
+  comprobante_url?: string;
+  comprobante_nombre?: string;
   registrado_at?: string;
 }
 
@@ -163,6 +167,8 @@ export interface FichaProgreso {
   adherencia_porcentaje?: number;
   notas_entrenador?: string;
   fecha_actualizacion?: string;
+  foto_url?: string;
+  foto_nombre?: string;
 }
 
 export interface SerieLograda {

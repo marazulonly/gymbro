@@ -4,6 +4,8 @@ import { Usuario, PagoSuscripcion, PlanSuscripcion } from "@/types";
 import { NeuCard } from "@/components/ui/NeuCard";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { AthleteSubscriptionModal } from "@/components/AthleteSubscriptionModal";
+import { isAthleteAssignedOrCreatedByTrainer } from "@/utils/routineAccess";
+import { optimizeImageTo72Dpi } from "@/utils/imageOptimizer";
 import {
   CreditCard,
   DollarSign,
@@ -19,6 +21,10 @@ import {
   TrendingUp,
   X,
   Sparkles,
+  Upload,
+  Image as ImageIcon,
+  Eye,
+  FileCheck,
 } from "lucide-react";
 import {
   formatPEN,
@@ -46,14 +52,15 @@ export function TrainerMembershipsModule() {
   const isAdmin = currentUser?.rol === "admin";
   const todayStr = getTodayDateString();
 
-  // List of active athletes
+  // List of active athletes assigned or created by the current trainer (or all if admin)
   const athletes = useMemo(() => {
     return usuarios
       .filter((u) => u.rol === "cliente")
+      .filter((u) => isAthleteAssignedOrCreatedByTrainer(u, currentUser?.id, isAdmin))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
-  }, [usuarios]);
+  }, [usuarios, currentUser?.id, isAdmin]);
 
-  // Aggregate all payments across all athletes
+  // Aggregate all payments across assigned athletes
   const allPayments = useMemo<PaymentWithAthlete[]>(() => {
     const list: PaymentWithAthlete[] = [];
     athletes.forEach((ath) => {
@@ -72,7 +79,7 @@ export function TrainerMembershipsModule() {
     return list.sort((a, b) => {
       const dateDiff = new Date(b.fecha_pago).getTime() - new Date(a.fecha_pago).getTime();
       if (dateDiff !== 0) return dateDiff;
-      return new Date(b.registrado_at).getTime() - new Date(a.registrado_at).getTime();
+      return new Date(b.registrado_at || "").getTime() - new Date(a.registrado_at || "").getTime();
     });
   }, [athletes]);
 
@@ -128,6 +135,7 @@ export function TrainerMembershipsModule() {
   // Modal for New Payment
   const [isNewPaymentOpen, setIsNewPaymentOpen] = useState(false);
   const [selectedAthleteForModal, setSelectedAthleteForModal] = useState<Usuario | null>(null);
+  const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
 
   // Filtered payments
   const filteredPayments = useMemo(() => {
@@ -146,7 +154,7 @@ export function TrainerMembershipsModule() {
         const matchName = p.athleteName.toLowerCase().includes(query);
         const matchRef = p.referencia?.toLowerCase().includes(query) || false;
         const matchDni = p.athleteDni?.includes(query) || false;
-        const matchMetodo = p.metodo_pago.toLowerCase().includes(query);
+        const matchMetodo = (p.metodo_pago || "").toLowerCase().includes(query);
         if (!matchName && !matchRef && !matchDni && !matchMetodo) return false;
       }
 
@@ -167,6 +175,9 @@ export function TrainerMembershipsModule() {
   const [modalEstadoPago, setModalEstadoPago] = useState<"completado" | "pendiente">("completado");
   const [modalReferencia, setModalReferencia] = useState<string>("");
   const [modalNotas, setModalNotas] = useState<string>("");
+  const [modalComprobanteUrl, setModalComprobanteUrl] = useState<string | null>(null);
+  const [modalComprobanteNombre, setModalComprobanteNombre] = useState<string | null>(null);
+  const [isProcessingComprobante, setIsProcessingComprobante] = useState<boolean>(false);
   const [modalAutoUpdateFin, setModalAutoUpdateFin] = useState<boolean>(true);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
@@ -197,6 +208,8 @@ export function TrainerMembershipsModule() {
     setModalEstadoPago("completado");
     setModalReferencia("");
     setModalNotas("");
+    setModalComprobanteUrl(null);
+    setModalComprobanteNombre(null);
     setModalAutoUpdateFin(true);
     setIsNewPaymentOpen(true);
   };
@@ -247,6 +260,25 @@ export function TrainerMembershipsModule() {
     }
   };
 
+  // Handle voucher upload with automatic 72 DPI optimization
+  const handleComprobanteUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingComprobante(true);
+    try {
+      const result = await optimizeImageTo72Dpi(file, 1200, 0.8);
+      setModalComprobanteUrl(result.dataUrl);
+      setModalComprobanteNombre(file.name);
+    } catch (err) {
+      console.error("Error optimizando comprobante a 72 dpi:", err);
+    } finally {
+      setIsProcessingComprobante(false);
+      // Reset input value so same file can be re-selected if desired
+      e.target.value = "";
+    }
+  };
+
   // Submit payment from modal
   const handleSubmitNewPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,6 +294,8 @@ export function TrainerMembershipsModule() {
         estado: modalEstadoPago,
         referencia: modalReferencia.trim(),
         notas: modalNotas.trim(),
+        comprobante_url: modalComprobanteUrl || undefined,
+        comprobante_nombre: modalComprobanteNombre || undefined,
         registrado_at: new Date().toISOString(),
       };
 
@@ -305,10 +339,10 @@ export function TrainerMembershipsModule() {
           </div>
           <div>
             <h1 className="text-lg sm:text-xl font-black text-[var(--color-text-main)] tracking-tight">
-              Membresías y Pagos
+              Membresías
             </h1>
             <p className="text-xs text-[var(--color-text-muted)]">
-              Control de recaudación, ingresos y pagos registrados
+              Ingresos y pagos
             </p>
           </div>
         </div>
@@ -320,45 +354,47 @@ export function TrainerMembershipsModule() {
           className="px-4 py-2.5 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 shrink-0"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Registrar Nuevo Pago</span>
+          <span>Nuevo Pago</span>
         </button>
       </div>
 
-      {/* Cards de Total de Pagos Registrados (por día, por mes, por año) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Cards de Total de Pagos Registrados (Día, Mes, Año) - Altura compacta optimizada */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         {/* Total Por Día */}
         <div
           onClick={() => setFilterPeriod(filterPeriod === "dia" ? "todos" : "dia")}
-          className={`p-4 rounded-3xl cursor-pointer transition-all border ${
+          className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
             filterPeriod === "dia"
-              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.02]"
+              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
               : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border-[var(--color-text-muted)]/15"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span
-              className={`text-xs font-bold uppercase tracking-wider ${
-                filterPeriod === "dia" ? "text-white/80" : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              Total Hoy (Día)
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span
+                className={`text-[11px] font-bold uppercase tracking-wider block ${
+                  filterPeriod === "dia" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                Día
+              </span>
+              <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
+                {formatPEN(totals.dia.total)}
+              </div>
+              <div
+                className={`text-[10px] mt-0.5 ${
+                  filterPeriod === "dia" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                {totals.dia.count} {totals.dia.count === 1 ? "pago" : "pagos"}
+              </div>
+            </div>
             <div
-              className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
                 filterPeriod === "dia" ? "bg-white/20 text-white" : "shadow-neu-pressed text-emerald-500"
               }`}
             >
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black tracking-tight">{formatPEN(totals.dia.total)}</div>
-            <div
-              className={`text-[11px] mt-0.5 ${
-                filterPeriod === "dia" ? "text-white/80" : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              {totals.dia.count} {totals.dia.count === 1 ? "pago registrado" : "pagos registrados"}
+              <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
         </div>
@@ -366,36 +402,38 @@ export function TrainerMembershipsModule() {
         {/* Total Por Mes */}
         <div
           onClick={() => setFilterPeriod(filterPeriod === "mes" ? "todos" : "mes")}
-          className={`p-4 rounded-3xl cursor-pointer transition-all border ${
+          className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
             filterPeriod === "mes"
-              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.02]"
+              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
               : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border-[var(--color-text-muted)]/15"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span
-              className={`text-xs font-bold uppercase tracking-wider ${
-                filterPeriod === "mes" ? "text-white/80" : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              Total Este Mes
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span
+                className={`text-[11px] font-bold uppercase tracking-wider block ${
+                  filterPeriod === "mes" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                Mes
+              </span>
+              <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
+                {formatPEN(totals.mes.total)}
+              </div>
+              <div
+                className={`text-[10px] mt-0.5 ${
+                  filterPeriod === "mes" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                {totals.mes.count} {totals.mes.count === 1 ? "pago" : "pagos"}
+              </div>
+            </div>
             <div
-              className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
                 filterPeriod === "mes" ? "bg-white/20 text-white" : "shadow-neu-pressed text-[var(--color-accent-blue)]"
               }`}
             >
-              <Calendar className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black tracking-tight">{formatPEN(totals.mes.total)}</div>
-            <div
-              className={`text-[11px] mt-0.5 ${
-                filterPeriod === "mes" ? "text-white/80" : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              {totals.mes.count} {totals.mes.count === 1 ? "pago registrado" : "pagos registrados"}
+              <Calendar className="w-3.5 h-3.5" />
             </div>
           </div>
         </div>
@@ -403,36 +441,38 @@ export function TrainerMembershipsModule() {
         {/* Total Por Año */}
         <div
           onClick={() => setFilterPeriod(filterPeriod === "anio" ? "todos" : "anio")}
-          className={`p-4 rounded-3xl cursor-pointer transition-all border ${
+          className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
             filterPeriod === "anio"
-              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.02]"
+              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
               : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border-[var(--color-text-muted)]/15"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span
-              className={`text-xs font-bold uppercase tracking-wider ${
-                filterPeriod === "anio" ? "text-white/80" : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              Total Este Año ({currentYear})
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span
+                className={`text-[11px] font-bold uppercase tracking-wider block ${
+                  filterPeriod === "anio" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                Año
+              </span>
+              <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
+                {formatPEN(totals.anio.total)}
+              </div>
+              <div
+                className={`text-[10px] mt-0.5 ${
+                  filterPeriod === "anio" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                {totals.anio.count} {totals.anio.count === 1 ? "pago" : "pagos"}
+              </div>
+            </div>
             <div
-              className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
                 filterPeriod === "anio" ? "bg-white/20 text-white" : "shadow-neu-pressed text-amber-500"
               }`}
             >
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black tracking-tight">{formatPEN(totals.anio.total)}</div>
-            <div
-              className={`text-[11px] mt-0.5 ${
-                filterPeriod === "anio" ? "text-white/80" : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              {totals.anio.count} {totals.anio.count === 1 ? "pago registrado" : "pagos registrados"}
+              <TrendingUp className="w-3.5 h-3.5" />
             </div>
           </div>
         </div>
@@ -460,8 +500,8 @@ export function TrainerMembershipsModule() {
           )}
         </div>
 
-        {/* Filtros de Período y Estatus */}
-        <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
+        {/* Filtros de Período y Estado */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
           <div className="flex items-center bg-[var(--color-bg-base)] p-0.5 rounded-xl shadow-neu-pressed text-[11px] font-bold">
             <button
               type="button"
@@ -570,15 +610,17 @@ export function TrainerMembershipsModule() {
               No hay pagos registrados con los filtros seleccionados
             </p>
             <p className="text-[11px] text-[var(--color-text-muted)] max-w-xs">
-              Usa el botón "Registrar Nuevo Pago" para ingresar un abono para cualquier atleta.
+              Usa el botón "Nuevo Pago" para ingresar un abono para cualquier atleta.
             </p>
-            <button
-              type="button"
-              onClick={() => handleOpenNewPayment()}
-              className="mt-2 px-3 py-1.5 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90"
-            >
-              Registrar Primer Pago
-            </button>
+            {athletes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleOpenNewPayment()}
+                className="mt-2 px-3 py-1.5 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90"
+              >
+                Registrar Primer Pago
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
@@ -639,7 +681,19 @@ export function TrainerMembershipsModule() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {payment.comprobante_url && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewReceiptUrl(payment.comprobante_url || null)}
+                        className="px-2 py-1 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-emerald-600 dark:text-emerald-400 font-bold text-[11px] flex items-center gap-1 border border-emerald-500/30 transition-all active:scale-95"
+                        title="Ver Comprobante Adjunto"
+                      >
+                        <FileCheck className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="hidden sm:inline">Comprobante</span>
+                      </button>
+                    )}
+
                     <div className="text-right">
                       <div className="text-sm sm:text-base font-black text-[var(--color-text-main)]">
                         {formatPEN(payment.monto_pen)}
@@ -707,23 +761,29 @@ export function TrainerMembershipsModule() {
 
               {/* Form Content */}
               <form onSubmit={handleSubmitNewPayment} className="p-5 overflow-y-auto space-y-4 flex-1">
-                {/* Seleccionar Atleta */}
+                {/* Seleccionar Atleta - Solo asignados al entrenador actual */}
                 <div>
                   <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
                     Atleta
                   </label>
-                  <select
-                    required
-                    value={modalAthleteId}
-                    onChange={(e) => handleModalAthleteChange(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-semibold"
-                  >
-                    {athletes.map((ath) => (
-                      <option key={ath.id} value={ath.id}>
-                        {ath.nombre} {ath.dni ? `(DNI: ${ath.dni})` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  {athletes.length === 0 ? (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs font-medium">
+                      No tienes atletas asignados actualmente para registrar pagos.
+                    </div>
+                  ) : (
+                    <select
+                      required
+                      value={modalAthleteId}
+                      onChange={(e) => handleModalAthleteChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-semibold"
+                    >
+                      {athletes.map((ath) => (
+                        <option key={ath.id} value={ath.id}>
+                          {ath.nombre} {ath.dni ? `(DNI: ${ath.dni})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {/* Botones que sugieren los planes actuales */}
@@ -761,7 +821,7 @@ export function TrainerMembershipsModule() {
                   </div>
                 </div>
 
-                {/* Fecha de Pago y Monto Pagado (con opción a cambio manual) */}
+                {/* Fecha de Pago y Monto Pagado */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
@@ -794,9 +854,6 @@ export function TrainerMembershipsModule() {
                         className="w-full pl-8 pr-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold"
                       />
                     </div>
-                    <span className="text-[10px] text-[var(--color-text-muted)] mt-0.5 block">
-                      Editable manualmente
-                    </span>
                   </div>
                 </div>
 
@@ -870,6 +927,79 @@ export function TrainerMembershipsModule() {
                   </div>
                 </div>
 
+                {/* Subir Comprobante (Resolución 72 DPI automática para la nube) */}
+                <div className="space-y-1.5 p-3 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15">
+                  <label className="block text-xs font-bold text-[var(--color-text-main)] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+                      Comprobante de Pago
+                    </span>
+                    <span className="text-[10px] text-[var(--color-text-muted)] font-normal">
+                      Optimizado a 72 DPI
+                    </span>
+                  </label>
+
+                  {modalComprobanteUrl ? (
+                    <div className="p-2.5 rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-emerald-500/40 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={modalComprobanteUrl}
+                          alt="Comprobante"
+                          onClick={() => setPreviewReceiptUrl(modalComprobanteUrl)}
+                          className="w-12 h-12 object-cover rounded-lg shadow-neu-flat cursor-pointer border border-emerald-500/30 hover:opacity-90 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block truncate">
+                            {modalComprobanteNombre || "Comprobante cargado"}
+                          </span>
+                          <span className="text-[10px] text-[var(--color-text-muted)] block">
+                            Listo para guardar en Firestore
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewReceiptUrl(modalComprobanteUrl)}
+                          className="p-1.5 text-xs font-bold text-[var(--color-accent-blue)] rounded-lg shadow-neu-flat hover:shadow-neu-pressed"
+                          title="Ver imagen completa"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalComprobanteUrl(null);
+                            setModalComprobanteNombre(null);
+                          }}
+                          className="p-1.5 text-xs font-bold text-red-500 rounded-lg shadow-neu-flat hover:shadow-neu-pressed"
+                          title="Eliminar comprobante"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed active:scale-95 transition-all border border-[var(--color-accent-blue)]/30">
+                        <Upload className="w-4 h-4" />
+                        <span>{isProcessingComprobante ? "Optimizando a 72 DPI..." : "Subir Comprobante"}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleComprobanteUpload}
+                          disabled={isProcessingComprobante}
+                        />
+                      </label>
+                      <span className="block text-[10px] text-[var(--color-text-muted)] mt-1">
+                        Formatos JPG, PNG, WEBP. Se convierte automáticamente a resolución 72 DPI antes de subirse a la nube.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Referencia y Notas */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -910,13 +1040,56 @@ export function TrainerMembershipsModule() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmittingPayment}
+                    disabled={isSubmittingPayment || isProcessingComprobante || athletes.length === 0}
                     className="px-4 py-2 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90 disabled:opacity-50"
                   >
                     {isSubmittingPayment ? "Guardando..." : "Guardar Pago"}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Vista Previa de Comprobante / Recibo */}
+      <AnimatePresence>
+        {previewReceiptUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => setPreviewReceiptUrl(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-[var(--color-bg-base)] p-3 rounded-3xl max-w-lg w-full shadow-2xl border border-[var(--color-text-muted)]/20 overflow-hidden flex flex-col gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-2 pt-1">
+                <span className="text-xs font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
+                  <FileCheck className="w-4 h-4 text-emerald-500" />
+                  Comprobante de Pago Adjunto (72 DPI)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewReceiptUrl(null)}
+                  className="p-1.5 rounded-full shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="rounded-2xl overflow-hidden bg-black/5 flex items-center justify-center max-h-[70vh]">
+                <img
+                  src={previewReceiptUrl}
+                  alt="Comprobante completo"
+                  className="max-h-[70vh] w-auto object-contain rounded-xl"
+                />
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -933,3 +1106,4 @@ export function TrainerMembershipsModule() {
     </div>
   );
 }
+
