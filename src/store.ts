@@ -106,18 +106,27 @@ interface AppState {
   eliminarPagoSuscripcion: (athleteId: string, pagoId: string) => Promise<void>;
 }
 
-function cleanObject<T extends Record<string, any>>(obj: T): T {
-  const result: any = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
-      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-        result[key] = cleanObject(value);
-      } else {
-        result[key] = value;
+function cleanObject<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => (item !== null && typeof item === 'object' ? cleanObject(item) : item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj as Record<string, any>)) {
+      if (value !== undefined) {
+        if (value !== null && typeof value === 'object') {
+          result[key] = cleanObject(value);
+        } else {
+          result[key] = value;
+        }
       }
     }
+    return result;
   }
-  return result;
+  return obj;
 }
 
 const mockUsuarios: Usuario[] = [
@@ -1480,7 +1489,7 @@ export const useStore = create<AppState>((set, get) => ({
       ...athlete,
       suscripcion: {
         ...suscripcion,
-        historial_pagos: suscripcion.historial_pagos || athlete.suscripcion?.historial_pagos || [],
+        historial_pagos: suscripcion.historial_pagos !== undefined ? suscripcion.historial_pagos : (athlete.suscripcion?.historial_pagos || []),
         ultima_actualizacion: new Date().toISOString(),
       },
     };
@@ -1497,7 +1506,10 @@ export const useStore = create<AppState>((set, get) => ({
       fecha_fin: pago.fecha_pago,
     };
     const historial = existingSuscripcion.historial_pagos || [];
-    const updatedHistorial = [pago, ...historial.filter((p) => p.id !== pago.id)];
+    const exists = historial.some((p) => p.id === pago.id);
+    const updatedHistorial = exists
+      ? historial.map((p) => (p.id === pago.id ? { ...p, ...pago } : p))
+      : [pago, ...historial];
 
     const updatedUser: Usuario = {
       ...athlete,

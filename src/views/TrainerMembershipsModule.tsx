@@ -180,6 +180,7 @@ export function TrainerMembershipsModule() {
   // Modal for New Payment
   const [isNewPaymentOpen, setIsNewPaymentOpen] = useState(false);
   const [selectedAthleteForModal, setSelectedAthleteForModal] = useState<Usuario | null>(null);
+  const [selectedPaymentIdForModal, setSelectedPaymentIdForModal] = useState<string | null>(null);
   const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
 
   // Filtered payments
@@ -906,15 +907,32 @@ export function TrainerMembershipsModule() {
                         </div>
 
                         {ath && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAthleteForModal(ath)}
-                            className="p-2 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] active:scale-95 transition-all"
-                            title="Abrir Control de Membresía del Atleta"
-                            aria-label="Abrir Control de Membresía"
-                          >
-                            <ArrowUpRight className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPaymentIdForModal(payment.id);
+                                setSelectedAthleteForModal(ath);
+                              }}
+                              className="p-2 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] active:scale-95 transition-all"
+                              title="Editar este Pago"
+                              aria-label="Editar este Pago"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPaymentIdForModal(null);
+                                setSelectedAthleteForModal(ath);
+                              }}
+                              className="p-2 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] active:scale-95 transition-all"
+                              title="Abrir Control de Membresía del Atleta"
+                              aria-label="Abrir Control de Membresía"
+                            >
+                              <ArrowUpRight className="w-4 h-4" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1612,7 +1630,11 @@ export function TrainerMembershipsModule() {
       <AthleteSubscriptionModal
         athlete={selectedAthleteForModal}
         isOpen={!!selectedAthleteForModal}
-        onClose={() => setSelectedAthleteForModal(null)}
+        initialPaymentIdToEdit={selectedPaymentIdForModal}
+        onClose={() => {
+          setSelectedAthleteForModal(null);
+          setSelectedPaymentIdForModal(null);
+        }}
       />
 
       {/* Modal: Copiar Planes entre Entrenadores (Admin) */}

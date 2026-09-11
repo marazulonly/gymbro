@@ -38,14 +38,17 @@ interface AthleteSubscriptionModalProps {
   athlete: Usuario | null;
   isOpen: boolean;
   onClose: () => void;
+  initialPaymentIdToEdit?: string | null;
 }
 
 export function AthleteSubscriptionModal({
   athlete,
   isOpen,
   onClose,
+  initialPaymentIdToEdit,
 }: AthleteSubscriptionModalProps) {
   const {
+    usuarios,
     currentUser,
     planesSuscripcion,
     updateUsuarioSuscripcion,
@@ -59,8 +62,16 @@ export function AthleteSubscriptionModal({
 
   const [activeTab, setActiveTab] = useState<"suscripcion" | "planes" | "semaforo">("suscripcion");
 
+  // Keep athlete reactive with the Zustand store
+  const currentAthlete = useMemo(() => {
+    if (!athlete) return null;
+    return usuarios.find((u) => u.id === athlete.id) || athlete;
+  }, [usuarios, athlete]);
+
+  const activeAthlete = currentAthlete || athlete;
+
   // Filtrar planes exclusivos del entrenador asignado a este atleta
-  const effectiveTrainerId = athlete?.id_entrenador || (currentUser?.rol === "entrenador" ? currentUser?.id : undefined);
+  const effectiveTrainerId = activeAthlete?.id_entrenador || (currentUser?.rol === "entrenador" ? currentUser?.id : undefined);
   const visiblePlans = useMemo(() => {
     if (!effectiveTrainerId) return planesSuscripcion;
     const filtered = planesSuscripcion.filter((p) => isPlanOfTrainer(p, effectiveTrainerId));
@@ -68,7 +79,7 @@ export function AthleteSubscriptionModal({
   }, [planesSuscripcion, effectiveTrainerId]);
 
   // Form states for Athlete Subscription
-  const existingSub = athlete?.suscripcion;
+  const existingSub = activeAthlete?.suscripcion;
   const todayStr = useMemo(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -114,17 +125,34 @@ export function AthleteSubscriptionModal({
   const [editPlanDesc, setEditPlanDesc] = useState<string>("");
   const [isCreatingNewPlan, setIsCreatingNewPlan] = useState(false);
 
+  // Start editing a payment function
+  const handleStartEditPayment = (pago: PagoSuscripcion) => {
+    setEditingPaymentId(pago.id);
+    setPaymentFecha(pago.fecha_pago || todayStr);
+    setPaymentMonto(pago.monto_pen);
+    setPaymentMetodo(pago.metodo_pago || "Efectivo");
+    setPaymentEstado(pago.estado);
+    setPaymentReferencia(pago.referencia || "");
+    setPaymentNotas(pago.notas || "");
+    setPaymentSuggestedPlanId(pago.id_plan || null);
+    setPaymentSuggestedPlanName(pago.nombre_plan || "");
+    setPaymentAutoUpdateEnd(false);
+    setPaymentProjectedEnd(activeAthlete?.suscripcion?.fecha_fin || todayStr);
+    setShowAddPayment(true);
+  };
+
   // Sync state when athlete changes or modal opens
   useEffect(() => {
-    if (!athlete) return;
-    if (athlete.suscripcion) {
-      setSelectedPlanId(athlete.suscripcion.id_plan || "");
-      setNombrePlan(athlete.suscripcion.nombre_plan || "Plan 1 mes");
-      setDuracionMeses(athlete.suscripcion.duracion_meses || 1);
-      setPrecioPen(athlete.suscripcion.precio_pen ?? 300);
-      setFechaInicio(athlete.suscripcion.fecha_inicio || todayStr);
-      setFechaFin(athlete.suscripcion.fecha_fin || calculateSubscriptionEndDate(todayStr, 1));
-      setNotasSub(athlete.suscripcion.notas || "");
+    if (!athlete || !isOpen) return;
+    const ath = usuarios.find((u) => u.id === athlete.id) || athlete;
+    if (ath.suscripcion) {
+      setSelectedPlanId(ath.suscripcion.id_plan || "");
+      setNombrePlan(ath.suscripcion.nombre_plan || "Plan 1 mes");
+      setDuracionMeses(ath.suscripcion.duracion_meses || 1);
+      setPrecioPen(ath.suscripcion.precio_pen ?? 300);
+      setFechaInicio(ath.suscripcion.fecha_inicio || todayStr);
+      setFechaFin(ath.suscripcion.fecha_fin || calculateSubscriptionEndDate(todayStr, 1));
+      setNotasSub(ath.suscripcion.notas || "");
     } else {
       setSelectedPlanId("plan_1m");
       setNombrePlan("Plan 1 mes");
@@ -134,7 +162,14 @@ export function AthleteSubscriptionModal({
       setFechaFin(calculateSubscriptionEndDate(todayStr, 1));
       setNotasSub("");
     }
-  }, [athlete, todayStr, isOpen]);
+
+    if (initialPaymentIdToEdit) {
+      const targetPay = ath.suscripcion?.historial_pagos?.find((p) => p.id === initialPaymentIdToEdit);
+      if (targetPay) {
+        handleStartEditPayment(targetPay);
+      }
+    }
+  }, [athlete?.id, isOpen, initialPaymentIdToEdit]);
 
   // Live calculation of Semaphore based on the current fechaFin in the form
   const semaforoInfo = useMemo(() => {
@@ -168,11 +203,13 @@ export function AthleteSubscriptionModal({
 
   // Save athlete subscription changes
   const handleSaveSubscription = async () => {
-    if (!athlete) return;
+    if (!activeAthlete) return;
     setIsSavingSub(true);
     setSaveSuccessMessage(null);
     try {
+      const freshUser = useStore.getState().usuarios.find((u) => u.id === activeAthlete.id) || activeAthlete;
       const subData: SuscripcionAtleta = {
+        ...(freshUser.suscripcion || {}),
         id_plan: selectedPlanId,
         nombre_plan: nombrePlan,
         duracion_meses: duracionMeses,
@@ -180,9 +217,9 @@ export function AthleteSubscriptionModal({
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
         notas: notasSub,
-        historial_pagos: athlete.suscripcion?.historial_pagos || [],
+        historial_pagos: freshUser.suscripcion?.historial_pagos || [],
       };
-      await updateUsuarioSuscripcion(athlete.id, subData);
+      await updateUsuarioSuscripcion(activeAthlete.id, subData);
       setSaveSuccessMessage("Suscripción y fechas actualizadas correctamente.");
       setTimeout(() => setSaveSuccessMessage(null), 3000);
     } catch (err) {
@@ -190,19 +227,6 @@ export function AthleteSubscriptionModal({
     } finally {
       setIsSavingSub(false);
     }
-  };
-
-  // Start editing a payment
-  const handleStartEditPayment = (pago: PagoSuscripcion) => {
-    setEditingPaymentId(pago.id);
-    setPaymentFecha(pago.fecha_pago || todayStr);
-    setPaymentMonto(pago.monto_pen);
-    setPaymentMetodo(pago.metodo_pago || "Efectivo");
-    setPaymentEstado(pago.estado);
-    setPaymentReferencia(pago.referencia || "");
-    setPaymentNotas(pago.notas || "");
-    setPaymentProjectedEnd(athlete?.suscripcion?.fecha_fin || todayStr);
-    setShowAddPayment(true);
   };
 
   // Reset payment form
@@ -215,47 +239,55 @@ export function AthleteSubscriptionModal({
     setPaymentSuggestedPlanName("");
     setPaymentMonto(precioPen || 300);
     setPaymentFecha(todayStr);
+    setPaymentAutoUpdateEnd(true);
   };
 
   // Add or update payment
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeAthlete) return;
     const numMonto = Number(paymentMonto);
-    if (!athlete || !paymentMonto || isNaN(numMonto) || numMonto <= 0) return;
+    if (!paymentMonto || isNaN(numMonto) || numMonto <= 0) return;
 
     setIsSavingPayment(true);
     try {
+      const freshUser = useStore.getState().usuarios.find((u) => u.id === activeAthlete.id) || activeAthlete;
       const existingPay = editingPaymentId
-        ? athlete.suscripcion?.historial_pagos?.find((p) => p.id === editingPaymentId)
+        ? (freshUser.suscripcion?.historial_pagos || []).find((p) => p.id === editingPaymentId)
         : null;
 
       const paymentToSave: PagoSuscripcion = {
-        id: editingPaymentId || `pay_${Date.now()}`,
+        ...(existingPay || {}),
+        id: editingPaymentId || `pay_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         fecha_pago: paymentFecha,
         monto_pen: numMonto,
         metodo_pago: paymentMetodo,
         estado: paymentEstado,
-        referencia: paymentReferencia.trim(),
-        notas: paymentNotas.trim(),
+        referencia: paymentReferencia.trim() || undefined,
+        notas: paymentNotas.trim() || undefined,
         registrado_at: existingPay?.registrado_at || new Date().toISOString(),
       };
-      await registrarPagoSuscripcion(athlete.id, paymentToSave);
+
+      if (paymentSuggestedPlanId) {
+        paymentToSave.id_plan = paymentSuggestedPlanId;
+      }
+      if (paymentSuggestedPlanName) {
+        paymentToSave.nombre_plan = paymentSuggestedPlanName;
+      }
+
+      await registrarPagoSuscripcion(activeAthlete.id, paymentToSave);
 
       // Auto update athlete subscription end date if requested and completed
       if (paymentEstado === "completado" && paymentAutoUpdateEnd && paymentProjectedEnd) {
-        await updateUsuarioSuscripcion(athlete.id, {
-          ...(athlete.suscripcion || {
-            id_plan: paymentSuggestedPlanId || selectedPlanId,
-            nombre_plan: paymentSuggestedPlanName || nombrePlan,
-            duracion_meses: duracionMeses,
-            precio_pen: numMonto,
-            fecha_inicio: fechaInicio,
+        const userAfterPayment = useStore.getState().usuarios.find((u) => u.id === activeAthlete.id) || activeAthlete;
+        const currentSub = userAfterPayment.suscripcion;
+        if (currentSub) {
+          await updateUsuarioSuscripcion(activeAthlete.id, {
+            ...currentSub,
             fecha_fin: paymentProjectedEnd,
-            historial_pagos: [],
-          }),
-          fecha_fin: paymentProjectedEnd,
-          nombre_plan: paymentSuggestedPlanName || athlete.suscripcion?.nombre_plan || nombrePlan,
-        });
+            nombre_plan: paymentSuggestedPlanName || currentSub.nombre_plan || nombrePlan,
+          });
+        }
         setFechaFin(paymentProjectedEnd);
       }
 
@@ -269,12 +301,12 @@ export function AthleteSubscriptionModal({
 
   // Delete payment
   const handleDeletePayment = async (paymentId: string) => {
-    if (!athlete) return;
+    if (!activeAthlete) return;
     if (!confirm("¿Deseas eliminar este registro de pago?")) return;
     if (editingPaymentId === paymentId) {
       handleCancelPaymentForm();
     }
-    await eliminarPagoSuscripcion(athlete.id, paymentId);
+    await eliminarPagoSuscripcion(activeAthlete.id, paymentId);
   };
 
   // Plan catalog editing handlers
@@ -328,7 +360,7 @@ export function AthleteSubscriptionModal({
 
   if (!isOpen || !athlete) return null;
 
-  const pagosHistorial = athlete.suscripcion?.historial_pagos || [];
+  const pagosHistorial = activeAthlete?.suscripcion?.historial_pagos || [];
   const totalPagado = pagosHistorial
     .filter((p) => p.estado === "completado")
     .reduce((sum, p) => sum + (p.monto_pen || 0), 0);
@@ -356,10 +388,10 @@ export function AthleteSubscriptionModal({
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-[var(--color-text-main)] flex items-center gap-2">
                   <span>Control de Membresía</span>
-                  <span className="text-xs font-normal text-[var(--color-text-muted)]">• {athlete.nombre}</span>
+                  <span className="text-xs font-normal text-[var(--color-text-muted)]">• {activeAthlete?.nombre}</span>
                 </h2>
                 <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-                  <span>DNI: {athlete.dni}</span>
+                  <span>DNI: {activeAthlete?.dni}</span>
                   <span>•</span>
                   <span>Plan actual: <strong className="text-[var(--color-text-main)]">{nombrePlan}</strong></span>
                 </div>
@@ -502,7 +534,7 @@ export function AthleteSubscriptionModal({
                           )}
                         </span>
                         <span className="text-[10px] text-[var(--color-text-muted)]">
-                          Comprobante para {athlete.nombre}
+                          Comprobante para {activeAthlete?.nombre}
                         </span>
                       </div>
 
@@ -528,9 +560,9 @@ export function AthleteSubscriptionModal({
                                   setPaymentSuggestedPlanName(p.nombre);
                                   setPaymentMonto(p.precio_pen);
                                   const base =
-                                    athlete.suscripcion?.fecha_fin &&
-                                    athlete.suscripcion.fecha_fin >= paymentFecha
-                                      ? athlete.suscripcion.fecha_fin
+                                    activeAthlete?.suscripcion?.fecha_fin &&
+                                    activeAthlete.suscripcion.fecha_fin >= paymentFecha
+                                      ? activeAthlete.suscripcion.fecha_fin
                                       : paymentFecha;
                                   setPaymentProjectedEnd(
                                     calculateSubscriptionEndDate(base, p.duracion_meses)
@@ -569,9 +601,9 @@ export function AthleteSubscriptionModal({
                                 );
                                 if (foundPlan) {
                                   const base =
-                                    athlete.suscripcion?.fecha_fin &&
-                                    athlete.suscripcion.fecha_fin >= newDate
-                                      ? athlete.suscripcion.fecha_fin
+                                    activeAthlete?.suscripcion?.fecha_fin &&
+                                    activeAthlete.suscripcion.fecha_fin >= newDate
+                                      ? activeAthlete.suscripcion.fecha_fin
                                       : newDate;
                                   setPaymentProjectedEnd(
                                     calculateSubscriptionEndDate(base, foundPlan.duracion_meses)
@@ -1151,7 +1183,7 @@ export function AthleteSubscriptionModal({
 
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-xs text-[var(--color-text-muted)]">
-                    Atleta: <strong className="text-[var(--color-text-main)]">{athlete.nombre}</strong> (Vencimiento: {fechaFin})
+                    Atleta: <strong className="text-[var(--color-text-main)]">{activeAthlete?.nombre}</strong> (Vencimiento: {fechaFin})
                   </span>
                   <button
                     type="button"
