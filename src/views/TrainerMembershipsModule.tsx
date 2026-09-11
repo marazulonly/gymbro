@@ -35,15 +35,20 @@ import {
   PieChart,
   Tag,
   Sliders,
-  AlertTriangle
+  AlertTriangle,
+  Copy,
 } from "lucide-react";
 import {
   formatPEN,
   formatDateDisplay,
   getTodayDateString,
   calculateSubscriptionEndDate,
-  calcularSemaforoPago
+  calcularSemaforoPago,
+  isPlanOfTrainer,
+  createPlanCopyForTrainer,
+  DEFAULT_PLANES_SUSCRIPCION,
 } from "@/utils/subscriptionUtils";
+import { AdminCopyPlansModal } from "@/components/AdminCopyPlansModal";
 import { motion, AnimatePresence } from "motion/react";
 
 interface PaymentWithAthlete extends PagoSuscripcion {
@@ -221,10 +226,26 @@ export function TrainerMembershipsModule() {
   const [modalAutoUpdateFin, setModalAutoUpdateFin] = useState<boolean>(true);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
-  // Plans belonging to this trainer (or general plans if none)
+  // List of all trainers/admins in system
+  const trainers = useMemo(() => {
+    return usuarios.filter((u) => u.rol === "entrenador" || u.rol === "admin");
+  }, [usuarios]);
+
+  // Admin filter state for viewing plans of a specific trainer
+  const [adminSelectedTrainerId, setAdminSelectedTrainerId] = useState<string>("todos");
+  const [isAdminCopyModalOpen, setIsAdminCopyModalOpen] = useState<boolean>(false);
+
+  // Plans belonging uniquely to this trainer (or filtered for admin)
   const trainerPlans = useMemo(() => {
-    return planesSuscripcion.filter((p) => !p.id_entrenador || p.id_entrenador === currentUser?.id);
-  }, [planesSuscripcion, currentUser?.id]);
+    if (isAdmin) {
+      if (adminSelectedTrainerId === "todos") {
+        return planesSuscripcion;
+      }
+      return planesSuscripcion.filter((p) => isPlanOfTrainer(p, adminSelectedTrainerId));
+    }
+    // Para un entrenador, sólo mostrar los planes que ha creado
+    return planesSuscripcion.filter((p) => isPlanOfTrainer(p, currentUser?.id));
+  }, [planesSuscripcion, currentUser?.id, isAdmin, adminSelectedTrainerId]);
 
   // States for Plan Creation & Editing Modal
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
@@ -235,6 +256,24 @@ export function TrainerMembershipsModule() {
   const [planFormDescripcion, setPlanFormDescripcion] = useState("");
   const [planFormActivo, setPlanFormActivo] = useState(true);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
+
+  // Copy plans between trainers (Admin action)
+  const handleAdminCopyPlans = async (plansToCopy: PlanSuscripcion[], targetTrainerId: string) => {
+    for (const plan of plansToCopy) {
+      const cloned = createPlanCopyForTrainer(plan, targetTrainerId);
+      await addPlanSuscripcion(cloned);
+    }
+  };
+
+  // Import base default plans for the current trainer if they have none
+  const handleInitializeBasePlans = async () => {
+    if (!currentUser) return;
+    const targetTrainerId = isAdmin && adminSelectedTrainerId !== "todos" ? adminSelectedTrainerId : currentUser.id;
+    for (const basePlan of DEFAULT_PLANES_SUSCRIPCION) {
+      const cloned = createPlanCopyForTrainer(basePlan, targetTrainerId);
+      await addPlanSuscripcion(cloned);
+    }
+  };
 
   // Pre-select first athlete when opening new payment modal
   const handleOpenNewPayment = (athleteId?: string) => {
@@ -408,6 +447,7 @@ export function TrainerMembershipsModule() {
     setIsSavingPlan(true);
     try {
       if (editingPlan) {
+        const ownerId = editingPlan.id_entrenador || (isAdmin && adminSelectedTrainerId !== "todos" ? adminSelectedTrainerId : currentUser?.id);
         const updated: PlanSuscripcion = {
           ...editingPlan,
           nombre: planFormNombre.trim(),
@@ -415,10 +455,11 @@ export function TrainerMembershipsModule() {
           precio_pen: Number(planFormPrecio) || 0,
           descripcion: planFormDescripcion.trim() || undefined,
           activo: planFormActivo,
-          id_entrenador: editingPlan.id_entrenador || currentUser?.id,
+          id_entrenador: ownerId,
         };
         await updatePlanSuscripcion(updated);
       } else {
+        const ownerId = isAdmin && adminSelectedTrainerId !== "todos" ? adminSelectedTrainerId : (currentUser?.id || "entrenador1");
         const newPlan: PlanSuscripcion = {
           id: `plan_tr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           nombre: planFormNombre.trim(),
@@ -426,7 +467,7 @@ export function TrainerMembershipsModule() {
           precio_pen: Number(planFormPrecio) || 0,
           descripcion: planFormDescripcion.trim() || undefined,
           activo: planFormActivo,
-          id_entrenador: currentUser?.id,
+          id_entrenador: ownerId,
         };
         await addPlanSuscripcion(newPlan);
       }
@@ -517,43 +558,43 @@ export function TrainerMembershipsModule() {
         /* DASHBOARD CONSOLIDADO DE PAGOS                                            */
         /* ========================================================================= */
         <div className="space-y-4">
-          {/* Cards de Total de Pagos Registrados (Día, Mes, Año) - Mantiene botones con altura reducida */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Cards de Total de Pagos Registrados (Día, Mes, Año) - Tres columnas en móvil y escritorio */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
             {/* Total Por Día */}
             <div
               onClick={() => setFilterPeriod(filterPeriod === "dia" ? "todos" : "dia")}
-              className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
+              className={`py-2 px-2 sm:py-2.5 sm:px-3.5 rounded-2xl cursor-pointer transition-all border flex flex-col justify-between ${
                 filterPeriod === "dia"
                   ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
                   : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border border-[var(--color-text-muted)]/15"
               }`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span
-                    className={`text-[11px] font-bold uppercase tracking-wider block ${
-                      filterPeriod === "dia" ? "text-white/85" : "text-[var(--color-text-muted)]"
-                    }`}
-                  >
-                    Día
-                  </span>
-                  <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
-                    {formatPEN(totals.dia.total)}
-                  </div>
-                  <div
-                    className={`text-[10px] mt-0.5 ${
-                      filterPeriod === "dia" ? "text-white/80" : "text-[var(--color-text-muted)]"
-                    }`}
-                  >
-                    {totals.dia.count} {totals.dia.count === 1 ? "pago" : "pagos"}
-                  </div>
-                </div>
+              <div className="flex items-center justify-between gap-1">
+                <span
+                  className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider block truncate ${
+                    filterPeriod === "dia" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  Día
+                </span>
                 <div
-                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${
                     filterPeriod === "dia" ? "bg-white/20 text-white" : "shadow-neu-pressed text-emerald-500"
                   }`}
                 >
-                  <Clock className="w-3.5 h-3.5" />
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </div>
+              </div>
+              <div className="mt-1 min-w-0">
+                <div className="text-sm sm:text-base md:text-xl font-black tracking-tight leading-tight truncate">
+                  {formatPEN(totals.dia.total)}
+                </div>
+                <div
+                  className={`text-[9px] sm:text-[10px] mt-0.5 truncate ${
+                    filterPeriod === "dia" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  {totals.dia.count} {totals.dia.count === 1 ? "pago" : "pagos"}
                 </div>
               </div>
             </div>
@@ -561,38 +602,38 @@ export function TrainerMembershipsModule() {
             {/* Total Por Mes */}
             <div
               onClick={() => setFilterPeriod(filterPeriod === "mes" ? "todos" : "mes")}
-              className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
+              className={`py-2 px-2 sm:py-2.5 sm:px-3.5 rounded-2xl cursor-pointer transition-all border flex flex-col justify-between ${
                 filterPeriod === "mes"
                   ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
                   : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border border-[var(--color-text-muted)]/15"
               }`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span
-                    className={`text-[11px] font-bold uppercase tracking-wider block ${
-                      filterPeriod === "mes" ? "text-white/85" : "text-[var(--color-text-muted)]"
-                    }`}
-                  >
-                    Mes
-                  </span>
-                  <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
-                    {formatPEN(totals.mes.total)}
-                  </div>
-                  <div
-                    className={`text-[10px] mt-0.5 ${
-                      filterPeriod === "mes" ? "text-white/80" : "text-[var(--color-text-muted)]"
-                    }`}
-                  >
-                    {totals.mes.count} {totals.mes.count === 1 ? "pago" : "pagos"}
-                  </div>
-                </div>
+              <div className="flex items-center justify-between gap-1">
+                <span
+                  className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider block truncate ${
+                    filterPeriod === "mes" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  Mes
+                </span>
                 <div
-                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${
                     filterPeriod === "mes" ? "bg-white/20 text-white" : "shadow-neu-pressed text-[var(--color-accent-blue)]"
                   }`}
                 >
-                  <Calendar className="w-3.5 h-3.5" />
+                  <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </div>
+              </div>
+              <div className="mt-1 min-w-0">
+                <div className="text-sm sm:text-base md:text-xl font-black tracking-tight leading-tight truncate">
+                  {formatPEN(totals.mes.total)}
+                </div>
+                <div
+                  className={`text-[9px] sm:text-[10px] mt-0.5 truncate ${
+                    filterPeriod === "mes" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  {totals.mes.count} {totals.mes.count === 1 ? "pago" : "pagos"}
                 </div>
               </div>
             </div>
@@ -600,38 +641,38 @@ export function TrainerMembershipsModule() {
             {/* Total Por Año */}
             <div
               onClick={() => setFilterPeriod(filterPeriod === "anio" ? "todos" : "anio")}
-              className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
+              className={`py-2 px-2 sm:py-2.5 sm:px-3.5 rounded-2xl cursor-pointer transition-all border flex flex-col justify-between ${
                 filterPeriod === "anio"
                   ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
                   : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border border-[var(--color-text-muted)]/15"
               }`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span
-                    className={`text-[11px] font-bold uppercase tracking-wider block ${
-                      filterPeriod === "anio" ? "text-white/85" : "text-[var(--color-text-muted)]"
-                    }`}
-                  >
-                    Año
-                  </span>
-                  <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
-                    {formatPEN(totals.anio.total)}
-                  </div>
-                  <div
-                    className={`text-[10px] mt-0.5 ${
-                      filterPeriod === "anio" ? "text-white/80" : "text-[var(--color-text-muted)]"
-                    }`}
-                  >
-                    {totals.anio.count} {totals.anio.count === 1 ? "pago" : "pagos"}
-                  </div>
-                </div>
+              <div className="flex items-center justify-between gap-1">
+                <span
+                  className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider block truncate ${
+                    filterPeriod === "anio" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  Año
+                </span>
                 <div
-                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${
                     filterPeriod === "anio" ? "bg-white/20 text-white" : "shadow-neu-pressed text-amber-500"
                   }`}
                 >
-                  <TrendingUp className="w-3.5 h-3.5" />
+                  <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </div>
+              </div>
+              <div className="mt-1 min-w-0">
+                <div className="text-sm sm:text-base md:text-xl font-black tracking-tight leading-tight truncate">
+                  {formatPEN(totals.anio.total)}
+                </div>
+                <div
+                  className={`text-[9px] sm:text-[10px] mt-0.5 truncate ${
+                    filterPeriod === "anio" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  {totals.anio.count} {totals.anio.count === 1 ? "pago" : "pagos"}
                 </div>
               </div>
             </div>
@@ -888,97 +929,187 @@ export function TrainerMembershipsModule() {
         /* CATÁLOGO DE PLANES DEL ENTRENADOR                                         */
         /* ========================================================================= */
         <div className="space-y-4">
-          {/* Banner informativo sobre planes del entrenador */}
-          <div className="p-4 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-[var(--color-text-muted)]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+          {/* Header del Catálogo de Planes con controles de Entrenador y Administrador */}
+          <div className="p-3.5 sm:p-4 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-[var(--color-text-muted)]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-[var(--color-text-main)]">
                 Planes de Suscripción Exclusivos
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--color-accent-blue)]/15 text-[var(--color-accent-blue)]">
-                Privado para tus Atletas
+                {isAdmin ? "Gestión de Planes" : "Privado para tus Atletas"}
               </span>
+
+              {/* Filtro de Entrenador (Exclusivo Administrador) */}
+              {isAdmin && (
+                <div className="flex items-center gap-1.5 ml-0 sm:ml-2">
+                  <span className="text-[11px] font-bold text-[var(--color-text-muted)]">Ver de:</span>
+                  <select
+                    value={adminSelectedTrainerId}
+                    onChange={(e) => setAdminSelectedTrainerId(e.target.value)}
+                    className="py-1 px-2.5 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/20 text-xs font-bold text-[var(--color-text-main)] outline-none"
+                  >
+                    <option value="todos">Todos los entrenadores</option>
+                    {trainers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
-            <button
-              type="button"
-              onClick={handleOpenCreatePlan}
-              className="px-4 py-2.5 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 shrink-0"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Crear Nuevo Plan</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Botón Administrador: Copiar Planes entre Entrenadores */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsAdminCopyModalOpen(true)}
+                  className="px-3.5 py-2 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] font-bold text-xs flex items-center gap-1.5 border border-[var(--color-accent-blue)]/30 active:scale-95 transition-all"
+                  title="Copiar planes de un entrenador a otro"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copiar Planes</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleOpenCreatePlan}
+                className="px-4 py-2 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 shrink-0"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>Crear Nuevo Plan</span>
+              </button>
+            </div>
           </div>
 
-          {/* Grid de Planes de Suscripción */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {trainerPlans.map((plan) => {
-              const isCustom = !!plan.id_entrenador && plan.id_entrenador === currentUser?.id;
-              const isActive = plan.activo !== false;
-
-              return (
-                <div
-                  key={plan.id}
-                  className={`p-4 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border transition-all flex flex-col justify-between gap-3 ${
-                    !isActive
-                      ? "opacity-60 border-dashed border-[var(--color-text-muted)]/30"
-                      : "border-[var(--color-text-muted)]/15 hover:shadow-neu-pressed"
-                  }`}
+          {/* Estado Vacío si el Entrenador no tiene planes */}
+          {trainerPlans.length === 0 ? (
+            <div className="p-6 sm:p-8 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl shadow-neu-pressed mx-auto flex items-center justify-center text-[var(--color-accent-blue)]">
+                <Layers className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-[var(--color-text-main)]">
+                No hay planes registrados en este catálogo
+              </h3>
+              <p className="text-xs text-[var(--color-text-muted)] max-w-sm mx-auto">
+                {isAdmin
+                  ? "Este entrenador aún no tiene planes asignados. Puedes crear uno nuevo o copiar planes de otro entrenador."
+                  : "Aún no tienes planes creados para tus atletas. Crea uno nuevo o importa los planes base del sistema."}
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleOpenCreatePlan}
+                  className="px-4 py-2 rounded-xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Crear Plan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleInitializeBasePlans}
+                  className="px-4 py-2 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-text-main)] font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Importar Planes Base</span>
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAdminCopyModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] font-bold text-xs flex items-center gap-1.5 border border-[var(--color-accent-blue)]/30 transition-all active:scale-95"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copiar de Otro Entrenador</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Grid de Planes de Suscripción en TRES COLUMNAS */
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
+              {trainerPlans.map((plan) => {
+                const isCustom = !!plan.id_entrenador && plan.id_entrenador === currentUser?.id;
+                const isActive = plan.activo !== false;
+                const planOwner = usuarios.find((u) => u.id === plan.id_entrenador);
+                const ownerName = planOwner?.nombre || (plan.id_entrenador ? "Entrenador" : "Base");
+
+                return (
+                  <div
+                    key={plan.id}
+                    className={`p-2 sm:p-3.5 rounded-2xl sm:rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border transition-all flex flex-col justify-between gap-2 sm:gap-3 ${
+                      !isActive
+                        ? "opacity-60 border-dashed border-[var(--color-text-muted)]/30"
+                        : "border-[var(--color-text-muted)]/15 hover:shadow-neu-pressed"
+                    }`}
+                  >
+                    <div className="space-y-1 sm:space-y-1.5">
                       <div>
-                        <h3 className="text-sm font-black text-[var(--color-text-main)]">
+                        <h3
+                          className="text-xs sm:text-sm font-black text-[var(--color-text-main)] truncate"
+                          title={plan.nombre}
+                        >
                           {plan.nombre}
                         </h3>
-                        <span className="text-xs font-bold text-[var(--color-text-muted)] mt-0.5 block">
+                        <span className="text-[10px] sm:text-xs font-bold text-[var(--color-text-muted)] mt-0.5 block truncate">
                           {plan.duracion_meses} {plan.duracion_meses === 1 ? "mes" : "meses"}
                         </span>
+                        {isAdmin && (
+                          <span
+                            className="text-[9px] font-bold text-[var(--color-accent-blue)] truncate block mt-0.5"
+                            title={`Asignado a: ${ownerName}`}
+                          >
+                            {ownerName}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="pt-0.5 sm:pt-1">
+                        <div className="text-xs sm:text-base md:text-xl font-black text-[var(--color-accent-blue)] truncate">
+                          {formatPEN(plan.precio_pen)}
+                        </div>
+                        {plan.descripcion ? (
+                          <p
+                            className="text-[9px] sm:text-xs text-[var(--color-text-muted)] mt-0.5 line-clamp-1 sm:line-clamp-2"
+                            title={plan.descripcion}
+                          >
+                            {plan.descripcion}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
-                    <div className="pt-1">
-                      <div className="text-xl font-black text-[var(--color-accent-blue)]">
-                        {formatPEN(plan.precio_pen)}
-                      </div>
-                      {plan.descripcion ? (
-                        <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-2">
-                          {plan.descripcion}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-[var(--color-text-muted)] italic mt-1">
-                          Sin descripción adicional.
-                        </p>
+                    {/* Acciones del Plan */}
+                    <div className="pt-1.5 border-t border-[var(--color-text-muted)]/15 flex items-center justify-between gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditPlan(plan)}
+                        title="Modificar Plan"
+                        aria-label="Modificar Plan"
+                        className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] flex items-center justify-center transition-all active:scale-95"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+
+                      {(isAdmin || isCustom) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePlan(plan.id)}
+                          className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-rose-500 transition-all active:scale-95"
+                          title="Eliminar este plan"
+                          aria-label="Eliminar Plan"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
                       )}
                     </div>
                   </div>
-
-                  {/* Acciones del Plan */}
-                  <div className="pt-2 border-t border-[var(--color-text-muted)]/15 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditPlan(plan)}
-                      title="Modificar Plan"
-                      aria-label="Modificar Plan"
-                      className="p-2 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] flex items-center justify-center transition-all active:scale-95"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-
-                    {isCustom && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePlan(plan.id)}
-                        className="p-2 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-rose-500 transition-all active:scale-95"
-                        title="Eliminar este plan exclusivo"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1477,6 +1608,17 @@ export function TrainerMembershipsModule() {
         isOpen={!!selectedAthleteForModal}
         onClose={() => setSelectedAthleteForModal(null)}
       />
+
+      {/* Modal: Copiar Planes entre Entrenadores (Admin) */}
+      {isAdmin && (
+        <AdminCopyPlansModal
+          isOpen={isAdminCopyModalOpen}
+          onClose={() => setIsAdminCopyModalOpen(false)}
+          trainers={trainers}
+          planesSuscripcion={planesSuscripcion}
+          onCopyPlans={handleAdminCopyPlans}
+        />
+      )}
     </div>
   );
 }

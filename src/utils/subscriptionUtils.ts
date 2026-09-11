@@ -227,3 +227,30 @@ export function formatDateDisplay(dateStr?: string | null): string {
     return dateStr;
   }
 }
+
+/**
+ * Determina si un plan pertenece exclusivamente a un entrenador específico.
+ * Los planes creados con id_entrenador se comparan directamente.
+ * Los planes iniciales sin id_entrenador se asocian por defecto a "entrenador1".
+ */
+export function isPlanOfTrainer(plan: PlanSuscripcion, trainerId?: string): boolean {
+  if (!trainerId) return false;
+  if (plan.id_entrenador) {
+    return plan.id_entrenador === trainerId;
+  }
+  return trainerId === "entrenador1";
+}
+
+/**
+ * Genera una copia limpia de un plan asignándola al entrenador destino.
+ */
+export function createPlanCopyForTrainer(
+  plan: PlanSuscripcion,
+  targetTrainerId: string
+): PlanSuscripcion {
+  return {
+    ...plan,
+    id: `plan_tr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id_entrenador: targetTrainerId,
+  };
+}

@@ -29,6 +29,7 @@ import {
   calculateSubscriptionEndDate,
   formatPEN,
   DEFAULT_PLANES_SUSCRIPCION,
+  isPlanOfTrainer,
 } from "@/utils/subscriptionUtils";
 import { NeuButton } from "@/components/ui/NeuButton";
 import { NeuCard } from "@/components/ui/NeuCard";
@@ -45,6 +46,7 @@ export function AthleteSubscriptionModal({
   onClose,
 }: AthleteSubscriptionModalProps) {
   const {
+    currentUser,
     planesSuscripcion,
     updateUsuarioSuscripcion,
     registrarPagoSuscripcion,
@@ -56,6 +58,14 @@ export function AthleteSubscriptionModal({
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<"suscripcion" | "planes" | "semaforo">("suscripcion");
+
+  // Filtrar planes exclusivos del entrenador asignado a este atleta
+  const effectiveTrainerId = athlete?.id_entrenador || (currentUser?.rol === "entrenador" ? currentUser?.id : undefined);
+  const visiblePlans = useMemo(() => {
+    if (!effectiveTrainerId) return planesSuscripcion;
+    const filtered = planesSuscripcion.filter((p) => isPlanOfTrainer(p, effectiveTrainerId));
+    return filtered.length > 0 ? filtered : planesSuscripcion;
+  }, [planesSuscripcion, effectiveTrainerId]);
 
   // Form states for Athlete Subscription
   const existingSub = athlete?.suscripcion;
@@ -291,6 +301,7 @@ export function AthleteSubscriptionModal({
 
   const handleCreateNewPlan = async () => {
     const newId = `plan_${Date.now()}`;
+    const ownerId = effectiveTrainerId || currentUser?.id || "entrenador1";
     await addPlanSuscripcion({
       id: newId,
       nombre: editPlanNombre.trim() || "Nuevo Plan",
@@ -298,6 +309,7 @@ export function AthleteSubscriptionModal({
       precio_pen: Number(editPlanPrecio) || 100,
       descripcion: editPlanDesc.trim(),
       activo: true,
+      id_entrenador: ownerId,
     });
     setIsCreatingNewPlan(false);
     setEditingPlanId(null);
@@ -387,7 +399,7 @@ export function AthleteSubscriptionModal({
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span>Catálogo de Planes ({planesSuscripcion.length})</span>
+              <span>Catálogo de Planes ({visiblePlans.length})</span>
             </button>
 
             {/* Semáforo de Pagos dentro de un botón al lado de Catálogo de Planes */}
@@ -504,7 +516,7 @@ export function AthleteSubscriptionModal({
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {planesSuscripcion.map((p) => {
+                          {visiblePlans.map((p) => {
                             const isSelected = paymentSuggestedPlanId === p.id;
                             return (
                               <button
@@ -551,7 +563,7 @@ export function AthleteSubscriptionModal({
                               const newDate = e.target.value;
                               setPaymentFecha(newDate);
                               if (paymentSuggestedPlanId) {
-                                const foundPlan = planesSuscripcion.find(
+                                const foundPlan = visiblePlans.find(
                                   (p) => p.id === paymentSuggestedPlanId
                                 );
                                 if (foundPlan) {
@@ -950,7 +962,7 @@ export function AthleteSubscriptionModal({
 
                 {/* Lista de planes configurados */}
                 <div className="space-y-2.5">
-                  {planesSuscripcion.map((plan) => (
+                  {visiblePlans.map((plan) => (
                     <div
                       key={plan.id}
                       className="p-3.5 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15 flex items-center justify-between gap-3"
