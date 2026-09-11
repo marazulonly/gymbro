@@ -37,7 +37,8 @@ import {
   UserPlus,
   Send,
   AlertCircle,
-  CreditCard
+  CreditCard,
+  ArrowUpDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "@/components/ProfileModal";
@@ -48,6 +49,7 @@ import { RegistroEjerciciosRealizadosModal } from "@/components/RegistroEjercici
 import { RoutineAccessControlModal } from "@/components/RoutineAccessControlModal";
 import { AthleteSubscriptionModal } from "@/components/AthleteSubscriptionModal";
 import { TrainerInvitePromptModal } from "@/components/TrainerInvitePromptModal";
+import { AthleteImportExportModal } from "@/components/AthleteImportExportModal";
 import { TrainerMembershipsModule } from "@/views/TrainerMembershipsModule";
 import { Rutina, EjercicioRutina, Usuario, Ejercicio, ModoControlAcceso, SemaforoPago } from "@/types";
 import { isAthleteAssignedOrCreatedByTrainer } from "@/utils/routineAccess";
@@ -282,6 +284,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   // Modals for web usage stats and exercise completion history
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [isExerciseLogModalOpen, setIsExerciseLogModalOpen] = useState(false);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedModalAthleteId, setSelectedModalAthleteId] = useState<string | undefined>(undefined);
   const [subscriptionModalAthlete, setSubscriptionModalAthlete] = useState<Usuario | null>(null);
 
@@ -635,6 +638,17 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
             <Clock className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Ficha</span>
             <span>Tiempo</span>
+          </NeuButton>
+
+          {/* Botón con ícono (sin texto) para Importar o Exportar la base de datos de atletas asignados */}
+          <NeuButton
+            variant="circle"
+            className="w-9 h-9 shadow-neu-flat flex items-center justify-center text-[var(--color-accent-blue)]"
+            onClick={() => setIsImportExportOpen(true)}
+            title="Importar / Exportar base de datos de atletas (DNI, Nombres, Fecha de Inicial, Whatsapp, Sexo, Fecha Final)"
+            aria-label="Importar y Exportar base de datos de atletas"
+          >
+            <ArrowUpDown className="w-4 h-4 stroke-[2.2]" />
           </NeuButton>
 
           <NeuButton variant="circle" className="w-9 h-9 shadow-neu-flat" onClick={() => setIsAdding(true)} title="Registrar Atleta">
@@ -1108,6 +1122,13 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
         isOpen={!!subscriptionModalAthlete}
         athlete={subscriptionModalAthlete}
         onClose={() => setSubscriptionModalAthlete(null)}
+      />
+
+      <AthleteImportExportModal
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        assignedAthletes={assignedAthletes}
+        trainerId={currentUser?.id}
       />
 
       <ProfileModal

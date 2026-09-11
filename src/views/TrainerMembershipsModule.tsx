@@ -25,12 +25,24 @@ import {
   Image as ImageIcon,
   Eye,
   FileCheck,
+  Layers,
+  Edit3,
+  Trash2,
+  Check,
+  ShieldCheck,
+  Users,
+  Wallet,
+  PieChart,
+  Tag,
+  Sliders,
+  AlertTriangle
 } from "lucide-react";
 import {
   formatPEN,
   formatDateDisplay,
   getTodayDateString,
   calculateSubscriptionEndDate,
+  calcularSemaforoPago
 } from "@/utils/subscriptionUtils";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -47,10 +59,16 @@ export function TrainerMembershipsModule() {
     planesSuscripcion,
     registrarPagoSuscripcion,
     updateUsuarioSuscripcion,
+    addPlanSuscripcion,
+    updatePlanSuscripcion,
+    deletePlanSuscripcion,
   } = useStore();
 
   const isAdmin = currentUser?.rol === "admin";
   const todayStr = getTodayDateString();
+
+  // Active module view: "dashboard" (Consolidado de pagos) or "planes" (Catálogo de planes)
+  const [activeModuleView, setActiveModuleView] = useState<"dashboard" | "planes">("dashboard");
 
   // List of active athletes assigned or created by the current trainer (or all if admin)
   const athletes = useMemo(() => {
@@ -83,7 +101,19 @@ export function TrainerMembershipsModule() {
     });
   }, [athletes]);
 
-  // Totals calculations: By Day, Month, Year
+  // Semáforo distribution for assigned athletes
+  const athletesSemaforoStats = useMemo(() => {
+    const stats = { verde: 0, ambar: 0, rojo: 0, negro: 0 };
+    athletes.forEach((ath) => {
+      const sem = calcularSemaforoPago(ath.suscripcion?.fecha_fin);
+      if (sem.semaforo in stats) {
+        stats[sem.semaforo as keyof typeof stats]++;
+      }
+    });
+    return stats;
+  }, [athletes]);
+
+  // Totals calculations: By Day, Month, Year, and Methods
   const currentYear = new Date().getFullYear().toString();
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, "0");
   const currentYearMonth = `${currentYear}-${currentMonth}`;
@@ -98,12 +128,21 @@ export function TrainerMembershipsModule() {
     let totalHistorico = 0;
     let countHistorico = 0;
 
+    const methodStats: Record<string, { count: number; total: number }> = {};
+
     allPayments.forEach((p) => {
       if (p.estado === "anulado") return;
       const amount = Number(p.monto_pen) || 0;
 
       totalHistorico += amount;
       countHistorico += 1;
+
+      const metodo = p.metodo_pago || "Otro";
+      if (!methodStats[metodo]) {
+        methodStats[metodo] = { count: 0, total: 0 };
+      }
+      methodStats[metodo].count += 1;
+      methodStats[metodo].total += amount;
 
       if (p.fecha_pago === todayStr) {
         totalDia += amount;
@@ -124,6 +163,7 @@ export function TrainerMembershipsModule() {
       mes: { total: totalMes, count: countMes },
       anio: { total: totalAnio, count: countAnio },
       historico: { total: totalHistorico, count: countHistorico },
+      methodStats,
     };
   }, [allPayments, todayStr, currentYearMonth, currentYear]);
 
@@ -181,12 +221,27 @@ export function TrainerMembershipsModule() {
   const [modalAutoUpdateFin, setModalAutoUpdateFin] = useState<boolean>(true);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
+  // Plans belonging to this trainer (or general plans if none)
+  const trainerPlans = useMemo(() => {
+    return planesSuscripcion.filter((p) => !p.id_entrenador || p.id_entrenador === currentUser?.id);
+  }, [planesSuscripcion, currentUser?.id]);
+
+  // States for Plan Creation & Editing Modal
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<PlanSuscripcion | null>(null);
+  const [planFormNombre, setPlanFormNombre] = useState("");
+  const [planFormMeses, setPlanFormMeses] = useState(1);
+  const [planFormPrecio, setPlanFormPrecio] = useState(300);
+  const [planFormDescripcion, setPlanFormDescripcion] = useState("");
+  const [planFormActivo, setPlanFormActivo] = useState(true);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+
   // Pre-select first athlete when opening new payment modal
   const handleOpenNewPayment = (athleteId?: string) => {
     const targetId = athleteId || athletes[0]?.id || "";
     setModalAthleteId(targetId);
     const ath = athletes.find((a) => a.id === targetId);
-    const defaultPlan = planesSuscripcion[0];
+    const defaultPlan = trainerPlans.find((p) => p.activo !== false) || planesSuscripcion[0];
 
     if (defaultPlan) {
       setModalPlanSugeridoId(defaultPlan.id);
@@ -218,7 +273,7 @@ export function TrainerMembershipsModule() {
   const handleModalAthleteChange = (newAthleteId: string) => {
     setModalAthleteId(newAthleteId);
     const ath = athletes.find((a) => a.id === newAthleteId);
-    const plan = planesSuscripcion.find((p) => p.id === modalPlanSugeridoId) || planesSuscripcion[0];
+    const plan = planesSuscripcion.find((p) => p.id === modalPlanSugeridoId) || trainerPlans[0];
     if (plan) {
       const baseDate =
         ath?.suscripcion?.fecha_fin && ath.suscripcion.fecha_fin >= modalFechaPago
@@ -260,63 +315,57 @@ export function TrainerMembershipsModule() {
     }
   };
 
-  // Handle voucher upload with automatic 72 DPI optimization
-  const handleComprobanteUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle receipt image upload (optimizing to 72 DPI)
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessingComprobante(true);
     try {
-      const result = await optimizeImageTo72Dpi(file, 1200, 0.8);
-      setModalComprobanteUrl(result.dataUrl);
+      const optimizedBase64 = await optimizeImageTo72Dpi(file);
+      setModalComprobanteUrl(optimizedBase64);
       setModalComprobanteNombre(file.name);
     } catch (err) {
-      console.error("Error optimizando comprobante a 72 dpi:", err);
+      console.error("Error optimizing receipt image:", err);
     } finally {
       setIsProcessingComprobante(false);
-      // Reset input value so same file can be re-selected if desired
-      e.target.value = "";
     }
   };
 
-  // Submit payment from modal
+  // Submit new payment
   const handleSubmitNewPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalAthleteId || modalMonto <= 0) return;
+    if (!modalAthleteId) return;
 
     setIsSubmittingPayment(true);
     try {
+      const targetAthlete = athletes.find((a) => a.id === modalAthleteId);
       const newPayment: PagoSuscripcion = {
-        id: `pay_${Date.now()}`,
+        id: `pay_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        id_plan: modalPlanSugeridoId || undefined,
+        nombre_plan: modalPlanNombre || "Membresía",
         fecha_pago: modalFechaPago,
-        monto_pen: Number(modalMonto),
+        monto_pen: modalMonto,
         metodo_pago: modalMetodoPago,
         estado: modalEstadoPago,
-        referencia: modalReferencia.trim(),
-        notas: modalNotas.trim(),
+        referencia: modalReferencia.trim() || undefined,
+        notas: modalNotas.trim() || undefined,
+        registrado_por: currentUser?.id,
+        registrado_at: new Date().toISOString(),
         comprobante_url: modalComprobanteUrl || undefined,
         comprobante_nombre: modalComprobanteNombre || undefined,
-        registrado_at: new Date().toISOString(),
       };
 
       await registrarPagoSuscripcion(modalAthleteId, newPayment);
 
-      // Auto update athlete's subscription end date if requested and completed
-      if (modalEstadoPago === "completado" && modalAutoUpdateFin && modalFechaFinal) {
-        const ath = athletes.find((a) => a.id === modalAthleteId);
-        if (ath) {
+      if (modalAutoUpdateFin && targetAthlete) {
+        const currentSub = targetAthlete.suscripcion;
+        if (currentSub) {
           await updateUsuarioSuscripcion(modalAthleteId, {
-            ...(ath.suscripcion || {
-              id_plan: modalPlanSugeridoId || "plan_1m",
-              nombre_plan: modalPlanNombre || "Plan 1 mes",
-              duracion_meses: 1,
-              precio_pen: modalMonto,
-              fecha_inicio: modalFechaPago,
-              fecha_fin: modalFechaFinal,
-              historial_pagos: [],
-            }),
+            ...currentSub,
             fecha_fin: modalFechaFinal,
-            nombre_plan: modalPlanNombre || ath.suscripcion?.nombre_plan || "Plan",
+            nombre_plan: modalPlanNombre || currentSub.nombre_plan,
+            precio_pen: modalMonto || currentSub.precio_pen,
           });
         }
       }
@@ -329,9 +378,76 @@ export function TrainerMembershipsModule() {
     }
   };
 
+  // Open Plan Modal for Create
+  const handleOpenCreatePlan = () => {
+    setEditingPlan(null);
+    setPlanFormNombre("");
+    setPlanFormMeses(1);
+    setPlanFormPrecio(300);
+    setPlanFormDescripcion("");
+    setPlanFormActivo(true);
+    setIsPlanModalOpen(true);
+  };
+
+  // Open Plan Modal for Edit
+  const handleOpenEditPlan = (plan: PlanSuscripcion) => {
+    setEditingPlan(plan);
+    setPlanFormNombre(plan.nombre);
+    setPlanFormMeses(plan.duracion_meses);
+    setPlanFormPrecio(plan.precio_pen);
+    setPlanFormDescripcion(plan.descripcion || "");
+    setPlanFormActivo(plan.activo !== false);
+    setIsPlanModalOpen(true);
+  };
+
+  // Save Plan (Create or Update)
+  const handleSavePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planFormNombre.trim()) return;
+
+    setIsSavingPlan(true);
+    try {
+      if (editingPlan) {
+        const updated: PlanSuscripcion = {
+          ...editingPlan,
+          nombre: planFormNombre.trim(),
+          duracion_meses: Number(planFormMeses) || 1,
+          precio_pen: Number(planFormPrecio) || 0,
+          descripcion: planFormDescripcion.trim() || undefined,
+          activo: planFormActivo,
+          id_entrenador: editingPlan.id_entrenador || currentUser?.id,
+        };
+        await updatePlanSuscripcion(updated);
+      } else {
+        const newPlan: PlanSuscripcion = {
+          id: `plan_tr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          nombre: planFormNombre.trim(),
+          duracion_meses: Number(planFormMeses) || 1,
+          precio_pen: Number(planFormPrecio) || 0,
+          descripcion: planFormDescripcion.trim() || undefined,
+          activo: planFormActivo,
+          id_entrenador: currentUser?.id,
+        };
+        await addPlanSuscripcion(newPlan);
+      }
+      setIsPlanModalOpen(false);
+    } catch (err) {
+      console.error("Error saving plan:", err);
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  // Delete Plan
+  const handleDeletePlan = async (planId: string) => {
+    if (confirm("¿Estás seguro de eliminar este plan de tu catálogo?")) {
+      await deletePlanSuscripcion(planId);
+    }
+  };
+
   return (
     <div className="space-y-4 pb-16">
-      {/* Header with Title and Primary Action */}
+      {/* Header with Title and Primary Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--color-bg-base)] p-4 rounded-3xl shadow-neu-flat border border-[var(--color-text-muted)]/15">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)] shrink-0">
@@ -341,374 +457,521 @@ export function TrainerMembershipsModule() {
             <h1 className="text-lg sm:text-xl font-black text-[var(--color-text-main)] tracking-tight">
               Membresías
             </h1>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Ingresos y pagos
-            </p>
           </div>
         </div>
 
-        {/* Botón para registrar Nuevo Pago */}
-        <button
-          type="button"
-          onClick={() => handleOpenNewPayment()}
-          className="px-4 py-2.5 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Nuevo Pago</span>
-        </button>
-      </div>
-
-      {/* Cards de Total de Pagos Registrados (Día, Mes, Año) - Altura compacta optimizada */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        {/* Total Por Día */}
-        <div
-          onClick={() => setFilterPeriod(filterPeriod === "dia" ? "todos" : "dia")}
-          className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
-            filterPeriod === "dia"
-              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
-              : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border-[var(--color-text-muted)]/15"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span
-                className={`text-[11px] font-bold uppercase tracking-wider block ${
-                  filterPeriod === "dia" ? "text-white/85" : "text-[var(--color-text-muted)]"
-                }`}
-              >
-                Día
-              </span>
-              <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
-                {formatPEN(totals.dia.total)}
-              </div>
-              <div
-                className={`text-[10px] mt-0.5 ${
-                  filterPeriod === "dia" ? "text-white/80" : "text-[var(--color-text-muted)]"
-                }`}
-              >
-                {totals.dia.count} {totals.dia.count === 1 ? "pago" : "pagos"}
-              </div>
-            </div>
-            <div
-              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
-                filterPeriod === "dia" ? "bg-white/20 text-white" : "shadow-neu-pressed text-emerald-500"
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Total Por Mes */}
-        <div
-          onClick={() => setFilterPeriod(filterPeriod === "mes" ? "todos" : "mes")}
-          className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
-            filterPeriod === "mes"
-              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
-              : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border-[var(--color-text-muted)]/15"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span
-                className={`text-[11px] font-bold uppercase tracking-wider block ${
-                  filterPeriod === "mes" ? "text-white/85" : "text-[var(--color-text-muted)]"
-                }`}
-              >
-                Mes
-              </span>
-              <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
-                {formatPEN(totals.mes.total)}
-              </div>
-              <div
-                className={`text-[10px] mt-0.5 ${
-                  filterPeriod === "mes" ? "text-white/80" : "text-[var(--color-text-muted)]"
-                }`}
-              >
-                {totals.mes.count} {totals.mes.count === 1 ? "pago" : "pagos"}
-              </div>
-            </div>
-            <div
-              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
-                filterPeriod === "mes" ? "bg-white/20 text-white" : "shadow-neu-pressed text-[var(--color-accent-blue)]"
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Total Por Año */}
-        <div
-          onClick={() => setFilterPeriod(filterPeriod === "anio" ? "todos" : "anio")}
-          className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
-            filterPeriod === "anio"
-              ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
-              : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border-[var(--color-text-muted)]/15"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span
-                className={`text-[11px] font-bold uppercase tracking-wider block ${
-                  filterPeriod === "anio" ? "text-white/85" : "text-[var(--color-text-muted)]"
-                }`}
-              >
-                Año
-              </span>
-              <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
-                {formatPEN(totals.anio.total)}
-              </div>
-              <div
-                className={`text-[10px] mt-0.5 ${
-                  filterPeriod === "anio" ? "text-white/80" : "text-[var(--color-text-muted)]"
-                }`}
-              >
-                {totals.anio.count} {totals.anio.count === 1 ? "pago" : "pagos"}
-              </div>
-            </div>
-            <div
-              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
-                filterPeriod === "anio" ? "bg-white/20 text-white" : "shadow-neu-pressed text-amber-500"
-              }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Controles de Filtro y Búsqueda */}
-      <div className="bg-[var(--color-bg-base)] p-3 rounded-2xl shadow-neu-flat border border-[var(--color-text-muted)]/15 flex flex-col sm:flex-row gap-2.5 items-center justify-between">
-        {/* Barra de Búsqueda */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-[var(--color-text-muted)]" />
-          <input
-            type="text"
-            placeholder="Buscar por atleta, método, ref..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none"
-          />
-          {searchTerm && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Selector de pestañas: Pagos / Planes */}
+          <div className="flex items-center bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed border border-[var(--color-text-muted)]/10">
             <button
-              onClick={() => setSearchTerm("")}
-              className="absolute right-2.5 top-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+              type="button"
+              onClick={() => setActiveModuleView("dashboard")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeModuleView === "dashboard"
+                  ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+              }`}
             >
-              <X className="w-3.5 h-3.5" />
+              <DollarSign className="w-3.5 h-3.5" />
+              <span>Pagos</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveModuleView("planes")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeModuleView === "planes"
+                  ? "bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Planes</span>
+            </button>
+          </div>
+
+          {activeModuleView === "dashboard" ? (
+            <button
+              type="button"
+              onClick={() => handleOpenNewPayment()}
+              className="px-4 py-2 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Nuevo Pago</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleOpenCreatePlan}
+              className="px-4 py-2 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Nuevo Plan</span>
             </button>
           )}
         </div>
-
-        {/* Filtros de Período y Estado */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-          <div className="flex items-center bg-[var(--color-bg-base)] p-0.5 rounded-xl shadow-neu-pressed text-[11px] font-bold">
-            <button
-              type="button"
-              onClick={() => setFilterPeriod("todos")}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
-                filterPeriod === "todos"
-                  ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-              }`}
-            >
-              Todos
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterPeriod("dia")}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
-                filterPeriod === "dia"
-                  ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-              }`}
-            >
-              Día
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterPeriod("mes")}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
-                filterPeriod === "mes"
-                  ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-              }`}
-            >
-              Mes
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterPeriod("anio")}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
-                filterPeriod === "anio"
-                  ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-              }`}
-            >
-              Año
-            </button>
-          </div>
-
-          <div className="flex items-center bg-[var(--color-bg-base)] p-0.5 rounded-xl shadow-neu-pressed text-[11px] font-bold">
-            <button
-              type="button"
-              onClick={() => setFilterStatus("todos")}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
-                filterStatus === "todos"
-                  ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-              }`}
-            >
-              Todos
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterStatus("completado")}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
-                filterStatus === "completado"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-              }`}
-            >
-              Completados
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterStatus("pendiente")}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
-                filterStatus === "pendiente"
-                  ? "bg-amber-500 text-white shadow-sm"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
-              }`}
-            >
-              Pendientes
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Sección: Los Últimos Pagos Registrados */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)] flex items-center gap-1.5">
-            <DollarSign className="w-3.5 h-3.5" />
-            <span>Últimos Pagos Registrados ({filteredPayments.length})</span>
-          </h2>
+      {activeModuleView === "dashboard" ? (
+        /* ========================================================================= */
+        /* DASHBOARD CONSOLIDADO DE PAGOS                                            */
+        /* ========================================================================= */
+        <div className="space-y-4">
+          {/* Cards de Total de Pagos Registrados (Día, Mes, Año) - Mantiene botones con altura reducida */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Total Por Día */}
+            <div
+              onClick={() => setFilterPeriod(filterPeriod === "dia" ? "todos" : "dia")}
+              className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
+                filterPeriod === "dia"
+                  ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border border-[var(--color-text-muted)]/15"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span
+                    className={`text-[11px] font-bold uppercase tracking-wider block ${
+                      filterPeriod === "dia" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                    }`}
+                  >
+                    Día
+                  </span>
+                  <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
+                    {formatPEN(totals.dia.total)}
+                  </div>
+                  <div
+                    className={`text-[10px] mt-0.5 ${
+                      filterPeriod === "dia" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                    }`}
+                  >
+                    {totals.dia.count} {totals.dia.count === 1 ? "pago" : "pagos"}
+                  </div>
+                </div>
+                <div
+                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                    filterPeriod === "dia" ? "bg-white/20 text-white" : "shadow-neu-pressed text-emerald-500"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            </div>
 
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            Total filtrado:{" "}
-            <strong className="text-[var(--color-text-main)]">
-              {formatPEN(filteredPayments.reduce((acc, p) => acc + (p.estado !== "anulado" ? p.monto_pen : 0), 0))}
-            </strong>
-          </span>
-        </div>
+            {/* Total Por Mes */}
+            <div
+              onClick={() => setFilterPeriod(filterPeriod === "mes" ? "todos" : "mes")}
+              className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
+                filterPeriod === "mes"
+                  ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border border-[var(--color-text-muted)]/15"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span
+                    className={`text-[11px] font-bold uppercase tracking-wider block ${
+                      filterPeriod === "mes" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                    }`}
+                  >
+                    Mes
+                  </span>
+                  <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
+                    {formatPEN(totals.mes.total)}
+                  </div>
+                  <div
+                    className={`text-[10px] mt-0.5 ${
+                      filterPeriod === "mes" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                    }`}
+                  >
+                    {totals.mes.count} {totals.mes.count === 1 ? "pago" : "pagos"}
+                  </div>
+                </div>
+                <div
+                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                    filterPeriod === "mes" ? "bg-white/20 text-white" : "shadow-neu-pressed text-[var(--color-accent-blue)]"
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            </div>
 
-        {filteredPayments.length === 0 ? (
-          <div className="p-8 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15 text-center flex flex-col items-center justify-center gap-2">
-            <CreditCard className="w-10 h-10 text-[var(--color-text-muted)] stroke-1" />
-            <p className="text-xs font-bold text-[var(--color-text-main)]">
-              No hay pagos registrados con los filtros seleccionados
-            </p>
-            <p className="text-[11px] text-[var(--color-text-muted)] max-w-xs">
-              Usa el botón "Nuevo Pago" para ingresar un abono para cualquier atleta.
-            </p>
-            {athletes.length > 0 && (
-              <button
-                type="button"
-                onClick={() => handleOpenNewPayment()}
-                className="mt-2 px-3 py-1.5 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90"
-              >
-                Registrar Primer Pago
-              </button>
+            {/* Total Por Año */}
+            <div
+              onClick={() => setFilterPeriod(filterPeriod === "anio" ? "todos" : "anio")}
+              className={`py-2.5 px-3.5 sm:px-4 rounded-2xl cursor-pointer transition-all border ${
+                filterPeriod === "anio"
+                  ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.01]"
+                  : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed border border-[var(--color-text-muted)]/15"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span
+                    className={`text-[11px] font-bold uppercase tracking-wider block ${
+                      filterPeriod === "anio" ? "text-white/85" : "text-[var(--color-text-muted)]"
+                    }`}
+                  >
+                    Año
+                  </span>
+                  <div className="text-lg sm:text-xl font-black tracking-tight leading-tight mt-0.5">
+                    {formatPEN(totals.anio.total)}
+                  </div>
+                  <div
+                    className={`text-[10px] mt-0.5 ${
+                      filterPeriod === "anio" ? "text-white/80" : "text-[var(--color-text-muted)]"
+                    }`}
+                  >
+                    {totals.anio.count} {totals.anio.count === 1 ? "pago" : "pagos"}
+                  </div>
+                </div>
+                <div
+                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                    filterPeriod === "anio" ? "bg-white/20 text-white" : "shadow-neu-pressed text-amber-500"
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Controles de Filtro y Búsqueda */}
+          <div className="bg-[var(--color-bg-base)] p-3 rounded-2xl shadow-neu-flat border border-[var(--color-text-muted)]/15 flex flex-col sm:flex-row gap-2.5 items-center justify-between">
+            {/* Barra de Búsqueda */}
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-[var(--color-text-muted)]" />
+              <input
+                type="text"
+                placeholder="Buscar por atleta, método, ref..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2.5 top-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filtros de Período y Estado */}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+              <div className="flex items-center bg-[var(--color-bg-base)] p-0.5 rounded-xl shadow-neu-pressed text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setFilterPeriod("todos")}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    filterPeriod === "todos"
+                      ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterPeriod("dia")}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    filterPeriod === "dia"
+                      ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  }`}
+                >
+                  Día
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterPeriod("mes")}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    filterPeriod === "mes"
+                      ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  }`}
+                >
+                  Mes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterPeriod("anio")}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    filterPeriod === "anio"
+                      ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  }`}
+                >
+                  Año
+                </button>
+              </div>
+
+              <div className="flex items-center bg-[var(--color-bg-base)] p-0.5 rounded-xl shadow-neu-pressed text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("todos")}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    filterStatus === "todos"
+                      ? "bg-[var(--color-accent-blue)] text-white shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("completado")}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    filterStatus === "completado"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  }`}
+                >
+                  Completados
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus("pendiente")}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    filterStatus === "pendiente"
+                      ? "bg-amber-500 text-white shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  }`}
+                >
+                  Pendientes
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sección: Lista Consolidada de Pagos Registrados */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)] flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+                <span>Historial de Pagos ({filteredPayments.length})</span>
+              </h2>
+
+              <span className="text-[11px] text-[var(--color-text-muted)]">
+                Total filtrado:{" "}
+                <strong className="text-[var(--color-text-main)]">
+                  {formatPEN(
+                    filteredPayments.reduce(
+                      (acc, p) => acc + (p.estado !== "anulado" ? p.monto_pen : 0),
+                      0
+                    )
+                  )}
+                </strong>
+              </span>
+            </div>
+
+            {filteredPayments.length === 0 ? (
+              <div className="p-8 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15 text-center flex flex-col items-center justify-center gap-2">
+                <CreditCard className="w-10 h-10 text-[var(--color-text-muted)] stroke-1" />
+                <p className="text-xs font-bold text-[var(--color-text-main)]">
+                  No hay pagos registrados con los filtros seleccionados
+                </p>
+                <p className="text-[11px] text-[var(--color-text-muted)] max-w-xs">
+                  Usa el botón "Nuevo Pago" para ingresar un abono para cualquier atleta.
+                </p>
+                {athletes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenNewPayment()}
+                    className="mt-2 px-3 py-1.5 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90"
+                  >
+                    Registrar Primer Pago
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredPayments.map((payment) => {
+                  const ath = athletes.find((a) => a.id === payment.athleteId);
+                  return (
+                    <div
+                      key={payment.id}
+                      className="p-3.5 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed transition-all border border-[var(--color-text-muted)]/10 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl shadow-neu-pressed flex items-center justify-center font-bold text-[var(--color-accent-blue)] text-sm shrink-0">
+                          {payment.athleteName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-[var(--color-text-main)] truncate">
+                              {payment.athleteName}
+                            </span>
+                            <span
+                              className={`px-2 py-0.2 rounded-full text-[10px] font-bold border ${
+                                payment.estado === "completado"
+                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                                  : payment.estado === "pendiente"
+                                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
+                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20"
+                              }`}
+                            >
+                              {payment.estado === "completado"
+                                ? "Completado"
+                                : payment.estado === "pendiente"
+                                ? "Pendiente"
+                                : "Anulado"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)] mt-0.5 flex-wrap">
+                            <span>{formatDateDisplay(payment.fecha_pago)}</span>
+                            <span>•</span>
+                            <span className="font-medium text-[var(--color-text-main)]">
+                              {payment.metodo_pago}
+                            </span>
+                            {payment.referencia && (
+                              <>
+                                <span>•</span>
+                                <span className="opacity-80">Ref: {payment.referencia}</span>
+                              </>
+                            )}
+                            {payment.notas && (
+                              <>
+                                <span>•</span>
+                                <span className="italic opacity-70 truncate max-w-[150px]">
+                                  {payment.notas}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        {payment.comprobante_url && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewReceiptUrl(payment.comprobante_url || null)}
+                            className="px-2 py-1 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-emerald-600 dark:text-emerald-400 font-bold text-[11px] flex items-center gap-1 border border-emerald-500/30 transition-all active:scale-95"
+                            title="Ver Comprobante Adjunto"
+                          >
+                            <FileCheck className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="hidden sm:inline">Comprobante</span>
+                          </button>
+                        )}
+
+                        <div className="text-right">
+                          <div className="text-sm sm:text-base font-black text-[var(--color-text-main)]">
+                            {formatPEN(payment.monto_pen)}
+                          </div>
+                        </div>
+
+                        {ath && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAthleteForModal(ath)}
+                            className="p-2 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] active:scale-95 transition-all"
+                            title="Abrir Control de Membresía del Atleta"
+                            aria-label="Abrir Control de Membresía"
+                          >
+                            <ArrowUpRight className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredPayments.map((payment) => {
-              const ath = athletes.find((a) => a.id === payment.athleteId);
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* CATÁLOGO DE PLANES DEL ENTRENADOR                                         */
+        /* ========================================================================= */
+        <div className="space-y-4">
+          {/* Banner informativo sobre planes del entrenador */}
+          <div className="p-4 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-[var(--color-text-muted)]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-[var(--color-text-main)]">
+                Planes de Suscripción Exclusivos
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--color-accent-blue)]/15 text-[var(--color-accent-blue)]">
+                Privado para tus Atletas
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenCreatePlan}
+              className="px-4 py-2.5 rounded-2xl bg-[var(--color-accent-blue)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Crear Nuevo Plan</span>
+            </button>
+          </div>
+
+          {/* Grid de Planes de Suscripción */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {trainerPlans.map((plan) => {
+              const isCustom = !!plan.id_entrenador && plan.id_entrenador === currentUser?.id;
+              const isActive = plan.activo !== false;
+
               return (
                 <div
-                  key={payment.id}
-                  className="p-3.5 rounded-2xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed transition-all border border-[var(--color-text-muted)]/10 flex items-center justify-between gap-3"
+                  key={plan.id}
+                  className={`p-4 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border transition-all flex flex-col justify-between gap-3 ${
+                    !isActive
+                      ? "opacity-60 border-dashed border-[var(--color-text-muted)]/30"
+                      : "border-[var(--color-text-muted)]/15 hover:shadow-neu-pressed"
+                  }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl shadow-neu-pressed flex items-center justify-center font-bold text-[var(--color-accent-blue)] text-sm shrink-0">
-                      {payment.athleteName.charAt(0).toUpperCase()}
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-black text-[var(--color-text-main)]">
+                          {plan.nombre}
+                        </h3>
+                        <span className="text-xs font-bold text-[var(--color-text-muted)] mt-0.5 block">
+                          {plan.duracion_meses} {plan.duracion_meses === 1 ? "mes" : "meses"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-[var(--color-text-main)] truncate">
-                          {payment.athleteName}
-                        </span>
-                        <span
-                          className={`px-2 py-0.2 rounded-full text-[10px] font-bold border ${
-                            payment.estado === "completado"
-                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
-                              : payment.estado === "pendiente"
-                              ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
-                              : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20"
-                          }`}
-                        >
-                          {payment.estado === "completado"
-                            ? "Completado"
-                            : payment.estado === "pendiente"
-                            ? "Pendiente"
-                            : "Anulado"}
-                        </span>
-                      </div>
 
-                      <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)] mt-0.5 flex-wrap">
-                        <span>{formatDateDisplay(payment.fecha_pago)}</span>
-                        <span>•</span>
-                        <span className="font-medium text-[var(--color-text-main)]">
-                          {payment.metodo_pago}
-                        </span>
-                        {payment.referencia && (
-                          <>
-                            <span>•</span>
-                            <span className="opacity-80">Ref: {payment.referencia}</span>
-                          </>
-                        )}
-                        {payment.notas && (
-                          <>
-                            <span>•</span>
-                            <span className="italic opacity-70 truncate max-w-[150px]">
-                              {payment.notas}
-                            </span>
-                          </>
-                        )}
+                    <div className="pt-1">
+                      <div className="text-xl font-black text-[var(--color-accent-blue)]">
+                        {formatPEN(plan.precio_pen)}
                       </div>
+                      {plan.descripcion ? (
+                        <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-2">
+                          {plan.descripcion}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-[var(--color-text-muted)] italic mt-1">
+                          Sin descripción adicional.
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    {payment.comprobante_url && (
+                  {/* Acciones del Plan */}
+                  <div className="pt-2 border-t border-[var(--color-text-muted)]/15 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditPlan(plan)}
+                      title="Modificar Plan"
+                      aria-label="Modificar Plan"
+                      className="p-2 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] flex items-center justify-center transition-all active:scale-95"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+
+                    {isCustom && (
                       <button
                         type="button"
-                        onClick={() => setPreviewReceiptUrl(payment.comprobante_url || null)}
-                        className="px-2 py-1 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-emerald-600 dark:text-emerald-400 font-bold text-[11px] flex items-center gap-1 border border-emerald-500/30 transition-all active:scale-95"
-                        title="Ver Comprobante Adjunto"
+                        onClick={() => handleDeletePlan(plan.id)}
+                        className="p-2 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-rose-500 transition-all active:scale-95"
+                        title="Eliminar este plan exclusivo"
                       >
-                        <FileCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        <span className="hidden sm:inline">Comprobante</span>
-                      </button>
-                    )}
-
-                    <div className="text-right">
-                      <div className="text-sm sm:text-base font-black text-[var(--color-text-main)]">
-                        {formatPEN(payment.monto_pen)}
-                      </div>
-                    </div>
-
-                    {ath && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedAthleteForModal(ath)}
-                        className="p-2 rounded-xl shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-accent-blue)] active:scale-95 transition-all"
-                        title="Abrir Control de Membresía del Atleta"
-                        aria-label="Abrir Control de Membresía"
-                      >
-                        <ArrowUpRight className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
@@ -716,8 +979,8 @@ export function TrainerMembershipsModule() {
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Modal: Registrar Nuevo Pago */}
       <AnimatePresence>
@@ -792,88 +1055,67 @@ export function TrainerMembershipsModule() {
                     Planes sugeridos (Pulsa para autocompletar monto y fecha final):
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {planesSuscripcion
+                    {trainerPlans
                       .filter((p) => p.activo !== false)
                       .map((plan) => {
                         const isSelected = modalPlanSugeridoId === plan.id;
                         return (
                           <button
-                            key={plan.id}
                             type="button"
+                            key={plan.id}
                             onClick={() => handleModalSelectSuggestedPlan(plan)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                               isSelected
-                                ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-md scale-[1.02]"
-                                : "bg-[var(--color-bg-base)] text-[var(--color-text-main)] shadow-neu-flat hover:shadow-neu-pressed border-transparent hover:border-[var(--color-accent-blue)]/40"
+                                ? "bg-[var(--color-accent-blue)] text-white border-[var(--color-accent-blue)] shadow-sm scale-105"
+                                : "bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed text-[var(--color-text-main)] border-[var(--color-text-muted)]/15"
                             }`}
                           >
                             <span>{plan.nombre}</span>
-                            <span
-                              className={`text-[11px] font-black ${
-                                isSelected ? "text-white/90" : "text-[var(--color-accent-blue)]"
-                              }`}
-                            >
-                              {formatPEN(plan.precio_pen)}
-                            </span>
+                            <span className="opacity-80 ml-1.5 font-normal">({formatPEN(plan.precio_pen)})</span>
                           </button>
                         );
                       })}
                   </div>
                 </div>
 
-                {/* Fecha de Pago y Monto Pagado */}
+                {/* Monto y Fecha de Pago */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
-                      Fecha de Pago
+                      Monto (S/)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      value={modalMonto}
+                      onChange={(e) => setModalMonto(Number(e.target.value))}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold text-[var(--color-accent-blue)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
+                      Fecha del Pago
                     </label>
                     <input
                       type="date"
                       required
                       value={modalFechaPago}
                       onChange={(e) => handleModalFechaPagoChange(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none"
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-semibold"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
-                      Monto Pagado (PEN)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-xs font-bold text-[var(--color-text-muted)]">
-                        S/
-                      </span>
-                      <input
-                        type="number"
-                        required
-                        min="1"
-                        step="1"
-                        value={modalMonto}
-                        onChange={(e) => setModalMonto(Number(e.target.value))}
-                        className="w-full pl-8 pr-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold"
-                      />
-                    </div>
                   </div>
                 </div>
 
-                {/* Fecha hasta la que se estaría pagando (Fecha Final) */}
-                <div className="p-3 rounded-2xl bg-[var(--color-accent-blue)]/10 border border-[var(--color-accent-blue)]/30 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[var(--color-accent-blue)] shrink-0" />
-                      <div>
-                        <span className="text-xs font-bold text-[var(--color-text-main)] block">
-                          Fecha hasta la que se estaría pagando (Fecha Final)
-                        </span>
-                        <span className="text-[11px] text-[var(--color-text-muted)]">
-                          {modalFechaFinal
-                            ? `Cubre el servicio hasta el ${formatDateDisplay(modalFechaFinal)}`
-                            : "Ajusta la fecha final"}
-                        </span>
-                      </div>
-                    </div>
-
+                {/* Proyección de Fecha Final */}
+                <div className="p-3 rounded-2xl bg-[var(--color-accent-blue)]/5 border border-[var(--color-accent-blue)]/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[var(--color-accent-blue)]" />
+                      Fecha Final de Membresía:
+                    </span>
                     <input
                       type="date"
                       value={modalFechaFinal}
@@ -982,20 +1224,26 @@ export function TrainerMembershipsModule() {
                     </div>
                   ) : (
                     <div>
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-[var(--color-accent-blue)] bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed active:scale-95 transition-all border border-[var(--color-accent-blue)]/30">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        id="comprobante-input-trainer"
+                        onChange={handleReceiptUpload}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="comprobante-input-trainer"
+                        className={`w-full py-2.5 px-3 rounded-xl border border-dashed border-[var(--color-text-muted)]/30 hover:border-[var(--color-accent-blue)] bg-[var(--color-bg-base)] shadow-neu-pressed flex items-center justify-center gap-2 cursor-pointer text-xs font-bold text-[var(--color-text-muted)] hover:text-[var(--color-accent-blue)] transition-all ${
+                          isProcessingComprobante ? "opacity-50 pointer-events-none" : ""
+                        }`}
+                      >
                         <Upload className="w-4 h-4" />
-                        <span>{isProcessingComprobante ? "Optimizando a 72 DPI..." : "Subir Comprobante"}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleComprobanteUpload}
-                          disabled={isProcessingComprobante}
-                        />
+                        <span>
+                          {isProcessingComprobante
+                            ? "Optimizando imagen a 72 DPI..."
+                            : "Subir Comprobante (JPG, PNG)"}
+                        </span>
                       </label>
-                      <span className="block text-[10px] text-[var(--color-text-muted)] mt-1">
-                        Formatos JPG, PNG, WEBP. Se convierte automáticamente a resolución 72 DPI antes de subirse a la nube.
-                      </span>
                     </div>
                   )}
                 </div>
@@ -1008,40 +1256,41 @@ export function TrainerMembershipsModule() {
                     </label>
                     <input
                       type="text"
+                      placeholder="Ej: OP-982184"
                       value={modalReferencia}
                       onChange={(e) => setModalReferencia(e.target.value)}
-                      placeholder="Ej: Operación 938210"
                       className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
-                      Notas / Observaciones
+                      Notas
                     </label>
                     <input
                       type="text"
+                      placeholder="Observaciones adicionales"
                       value={modalNotas}
                       onChange={(e) => setModalNotas(e.target.value)}
-                      placeholder="Ej: Plan 3 meses promocional"
                       className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none"
                     />
                   </div>
                 </div>
 
-                {/* Submit Action */}
-                <div className="flex justify-end gap-2 pt-2">
+                {/* Actions */}
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-[var(--color-text-muted)]/15">
                   <button
                     type="button"
                     onClick={() => setIsNewPaymentOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] shadow-neu-flat"
+                    className="px-4 py-2 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat text-xs font-bold text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
                   >
                     Cancelar
                   </button>
+
                   <button
                     type="submit"
-                    disabled={isSubmittingPayment || isProcessingComprobante || athletes.length === 0}
-                    className="px-4 py-2 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90 disabled:opacity-50"
+                    disabled={isSubmittingPayment || athletes.length === 0}
+                    className="px-5 py-2 rounded-xl bg-[var(--color-accent-blue)] text-white text-xs font-bold shadow-sm hover:opacity-90 disabled:opacity-50"
                   >
                     {isSubmittingPayment ? "Guardando..." : "Guardar Pago"}
                   </button>
@@ -1052,58 +1301,182 @@ export function TrainerMembershipsModule() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Vista Previa de Comprobante / Recibo */}
+      {/* Modal: Crear / Editar Plan de Suscripción */}
+      <AnimatePresence>
+        {isPlanModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="bg-[var(--color-bg-base)] text-[var(--color-text-main)] w-full max-w-md rounded-3xl shadow-2xl border border-[var(--color-text-muted)]/20 overflow-hidden my-auto flex flex-col"
+            >
+              <div className="px-5 py-4 border-b border-[var(--color-text-muted)]/20 flex items-center justify-between bg-[var(--color-bg-base)]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
+                    <Layers className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-[var(--color-text-main)]">
+                      {editingPlan ? "Modificar Plan" : "Crear Nuevo Plan"}
+                    </h2>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      Plan exclusivo para tus atletas asignados
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsPlanModalOpen(false)}
+                  className="p-2 rounded-full shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSavePlan} className="p-5 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
+                    Nombre del Plan
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: Plan Trimestral VIP, Plan Mensual Pro"
+                    value={planFormNombre}
+                    onChange={(e) => setPlanFormNombre(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
+                      Duración (Meses)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="24"
+                      required
+                      value={planFormMeses}
+                      onChange={(e) => setPlanFormMeses(Number(e.target.value))}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
+                      Precio (S/)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      value={planFormPrecio}
+                      onChange={(e) => setPlanFormPrecio(Number(e.target.value))}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none font-bold text-[var(--color-accent-blue)]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--color-text-muted)] mb-1">
+                    Descripción / Beneficios incluidos
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Ej: Rutina personalizada, chequeo de medidas quincenal y soporte por WhatsApp"
+                    value={planFormDescripcion}
+                    onChange={(e) => setPlanFormDescripcion(e.target.value)}
+                    className="w-full p-2.5 text-xs rounded-xl bg-[var(--color-bg-base)] shadow-neu-pressed border border-transparent focus:border-[var(--color-accent-blue)] focus:outline-none text-[var(--color-text-main)]"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-xs font-bold text-[var(--color-text-main)] cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={planFormActivo}
+                    onChange={(e) => setPlanFormActivo(e.target.checked)}
+                    className="rounded text-[var(--color-accent-blue)] focus:ring-0"
+                  />
+                  <span>Plan activo y disponible para suscripción</span>
+                </label>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-[var(--color-text-muted)]/15">
+                  <button
+                    type="button"
+                    onClick={() => setIsPlanModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat text-xs font-bold text-[var(--color-text-muted)]"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingPlan}
+                    className="px-5 py-2 rounded-xl bg-[var(--color-accent-blue)] text-white text-xs font-bold shadow-sm hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isSavingPlan ? "Guardando..." : "Guardar Plan"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Vista previa de comprobante grande */}
       <AnimatePresence>
         {previewReceiptUrl && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
             onClick={() => setPreviewReceiptUrl(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out"
           >
             <motion.div
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
-              className="bg-[var(--color-bg-base)] p-3 rounded-3xl max-w-lg w-full shadow-2xl border border-[var(--color-text-muted)]/20 overflow-hidden flex flex-col gap-3"
+              className="relative max-w-lg w-full bg-[var(--color-bg-base)] p-3 rounded-3xl shadow-2xl border border-white/20"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-2 pt-1">
+              <div className="flex justify-between items-center mb-2 px-2">
                 <span className="text-xs font-bold text-[var(--color-text-main)] flex items-center gap-1.5">
                   <FileCheck className="w-4 h-4 text-emerald-500" />
                   Comprobante de Pago Adjunto (72 DPI)
                 </span>
                 <button
-                  type="button"
                   onClick={() => setPreviewReceiptUrl(null)}
-                  className="p-1.5 rounded-full shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+                  className="p-1 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-
-              <div className="rounded-2xl overflow-hidden bg-black/5 flex items-center justify-center max-h-[70vh]">
-                <img
-                  src={previewReceiptUrl}
-                  alt="Comprobante completo"
-                  className="max-h-[70vh] w-auto object-contain rounded-xl"
-                />
-              </div>
+              <img
+                src={previewReceiptUrl}
+                alt="Comprobante Completo"
+                className="w-full max-h-[75vh] object-contain rounded-2xl shadow-neu-pressed bg-black/5"
+              />
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Modal de Control de Membresía del Atleta individual */}
-      {selectedAthleteForModal && (
-        <AthleteSubscriptionModal
-          isOpen={!!selectedAthleteForModal}
-          athlete={selectedAthleteForModal}
-          onClose={() => setSelectedAthleteForModal(null)}
-        />
-      )}
+      {/* Modal: Gestión de Membresía del Atleta Individual */}
+      <AthleteSubscriptionModal
+        athlete={selectedAthleteForModal}
+        isOpen={!!selectedAthleteForModal}
+        onClose={() => setSelectedAthleteForModal(null)}
+      />
     </div>
   );
 }
-

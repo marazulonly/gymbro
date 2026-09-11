@@ -19,6 +19,7 @@ import { AnalogExerciseClock } from "@/components/AnalogExerciseClock";
 import { EvaluationCountdownCard } from "@/components/EvaluationCountdownCard";
 import { MissingFichaModal } from "@/components/MissingFichaModal";
 import { AthleteInvitationModal } from "@/components/AthleteInvitationModal";
+import { AthleteMembershipView } from "@/views/AthleteMembershipView";
 
 export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?: (tab: number) => void }) {
   const { currentUser, solicitudesEntrenador, responderSolicitudEntrenamiento } = useStore();
@@ -61,6 +62,7 @@ export function ClientView({ tab, onNavigateTab }: { tab: number; onNavigateTab?
       {tab === 0 && <ClientHome onStartWorkout={handleStartWorkout} />}
       {tab === 1 && <LiveWorkout initialRoutineId={selectedDayRoutineId} onClearInitialRoutine={() => setSelectedDayRoutineId(null)} />}
       {tab === 2 && <ClientProgress />}
+      {tab === 3 && <AthleteMembershipView />}
     </>
   );
 }

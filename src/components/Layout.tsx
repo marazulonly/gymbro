@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { useStore } from "@/store";
-import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Heart, Calendar, Search, CreditCard } from "lucide-react";
+import { LogOut, Dumbbell, Users, Settings, Home, Activity, ClipboardList, User, Database, Heart, Calendar, CreditCard } from "lucide-react";
 import { NeuButton } from "./ui/NeuButton";
 import { motion, AnimatePresence } from "motion/react";
 import { ProfileModal } from "./ProfileModal";
 import { GymBroWordmarkLogo } from "./GymBroWordmarkLogo";
+import { calcularSemaforoPago } from "@/utils/subscriptionUtils";
 
 
 export function Layout({ children }: { children: (activeTab: number, setActiveTab: (tab: number) => void) => React.ReactNode }) {
@@ -40,7 +41,19 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
           { icon: <CreditCard className="w-5 h-5" />, label: "", title: "Membresía" },
         ];
       case 'cliente':
-      default:
+      default: {
+        const semaforoInfo = calcularSemaforoPago(currentUser?.suscripcion?.fecha_fin);
+        
+        // El color del ícono es gris normal mientras está con los pagos al día, o ámbar, rojo o negro según el semáforo
+        let semaforoIconColor = "text-[var(--color-text-muted)]";
+        if (semaforoInfo.semaforo === "ambar") {
+          semaforoIconColor = "text-amber-500";
+        } else if (semaforoInfo.semaforo === "rojo") {
+          semaforoIconColor = "text-rose-500";
+        } else if (semaforoInfo.semaforo === "negro") {
+          semaforoIconColor = "text-slate-900 dark:text-slate-200";
+        }
+
         return [
           { 
             icon: uiStyle === 'modern_gold' 
@@ -60,7 +73,38 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
               : <Activity className="w-5 h-5" />, 
             label: "Progreso" 
           },
+          {
+            icon: (
+              <div className="relative flex items-center justify-center">
+                <CreditCard
+                  className={`w-5 h-5 transition-colors ${
+                    activeTab === 3
+                      ? uiStyle === 'soft_porcelain'
+                        ? "text-white"
+                        : uiStyle === 'modern_gold'
+                        ? "text-[var(--color-accent-amber)]"
+                        : "text-[var(--color-accent-blue)]"
+                      : semaforoIconColor
+                  }`}
+                />
+                {semaforoInfo.semaforo !== 'verde' && semaforoInfo.semaforo !== 'sin_registro' && (
+                  <span
+                    className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
+                      semaforoInfo.semaforo === 'ambar'
+                        ? 'bg-amber-500 ring-2 ring-[var(--color-bg-base)]'
+                        : semaforoInfo.semaforo === 'rojo'
+                        ? 'bg-rose-500 ring-2 ring-[var(--color-bg-base)] animate-pulse'
+                        : 'bg-black dark:bg-white ring-2 ring-rose-500'
+                    }`}
+                  />
+                )}
+              </div>
+            ),
+            label: "",
+            title: "Membresía",
+          },
         ];
+      }
     }
   };
 
@@ -78,48 +122,32 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
       {/* Top Header */}
       {isSoftPorcelain ? (
         <header className="z-10 px-4 pt-3 pb-2.5 flex justify-between items-center bg-[var(--color-bg-base)]/90 backdrop-blur-md">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M4 14.5L9.5 4H14.5L9 14.5H4Z" />
-                <path d="M10 20L15.5 9.5H20.5L15 20H10Z" opacity="0.65" />
-              </svg>
-            </div>
-            <div className="flex items-center">
-              {customLogoUrl ? (
-                <img
-                  src={customLogoUrl}
-                  alt="Logo"
-                  className="h-7 max-h-8 w-auto max-w-[140px] object-contain"
-                />
-              ) : (
-                <GymBroWordmarkLogo
-                  className="h-6 w-auto text-[var(--color-text-main)]"
-                  gymColor="currentColor"
-                  broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
-                />
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            {customLogoUrl ? (
+              <img
+                src={customLogoUrl}
+                alt="Logo"
+                className="h-7 max-h-8 w-auto max-w-[140px] object-contain"
+              />
+            ) : (
+              <GymBroWordmarkLogo
+                className="h-6 w-auto text-[var(--color-text-main)]"
+                gymColor="currentColor"
+                broColor={currentUser?.color_acento || "var(--color-accent-blue)"}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            {!isAthleteHomeScreen && (
-              <span className="text-xs font-bold text-[var(--color-text-main)] hidden xs:inline">
-                {currentUser?.nombre}
+            {currentUser?.nombre && (
+              <span className="text-xs font-bold text-[var(--color-text-main)] truncate max-w-[140px] sm:max-w-[180px]">
+                {currentUser.nombre}
               </span>
             )}
             <button
               type="button"
               onClick={() => setIsProfileOpen(true)}
-              title="Buscar / Ajustes"
-              className="w-9 h-9 rounded-full shadow-neu-pressed flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent-blue)] transition-colors"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsProfileOpen(true)}
-              title="Personalizar Estilo"
+              title="Ajustes y Personalización"
               className="w-9 h-9 rounded-full bg-[var(--color-accent-blue)] text-white flex items-center justify-center shadow-sm hover:opacity-90 active:scale-95 transition-all"
             >
               <Settings className="w-4 h-4" />

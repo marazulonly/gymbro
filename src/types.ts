@@ -50,10 +50,13 @@ export interface PlanSuscripcion {
   precio_pen: number;
   descripcion?: string;
   activo?: boolean;
+  id_entrenador?: string;
 }
 
 export interface PagoSuscripcion {
   id: string;
+  id_plan?: string;
+  nombre_plan?: string;
   fecha_pago: string; // "YYYY-MM-DD"
   monto_pen: number;
   metodo_pago?: string; // "Efectivo" | "Yape/Plin" | "Transferencia" | "Tarjeta" | "Otro"
@@ -62,6 +65,7 @@ export interface PagoSuscripcion {
   notas?: string;
   comprobante_url?: string;
   comprobante_nombre?: string;
+  registrado_por?: string;
   registrado_at?: string;
 }
 
