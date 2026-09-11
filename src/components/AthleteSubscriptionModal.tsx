@@ -39,6 +39,8 @@ interface AthleteSubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialPaymentIdToEdit?: string | null;
+  initialOpenPaymentForm?: boolean;
+  onPaymentSuccess?: (athleteId: string) => void;
 }
 
 export function AthleteSubscriptionModal({
@@ -46,6 +48,8 @@ export function AthleteSubscriptionModal({
   isOpen,
   onClose,
   initialPaymentIdToEdit,
+  initialOpenPaymentForm = false,
+  onPaymentSuccess,
 }: AthleteSubscriptionModalProps) {
   const {
     usuarios,
@@ -168,8 +172,25 @@ export function AthleteSubscriptionModal({
       if (targetPay) {
         handleStartEditPayment(targetPay);
       }
+    } else if (initialOpenPaymentForm) {
+      setShowAddPayment(true);
+      setActiveTab("suscripcion");
+      const defaultPlan = visiblePlans.length > 0 ? visiblePlans[0] : null;
+      if (defaultPlan) {
+        setPaymentSuggestedPlanId(defaultPlan.id);
+        setPaymentSuggestedPlanName(defaultPlan.nombre);
+        setPaymentMonto(defaultPlan.precio_pen);
+        setPaymentAutoUpdateEnd(true);
+        setPaymentProjectedEnd(calculateSubscriptionEndDate(todayStr, defaultPlan.duracion_meses));
+        setPaymentNotas(`Pago inicial - ${defaultPlan.nombre}`);
+      } else {
+        setPaymentMonto(300);
+        setPaymentAutoUpdateEnd(true);
+        setPaymentProjectedEnd(calculateSubscriptionEndDate(todayStr, 1));
+        setPaymentNotas("Pago inicial de suscripción");
+      }
     }
-  }, [athlete?.id, isOpen, initialPaymentIdToEdit]);
+  }, [athlete?.id, isOpen, initialPaymentIdToEdit, initialOpenPaymentForm]);
 
   // Live calculation of Semaphore based on the current fechaFin in the form
   const semaforoInfo = useMemo(() => {
@@ -280,18 +301,30 @@ export function AthleteSubscriptionModal({
       // Auto update athlete subscription end date if requested and completed
       if (paymentEstado === "completado" && paymentAutoUpdateEnd && paymentProjectedEnd) {
         const userAfterPayment = useStore.getState().usuarios.find((u) => u.id === activeAthlete.id) || activeAthlete;
-        const currentSub = userAfterPayment.suscripcion;
-        if (currentSub) {
-          await updateUsuarioSuscripcion(activeAthlete.id, {
-            ...currentSub,
-            fecha_fin: paymentProjectedEnd,
-            nombre_plan: paymentSuggestedPlanName || currentSub.nombre_plan || nombrePlan,
-          });
-        }
+        const currentSub = userAfterPayment.suscripcion || {
+          nombre_plan: paymentSuggestedPlanName || nombrePlan || "Plan 1 mes",
+          precio_pen: numMonto,
+          fecha_inicio: paymentFecha,
+          fecha_fin: paymentProjectedEnd,
+        };
+        await updateUsuarioSuscripcion(activeAthlete.id, {
+          ...currentSub,
+          id_plan: paymentSuggestedPlanId || currentSub.id_plan || selectedPlanId,
+          nombre_plan: paymentSuggestedPlanName || currentSub.nombre_plan || nombrePlan,
+          precio_pen: numMonto,
+          fecha_inicio: currentSub.fecha_inicio || paymentFecha,
+          fecha_fin: paymentProjectedEnd,
+        });
         setFechaFin(paymentProjectedEnd);
       }
 
       handleCancelPaymentForm();
+
+      if (onPaymentSuccess) {
+        onPaymentSuccess(activeAthlete.id);
+        onClose();
+        return;
+      }
     } catch (err) {
       console.error("Error saving payment:", err);
     } finally {
@@ -387,10 +420,10 @@ export function AthleteSubscriptionModal({
               </div>
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-[var(--color-text-main)] flex items-center gap-2">
-                  <span>Control de Membresía</span>
+                  <span><span className="hidden sm:inline">Control de </span>Membresía</span>
                   <span className="text-xs font-normal text-[var(--color-text-muted)]">• {activeAthlete?.nombre}</span>
                 </h2>
-                <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                <div className="hidden sm:flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
                   <span>DNI: {activeAthlete?.dni}</span>
                   <span>•</span>
                   <span>Plan actual: <strong className="text-[var(--color-text-main)]">{nombrePlan}</strong></span>
@@ -455,6 +488,37 @@ export function AthleteSubscriptionModal({
           <div className="p-4 sm:p-5 overflow-y-auto space-y-5 flex-1">
             {activeTab === "suscripcion" && (
               <div className="space-y-4">
+                {/* Banner de flujo: Registrar Pago tras crear nuevo atleta */}
+                {initialOpenPaymentForm && (
+                  <div className="p-3 sm:p-3.5 rounded-2xl bg-[var(--color-accent-blue)]/10 border border-[var(--color-accent-blue)]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                    <div className="hidden sm:flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-[var(--color-accent-blue)] text-white shrink-0 shadow-sm">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-[var(--color-text-main)]">
+                          Registrar Pago Inicial: {activeAthlete?.nombre}
+                        </p>
+                        <p className="text-[11px] text-[var(--color-text-muted)]">
+                          Registra el abono del atleta. Una vez registrado, irás automáticamente a sus Rutinas.
+                        </p>
+                      </div>
+                    </div>
+                    {onPaymentSuccess && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onPaymentSuccess(activeAthlete?.id || "");
+                          onClose();
+                        }}
+                        className="text-xs font-bold text-[var(--color-accent-blue)] hover:underline shrink-0 px-3 py-1.5 rounded-xl bg-[var(--color-bg-base)] shadow-neu-flat hover:shadow-neu-pressed transition-all active:scale-95 w-full sm:w-auto text-center"
+                      >
+                        Omitir e ir a Rutinas →
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Resumen del Plan y Estatus del Atleta */}
                 <div className="bg-[var(--color-bg-base)] rounded-2xl p-3.5 shadow-neu-pressed border border-[var(--color-text-muted)]/15 flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5">
@@ -490,7 +554,7 @@ export function AthleteSubscriptionModal({
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)] flex items-center gap-1.5">
                         <DollarSign className="w-3.5 h-3.5" />
-                        <span>Historial y Estatus de Pagos</span>
+                        <span>Historial<span className="hidden sm:inline"> y Estatus</span> de Pagos</span>
                       </h3>
                       <p className="text-[11px] text-[var(--color-text-muted)]">
                         Total abonado completado: <strong className="text-[var(--color-text-main)]">{formatPEN(totalPagado)}</strong>
@@ -533,14 +597,14 @@ export function AthleteSubscriptionModal({
                             </>
                           )}
                         </span>
-                        <span className="text-[10px] text-[var(--color-text-muted)]">
+                        <span className="text-[10px] text-[var(--color-text-muted)] hidden sm:inline">
                           Comprobante para {activeAthlete?.nombre}
                         </span>
                       </div>
 
                       {/* Botones que sugieren los planes actuales */}
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
+                        <div className="hidden sm:flex items-center justify-between">
                           <label className="block text-xs font-bold text-[var(--color-text-muted)]">
                             Sugerir monto y duración por Plan:
                           </label>
@@ -661,9 +725,9 @@ export function AthleteSubscriptionModal({
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div>
                             <span className="text-xs font-bold text-[var(--color-text-main)] block">
-                              Fecha hasta la que se estaría pagando (Fecha Final):
+                              Fecha hasta la que se estaría pagando<span className="hidden sm:inline"> (Fecha Final)</span>:
                             </span>
-                            <span className="text-[11px] text-[var(--color-text-muted)]">
+                            <span className="text-[11px] text-[var(--color-text-muted)] hidden sm:inline">
                               Calculada según vigencia de la suscripción o fecha de este pago
                             </span>
                           </div>
@@ -682,7 +746,9 @@ export function AthleteSubscriptionModal({
                             onChange={(e) => setPaymentAutoUpdateEnd(e.target.checked)}
                             className="w-4 h-4 rounded text-[var(--color-accent-blue)]"
                           />
-                          <span>Actualizar la Fecha Final del atleta a esta fecha al guardar el pago</span>
+                          <span>
+                            Actualizar la Fecha Final <span className="hidden sm:inline">del atleta </span>a esta fecha<span className="hidden sm:inline"> al guardar el pago</span>
+                          </span>
                         </label>
                       </div>
 
@@ -746,6 +812,8 @@ export function AthleteSubscriptionModal({
                             ? "Guardando..."
                             : editingPaymentId
                             ? "Guardar Cambios de Pago"
+                            : initialOpenPaymentForm
+                            ? "Registrar Pago e ir a Rutinas"
                             : "Registrar Pago"}
                         </button>
                       </div>

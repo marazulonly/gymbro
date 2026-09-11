@@ -287,6 +287,16 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedModalAthleteId, setSelectedModalAthleteId] = useState<string | undefined>(undefined);
   const [subscriptionModalAthlete, setSubscriptionModalAthlete] = useState<Usuario | null>(null);
+  const [autoOpenPaymentForm, setAutoOpenPaymentForm] = useState<boolean>(false);
+  const [pendingRoutineAthleteId, setPendingRoutineAthleteId] = useState<string | null>(null);
+
+  const handlePaymentSuccess = (athleteId: string) => {
+    const targetId = pendingRoutineAthleteId || athleteId;
+    setPendingRoutineAthleteId(null);
+    setAutoOpenPaymentForm(false);
+    setSubscriptionModalAthlete(null);
+    onManageRoutines(targetId);
+  };
 
   const [nombre, setNombre] = useState("");
   const [dni, setDni] = useState("");
@@ -450,7 +460,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
     if (!nombre.trim()) return;
 
     const newUserId = `u_${Date.now()}`;
-    await addUsuario({
+    const newAthleteData: Usuario = {
       id: newUserId,
       nombre,
       dni,
@@ -462,7 +472,8 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       rol: "cliente",
       id_entrenador: currentUser?.id || "entrenador1",
       creado_por: currentUser?.id,
-    });
+    };
+    await addUsuario(newAthleteData);
 
     // Ensure newly created athlete starts completely blank without any default or inherited routines
     await clearAthleteRoutines(newUserId);
@@ -475,8 +486,10 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
     setContrasena("0000");
     setExistingAthleteDetected(null);
     
-    // Automatically open routine management for the newly created athlete
-    onManageRoutines(newUserId);
+    // Abre la pantalla de Registrar Pago; una vez registrado el pago, se dirigirá a Rutinas
+    setPendingRoutineAthleteId(newUserId);
+    setAutoOpenPaymentForm(true);
+    setSubscriptionModalAthlete(newAthleteData);
   };
 
   if (isAdding) {
@@ -886,6 +899,8 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          setAutoOpenPaymentForm(false);
+                          setPendingRoutineAthleteId(null);
                           setSubscriptionModalAthlete(athlete);
                         }}
                         className={`w-7 h-7 rounded-full shadow-neu-flat hover:shadow-neu-pressed flex items-center justify-center transition-all active:scale-95 border ${semaforoPago.badgeBorder} ${semaforoPago.badgeBg}`}
@@ -933,7 +948,11 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                             {/* Botón semáforo: solo el círculo de color en forma de botón, sin texto */}
                             <button
                               type="button"
-                              onClick={() => setSubscriptionModalAthlete(athlete)}
+                              onClick={() => {
+                                setAutoOpenPaymentForm(false);
+                                setPendingRoutineAthleteId(null);
+                                setSubscriptionModalAthlete(athlete);
+                              }}
                               className={`w-5 h-5 rounded-full shadow-neu-flat hover:shadow-neu-pressed flex items-center justify-center transition-all active:scale-95 border ${semaforoPago.badgeBorder} ${semaforoPago.badgeBg}`}
                               title={`Control de Membresía (${semaforoPago.label}) - Vence: ${athlete.suscripcion?.fecha_fin || 'Sin fecha'}`}
                               aria-label="Control de Membresía"
@@ -1121,7 +1140,13 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       <AthleteSubscriptionModal
         isOpen={!!subscriptionModalAthlete}
         athlete={subscriptionModalAthlete}
-        onClose={() => setSubscriptionModalAthlete(null)}
+        initialOpenPaymentForm={autoOpenPaymentForm}
+        onPaymentSuccess={handlePaymentSuccess}
+        onClose={() => {
+          setSubscriptionModalAthlete(null);
+          setAutoOpenPaymentForm(false);
+          setPendingRoutineAthleteId(null);
+        }}
       />
 
       <AthleteImportExportModal
