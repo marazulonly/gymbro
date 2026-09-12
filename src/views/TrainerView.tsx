@@ -243,6 +243,10 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
   const [filterTrainerMode, setFilterTrainerMode] = useState<"mis_atletas" | "todos">("mis_atletas");
   const [expandedAthleteId, setExpandedAthleteId] = useState<string | null>(null);
 
+  // Search state for trainer's athletes
+  const [isAthleteSearchOpen, setIsAthleteSearchOpen] = useState(false);
+  const [athleteSearchTerm, setAthleteSearchTerm] = useState("");
+
   // Invitation flow states
   const [existingAthleteDetected, setExistingAthleteDetected] = useState<Usuario | null>(null);
   const [invitationAthlete, setInvitationAthlete] = useState<Usuario | null>(null);
@@ -343,12 +347,23 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
 
   // Filtered displayed athletes
   const displayedAthletes = useMemo(() => {
-    if (!selectedSemaforoFilter) return baseAthletes;
-    return baseAthletes.filter((athlete) => {
-      const semaforoInfo = calcularSemaforoPago(athlete.suscripcion?.fecha_fin);
-      return semaforoInfo.semaforo === selectedSemaforoFilter;
-    });
-  }, [baseAthletes, selectedSemaforoFilter]);
+    let list = baseAthletes;
+    if (selectedSemaforoFilter) {
+      list = list.filter((athlete) => {
+        const semaforoInfo = calcularSemaforoPago(athlete.suscripcion?.fecha_fin);
+        return semaforoInfo.semaforo === selectedSemaforoFilter;
+      });
+    }
+    if (athleteSearchTerm.trim()) {
+      const term = athleteSearchTerm.toLowerCase().trim();
+      list = list.filter((athlete) => {
+        const matchName = athlete.nombre.toLowerCase().includes(term);
+        const matchDni = athlete.dni ? athlete.dni.toLowerCase().includes(term) : false;
+        return matchName || matchDni;
+      });
+    }
+    return list;
+  }, [baseAthletes, selectedSemaforoFilter, athleteSearchTerm]);
 
   // Sent invitations by this trainer
   const trainerInvitations = useMemo(() => {
@@ -664,11 +679,54 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
             <ArrowUpDown className="w-4 h-4 stroke-[2.2]" />
           </NeuButton>
 
+          {/* Botón de lupa (sin texto) para activar la barra de búsqueda de atletas */}
+          <NeuButton
+            variant="circle"
+            className={`w-9 h-9 flex items-center justify-center transition-all ${
+              isAthleteSearchOpen
+                ? "text-[var(--color-accent-blue)] shadow-neu-pressed"
+                : "text-[var(--color-accent-blue)] shadow-neu-flat hover:shadow-neu-pressed"
+            }`}
+            onClick={() => {
+              setIsAthleteSearchOpen((prev) => !prev);
+              if (isAthleteSearchOpen) setAthleteSearchTerm("");
+            }}
+            title="Buscar atleta por nombre o DNI"
+            aria-label="Buscar atleta"
+          >
+            <Search className="w-4 h-4" />
+          </NeuButton>
+
           <NeuButton variant="circle" className="w-9 h-9 shadow-neu-flat" onClick={() => setIsAdding(true)} title="Registrar Atleta">
             <Plus className="w-4 h-4 text-[var(--color-accent-blue)]" />
           </NeuButton>
         </div>
       </div>
+
+      {/* Barra de búsqueda de atletas */}
+      {isAthleteSearchOpen && (
+        <div className="relative flex items-center animate-in fade-in duration-200">
+          <Search className="w-4 h-4 absolute left-3.5 text-[var(--color-text-muted)] pointer-events-none" />
+          <input
+            type="text"
+            value={athleteSearchTerm}
+            onChange={(e) => setAthleteSearchTerm(e.target.value)}
+            placeholder="Buscar atleta por nombre o DNI..."
+            autoFocus
+            className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-[var(--color-bg-base)] text-[var(--color-text-main)] placeholder-[var(--color-text-muted)] text-sm shadow-neu-pressed focus:outline-none focus:ring-1 focus:ring-[var(--color-accent-blue)]"
+          />
+          {athleteSearchTerm && (
+            <button
+              type="button"
+              onClick={() => setAthleteSearchTerm("")}
+              className="absolute right-3 p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Toast Feedback for Sent Invitations */}
       {invitationToast && (
@@ -822,7 +880,9 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           <div className="p-8 rounded-3xl bg-[var(--color-bg-base)] shadow-neu-flat border border-[var(--color-text-muted)]/15 text-center flex flex-col items-center justify-center gap-2.5 my-2">
             <CreditCard className="w-10 h-10 text-[var(--color-text-muted)] stroke-1" />
             <p className="text-xs font-bold text-[var(--color-text-main)]">
-              {selectedSemaforoFilter
+              {athleteSearchTerm.trim()
+                ? `No se encontraron atletas que coincidan con "${athleteSearchTerm.trim()}".`
+                : selectedSemaforoFilter
                 ? `No hay atletas con el estado ${
                     selectedSemaforoFilter === "verde"
                       ? "Al día (Verde)"
@@ -838,6 +898,15 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                 ? "No tienes atletas asignados a tu cuenta actualmente."
                 : "No hay atletas registrados en el gimnasio."}
             </p>
+            {athleteSearchTerm.trim() && (
+              <button
+                type="button"
+                onClick={() => setAthleteSearchTerm("")}
+                className="mt-1 px-3 py-1.5 rounded-xl bg-[var(--color-accent-blue)] text-white font-bold text-xs shadow-sm hover:opacity-90"
+              >
+                Limpiar Búsqueda
+              </button>
+            )}
             {selectedSemaforoFilter && (
               <button
                 type="button"

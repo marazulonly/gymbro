@@ -19,7 +19,8 @@ import {
   FileText,
   Image as ImageIcon,
   CheckSquare,
-  Square
+  Square,
+  Search
 } from "lucide-react";
 import { ProfileModal } from "@/components/ProfileModal";
 import { AthleteProgressModal } from "@/components/AthleteProgressModal";
@@ -109,15 +110,26 @@ function AccountManagement() {
   // Trainer view expansion state
   const [expandedTrainerId, setExpandedTrainerId] = useState<string | null>(null);
   
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
   // Success toast notification
   const [notification, setNotification] = useState<string | null>(null);
 
   const trainers = usuarios.filter(u => u.rol === 'entrenador');
   const clients = usuarios.filter(u => u.rol === 'cliente');
 
-  // Sorted alphabetically by name
+  // Filtered and sorted alphabetically by name
   const filteredUsers = usuarios
     .filter(u => u.rol === filterRole)
+    .filter(u => {
+      if (!searchTerm.trim()) return true;
+      const term = searchTerm.toLowerCase().trim();
+      const matchName = u.nombre.toLowerCase().includes(term);
+      const matchDni = u.dni ? u.dni.toLowerCase().includes(term) : false;
+      return matchName || matchDni;
+    })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
   const showNotification = (msg: string) => {
@@ -213,14 +225,59 @@ function AccountManagement() {
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Cuentas</h2>
-        <NeuButton 
-          onClick={() => handleOpenCreateModal(filterRole)} 
-          className="px-3 py-1.5 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1.5"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>{filterRole === 'cliente' ? 'Nuevo Atleta' : 'Nuevo Entrenador'}</span>
-        </NeuButton>
+        <div className="flex items-center gap-2">
+          {/* Botón de lupa (sin texto) que al pulsarse activa la barra de búsqueda de atletas o entrenadores */}
+          <NeuButton
+            variant="circle"
+            className={`w-9 h-9 flex items-center justify-center transition-all ${
+              isSearchOpen
+                ? "text-[var(--color-accent-blue)] shadow-neu-pressed"
+                : "text-[var(--color-accent-blue)] shadow-neu-flat hover:shadow-neu-pressed"
+            }`}
+            onClick={() => {
+              setIsSearchOpen((prev) => !prev);
+              if (isSearchOpen) setSearchTerm('');
+            }}
+            title={filterRole === 'cliente' ? 'Buscar atletas' : 'Buscar entrenadores'}
+            aria-label={filterRole === 'cliente' ? 'Buscar atletas' : 'Buscar entrenadores'}
+          >
+            <Search className="w-4 h-4" />
+          </NeuButton>
+
+          <NeuButton 
+            onClick={() => handleOpenCreateModal(filterRole)} 
+            className="px-3 py-1.5 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1.5"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>{filterRole === 'cliente' ? 'Nuevo Atleta' : 'Nuevo Entrenador'}</span>
+          </NeuButton>
+        </div>
       </div>
+
+      {/* Barra de búsqueda animada */}
+      {isSearchOpen && (
+        <div className="relative flex items-center animate-in fade-in duration-200">
+          <Search className="w-4 h-4 absolute left-3.5 text-[var(--color-text-muted)] pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={filterRole === 'cliente' ? 'Buscar atleta por nombre o DNI...' : 'Buscar entrenador por nombre o DNI...'}
+            autoFocus
+            className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-[var(--color-bg-base)] text-[var(--color-text-main)] placeholder-[var(--color-text-muted)] text-sm shadow-neu-pressed focus:outline-none focus:ring-1 focus:ring-[var(--color-accent-blue)]"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {notification && (
         <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-medium animate-fadeIn">
@@ -250,7 +307,11 @@ function AccountManagement() {
       {filterRole === 'cliente' && (
         <div className="flex flex-col gap-3">
           {filteredUsers.length === 0 ? (
-            <p className="text-center text-[var(--color-text-muted)] my-4 text-sm">No hay clientes registrados.</p>
+            <p className="text-center text-[var(--color-text-muted)] my-4 text-sm">
+              {searchTerm.trim()
+                ? `No se encontraron atletas que coincidan con "${searchTerm.trim()}".`
+                : "No hay clientes registrados."}
+            </p>
           ) : (
             filteredUsers.map((u) => {
               const assignedTrainer = trainers.find(t => t.id === u.id_entrenador);
@@ -317,7 +378,11 @@ function AccountManagement() {
       {filterRole === 'entrenador' && (
         <div className="flex flex-col gap-3">
           {filteredUsers.length === 0 ? (
-            <p className="text-center text-[var(--color-text-muted)] my-4 text-sm">No hay entrenadores registrados.</p>
+            <p className="text-center text-[var(--color-text-muted)] my-4 text-sm">
+              {searchTerm.trim()
+                ? `No se encontraron entrenadores que coincidan con "${searchTerm.trim()}".`
+                : "No hay entrenadores registrados."}
+            </p>
           ) : (
             filteredUsers.map((trainer) => {
               const assignedAthletes = clients.filter(c => c.id_entrenador === trainer.id);
