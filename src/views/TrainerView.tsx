@@ -592,7 +592,6 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
       <div className="flex justify-between items-start mb-1 flex-wrap gap-2">
         <div>
           <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Mis Atletas</h2>
-          <span className="text-xs text-[var(--color-text-muted)]">Gestión de rutinas, ejercicios y control físico</span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* 4 Botones con los colores del Semáforo de Pagos (sin textos) */}
@@ -659,12 +658,12 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
           </div>
 
           <NeuButton
-            className="text-xs font-bold text-[var(--color-accent-blue)] px-3 py-1.5 flex items-center gap-1.5 shadow-neu-flat h-9"
+            className="hidden sm:flex text-xs font-bold text-[var(--color-accent-blue)] px-3 py-1.5 items-center gap-1.5 shadow-neu-flat h-9"
             onClick={handleOpenAllUsage}
             title={isAdmin ? "Ver ficha de estadísticas de tiempo de uso de todos los usuarios" : "Ver ficha de estadísticas de tiempo de uso de mis atletas"}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Ficha</span>
+            <span className="hidden md:inline">Ficha</span>
             <span>Tiempo</span>
           </NeuButton>
 
@@ -2036,7 +2035,7 @@ function RoutineManager({
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Rutinas</h2>
-            <span className="text-xs text-[var(--color-text-muted)]">Asignación y edición de ejercicios por atleta</span>
+            <span className="text-xs text-[var(--color-text-muted)] hidden sm:inline">Asignación y edición de ejercicios por atleta</span>
           </div>
         </div>
         <NeuCard className="p-8 flex flex-col items-center justify-center text-center gap-3">
@@ -2058,7 +2057,7 @@ function RoutineManager({
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-[var(--color-text-main)]">Rutinas</h2>
-          <span className="text-xs text-[var(--color-text-muted)]">Asignación y edición de ejercicios por atleta</span>
+          <span className="text-xs text-[var(--color-text-muted)] hidden sm:inline">Asignación y edición de ejercicios por atleta</span>
         </div>
         <NeuButton
           className="px-3 py-1.5 text-xs text-[var(--color-accent-blue)] font-bold flex items-center gap-1.5"
@@ -2113,7 +2112,7 @@ function RoutineManager({
             <div className="flex flex-col">
               <span className="font-bold text-sm text-[var(--color-text-main)]">{currentAthlete?.nombre}</span>
               <span className="text-[10px] text-[var(--color-text-muted)]">
-                DNI: {currentAthlete?.dni} • {athleteRoutines.length} sesiones programadas
+                <span className="hidden sm:inline">DNI: {currentAthlete?.dni} • </span>{athleteRoutines.length} sesiones programadas
               </span>
             </div>
           </div>
@@ -2174,7 +2173,7 @@ function RoutineManager({
       {currentAthlete && (() => {
         const semaforoPago = calcularSemaforoPago(currentAthlete.suscripcion?.fecha_fin);
         return (
-          <NeuCard className="p-3.5 flex flex-col gap-2.5">
+          <NeuCard className="hidden sm:flex p-3.5 flex-col gap-2.5">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
@@ -2237,7 +2236,7 @@ function RoutineManager({
 
       {/* Control de Acceso a Rutinas Card */}
       {currentAthlete && (
-        <NeuCard className="p-3.5 flex flex-col gap-2.5">
+        <NeuCard className="hidden sm:flex p-3.5 flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl shadow-neu-pressed flex items-center justify-center text-[var(--color-accent-blue)]">
