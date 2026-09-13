@@ -335,7 +335,10 @@ export function getUserUIStyle(user?: Usuario | null): UIStyle {
 export function applyThemeToDocument(theme: 'light' | 'dark', accent: string, uiStyle: UIStyle = 'neumorfico') {
   if (typeof window === 'undefined') return;
   const root = document.documentElement;
-  if (theme === 'dark') {
+  
+  // neon_lime is always solid black
+  const isDark = uiStyle === 'neon_lime' ? true : theme === 'dark';
+  if (isDark) {
     root.classList.add('dark');
     document.body.classList.add('dark');
   } else {
@@ -345,11 +348,18 @@ export function applyThemeToDocument(theme: 'light' | 'dark', accent: string, ui
   root.setAttribute('data-ui-style', uiStyle);
   document.body.setAttribute('data-ui-style', uiStyle);
 
-  root.style.setProperty('--color-accent-blue', accent);
-  root.style.setProperty('--user-accent-color', accent);
+  const effectiveAccent = uiStyle === 'neon_lime' ? (accent && accent !== '#4D7CFE' ? accent : '#CCFF00') : accent;
+  root.style.setProperty('--color-accent-blue', effectiveAccent);
+  root.style.setProperty('--user-accent-color', effectiveAccent);
+  if (uiStyle === 'neon_lime') {
+    root.style.setProperty('--color-accent-green', effectiveAccent);
+  }
   if (document.body) {
-    document.body.style.setProperty('--color-accent-blue', accent);
-    document.body.style.setProperty('--user-accent-color', accent);
+    document.body.style.setProperty('--color-accent-blue', effectiveAccent);
+    document.body.style.setProperty('--user-accent-color', effectiveAccent);
+    if (uiStyle === 'neon_lime') {
+      document.body.style.setProperty('--color-accent-green', effectiveAccent);
+    }
   }
 }
 

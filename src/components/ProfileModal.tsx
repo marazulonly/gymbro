@@ -3,11 +3,12 @@ import { useStore } from "@/store";
 import { NeuCard } from "./ui/NeuCard";
 import { NeuInput } from "./ui/NeuInput";
 import { NeuButton } from "./ui/NeuButton";
-import { X, Sun, Moon, Palette, Check, Sparkles, Layers, Image as ImageIcon, Upload, Trash2, CheckSquare, Square } from "lucide-react";
+import { X, Sun, Moon, Palette, Check, Sparkles, Layers, Image as ImageIcon, Upload, Trash2, CheckSquare, Square, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UIStyle } from "@/types";
 
 const ACCENT_PRESETS = [
+  { name: "Lima Neón", value: "#CCFF00" },
   { name: "Azul Clásico", value: "#4D7CFE" },
   { name: "Morado Eléctrico", value: "#8B5CF6" },
   { name: "Verde Esmeralda", value: "#10B981" },
@@ -265,7 +266,7 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                       <h3 className="font-bold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Opciones de Estilo</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <button
                         type="button"
                         onClick={() => setUIStyle('soft_porcelain')}
@@ -327,6 +328,32 @@ export function ProfileModal({ isOpen, onClose, userId }: { isOpen: boolean; onC
                         </div>
                         {uiStyle === 'modern_gold' && (
                           <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUIStyle('neon_lime');
+                          setAccentColor('#CCFF00');
+                          setThemeMode('dark');
+                        }}
+                        className={`p-3 rounded-2xl text-left transition-all flex items-center justify-between border cursor-pointer ${
+                          uiStyle === 'neon_lime'
+                            ? 'shadow-neu-pressed border-[#CCFF00] bg-black ring-2 ring-[#CCFF00]/40'
+                            : 'shadow-neu-flat border-transparent bg-[var(--color-bg-base)] hover:opacity-90'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-[#CCFF00] text-black flex items-center justify-center shadow-[0_0_12px_rgba(204,255,0,0.4)]">
+                            <Zap className="w-4 h-4 fill-current" />
+                          </div>
+                          <span className="font-bold text-xs text-[var(--color-text-main)]">Negro & Lima Neón</span>
+                        </div>
+                        {uiStyle === 'neon_lime' && (
+                          <div className="w-5 h-5 rounded-full bg-[#CCFF00] text-black flex items-center justify-center shrink-0">
                             <Check className="w-3 h-3 stroke-[3]" />
                           </div>
                         )}

@@ -64,6 +64,17 @@ export const AnalogExerciseClock: React.FC<AnalogExerciseClockProps> = ({
             : 'shadow-[0_10px_25px_rgba(245,158,11,0.12),0_2px_8px_rgba(0,0,0,0.04)] border border-amber-100',
           debossedClass: 'bg-[var(--color-bg-base)] text-[var(--color-accent-amber)] shadow-neu-pressed',
         };
+      case 'neon_lime':
+        return {
+          faceBg: '#121212',
+          rimTrack: 'rgba(255,255,255,0.1)',
+          progressBar: '#CCFF00',
+          minutero: '#FFFFFF',
+          segundero: '#CCFF00',
+          centerDot: '#CCFF00',
+          shadowClass: 'shadow-[0_8px_24px_rgba(0,0,0,0.9)] border border-white/10',
+          debossedClass: 'bg-black text-[#CCFF00] border border-[#CCFF00]/40 shadow-inner',
+        };
       case 'neumorfico':
       default:
         return {

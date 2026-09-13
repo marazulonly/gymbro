@@ -83,6 +83,8 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
                         ? "text-white"
                         : uiStyle === 'modern_gold'
                         ? "text-[var(--color-accent-amber)]"
+                        : uiStyle === 'neon_lime'
+                        ? "text-black stroke-[2.5]"
                         : "text-[var(--color-accent-blue)]"
                       : semaforoIconColor
                   }`}
@@ -109,18 +111,63 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
   };
 
   const navItems = getNavItems();
+  const isNeonLime = uiStyle === 'neon_lime';
   const isModernGold = uiStyle === 'modern_gold';
   const isSoftPorcelain = uiStyle === 'soft_porcelain';
   const isAthleteHomeScreen = currentRole === 'cliente' && activeTab === 0;
 
   return (
     <div className={`flex flex-col h-[100dvh] w-full max-w-full sm:max-w-md mx-auto overflow-hidden relative ${
-      isModernGold 
+      isNeonLime
+        ? "bg-black font-sans text-white"
+        : isModernGold 
         ? "bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100" 
         : "bg-[var(--color-bg-base)] text-[var(--color-text-main)]"
     }`}>
       {/* Top Header */}
-      {isSoftPorcelain ? (
+      {isNeonLime ? (
+        <header className="z-10 px-4 pt-3 pb-2.5 flex justify-between items-center bg-black/95 backdrop-blur-md border-b border-white/10">
+          <div className="flex items-center gap-2">
+            {customLogoUrl ? (
+              <img
+                src={customLogoUrl}
+                alt="Logo"
+                className="h-7 max-h-8 w-auto max-w-[140px] object-contain"
+              />
+            ) : (
+              <GymBroWordmarkLogo
+                className="h-7 w-auto text-white"
+                gymColor="#FFFFFF"
+                broColor="#CCFF00"
+              />
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {currentUser?.nombre && (
+              <span className="text-xs font-bold text-white truncate max-w-[140px] sm:max-w-[180px]">
+                {currentUser.nombre}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(true)}
+              title="Ajustes y Personalización"
+              className="w-9 h-9 rounded-full bg-[#181818] border border-white/15 text-[#CCFF00] flex items-center justify-center shadow-sm hover:bg-[#CCFF00] hover:text-black active:scale-95 transition-all"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={logout}
+              title="Cerrar sesión"
+              className="w-9 h-9 rounded-full bg-[#181818] border border-white/15 text-zinc-400 flex items-center justify-center hover:text-rose-400 active:scale-95 transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+      ) : isSoftPorcelain ? (
         <header className="z-10 px-4 pt-3 pb-2.5 flex justify-between items-center bg-[var(--color-bg-base)]/90 backdrop-blur-md">
           <div className="flex items-center gap-2">
             {customLogoUrl ? (
@@ -253,7 +300,39 @@ export function Layout({ children }: { children: (activeTab: number, setActiveTa
       </main>
 
       {/* Bottom Navigation */}
-      {isSoftPorcelain ? (
+      {isNeonLime ? (
+        <nav className="absolute bottom-3 left-0 right-0 px-4 z-30 pointer-events-none">
+          <div className="pointer-events-auto max-w-[360px] mx-auto bg-[#121212]/95 backdrop-blur-xl rounded-full px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.85)] border border-white/10 flex justify-between items-center">
+            {navItems.map((item, idx) => {
+              const isActive = activeTab === idx;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setActiveTab(idx)}
+                  className="relative flex flex-col items-center justify-center min-w-[44px] h-12 transition-all cursor-pointer"
+                  title={item.title || item.label}
+                  aria-label={item.title || item.label || `Tab ${idx + 1}`}
+                >
+                  <div
+                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
+                      isActive
+                        ? "bg-[#CCFF00] text-black font-extrabold shadow-[0_0_16px_rgba(204,255,0,0.45)] scale-105"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {item.icon}
+                  </div>
+                  {item.label && (
+                    <span className={`text-[9px] tracking-tight mt-0.5 ${isActive ? "font-bold text-[#CCFF00]" : "text-zinc-500 font-medium"}`}>
+                      {item.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      ) : isSoftPorcelain ? (
         <nav className="absolute bottom-3 left-0 right-0 px-4 z-30 pointer-events-none">
           <div className="pointer-events-auto max-w-[370px] mx-auto bg-[var(--color-bg-base)] rounded-[28px] px-4 py-2 shadow-neu-flat border border-white/60 dark:border-slate-800/60 flex justify-between items-center">
             {navItems.map((item, idx) => {

@@ -1,5 +1,5 @@
 export type Role = 'admin' | 'entrenador' | 'cliente';
-export type UIStyle = 'neumorfico' | 'modern_gold' | 'soft_porcelain';
+export type UIStyle = 'neumorfico' | 'modern_gold' | 'soft_porcelain' | 'neon_lime';
 
 export type ModoControlAcceso = 'siempre_visible' | 'solo_hoy' | 'horario_manual' | 'franja_horaria';
 

@@ -463,29 +463,56 @@ function ClientHome({ onStartWorkout }: { onStartWorkout: (routineId: string) =>
       )}
 
       {todayRoutine ? (
-        <NeuCard className="flex items-center justify-between py-3 px-4">
-          <div className="flex flex-col max-w-[75%]">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[var(--color-accent-blue)] text-xs font-bold uppercase tracking-wider">
-                Rutina de Hoy • {getDiaSemanaNombre(todayRoutine.dia_semana)}
-              </span>
-              <span className="text-[9px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded shadow-sm">
-                Hoy
+        uiStyle === 'neon_lime' ? (
+          <div className="rounded-[24px] bg-[#CCFF00] text-black p-5 shadow-[0_0_24px_rgba(204,255,0,0.35)] flex items-center justify-between transition-all">
+            <div className="flex flex-col max-w-[75%]">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-black text-xs font-black uppercase tracking-wider">
+                  Rutina de Hoy • {getDiaSemanaNombre(todayRoutine.dia_semana)}
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-wider bg-black text-[#CCFF00] px-2 py-0.5 rounded-full">
+                  Activa
+                </span>
+              </div>
+              <span className="text-black text-xl font-black truncate">{todayRoutine.nombre_sesion}</span>
+              <span className="text-xs text-black/85 font-bold mt-0.5">
+                {ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id).length} ejercicios recomendados
               </span>
             </div>
-            <span className="text-[var(--color-text-main)] text-lg font-bold truncate">{todayRoutine.nombre_sesion}</span>
-            <span className="text-[11px] text-[var(--color-text-muted)]">
-              {ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id).length} ejercicios recomendados
-            </span>
+            <button 
+              type="button"
+              className="w-13 h-13 rounded-full bg-black text-[#CCFF00] shrink-0 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer" 
+              onClick={() => handleTryStartWorkout(todayRoutine.id)}
+              title="Iniciar entrenamiento"
+            >
+              <Play className="w-6 h-6 ml-0.5 fill-current" />
+            </button>
           </div>
-          <NeuButton 
-            variant="circle" 
-            className="w-12 h-12 text-[var(--color-accent-blue)] shrink-0" 
-            onClick={() => handleTryStartWorkout(todayRoutine.id)}
-          >
-            <Play className="w-5 h-5 ml-1" />
-          </NeuButton>
-        </NeuCard>
+        ) : (
+          <NeuCard className="flex items-center justify-between py-3 px-4">
+            <div className="flex flex-col max-w-[75%]">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[var(--color-accent-blue)] text-xs font-bold uppercase tracking-wider">
+                  Rutina de Hoy • {getDiaSemanaNombre(todayRoutine.dia_semana)}
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.2 rounded shadow-sm">
+                  Hoy
+                </span>
+              </div>
+              <span className="text-[var(--color-text-main)] text-lg font-bold truncate">{todayRoutine.nombre_sesion}</span>
+              <span className="text-[11px] text-[var(--color-text-muted)]">
+                {ejerciciosRutina.filter(er => er.id_rutina === todayRoutine.id).length} ejercicios recomendados
+              </span>
+            </div>
+            <NeuButton 
+              variant="circle" 
+              className="w-12 h-12 text-[var(--color-accent-blue)] shrink-0" 
+              onClick={() => handleTryStartWorkout(todayRoutine.id)}
+            >
+              <Play className="w-5 h-5 ml-1" />
+            </NeuButton>
+          </NeuCard>
+        )
       ) : (
         <NeuCard className="flex items-center justify-between py-3.5 px-4 bg-[var(--color-bg-base)]">
           <div className="flex items-center gap-3">
@@ -1244,20 +1271,32 @@ function LiveWorkout({
                   setSelectedRoutineId(r.id);
                   scrollToDay(r.dia_semana, true);
                 }}
-                className={`w-[88px] min-w-[88px] shrink-0 py-2.5 px-2 rounded-2xl text-center transition-all flex flex-col items-center justify-center gap-1 snap-center ${
-                  isSelected
-                    ? 'bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)] ring-2 ring-[var(--color-accent-blue)]/40 font-bold'
-                    : 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] font-medium active:shadow-neu-pressed'
+                className={`transition-all snap-center flex items-center justify-center cursor-pointer ${
+                  uiStyle === 'neon_lime'
+                    ? isSelected
+                      ? 'px-4 py-2 rounded-full bg-[#CCFF00] text-black font-black shadow-[0_0_16px_rgba(204,255,0,0.4)] scale-105 gap-1.5'
+                      : 'px-3.5 py-2 rounded-full bg-[#121212] text-zinc-400 hover:text-white border border-white/10 font-bold gap-1.5'
+                    : `w-[88px] min-w-[88px] shrink-0 py-2.5 px-2 rounded-2xl text-center flex-col gap-1 ${
+                        isSelected
+                          ? 'bg-[var(--color-bg-base)] shadow-neu-pressed text-[var(--color-accent-blue)] ring-2 ring-[var(--color-accent-blue)]/40 font-bold'
+                          : 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] font-medium active:shadow-neu-pressed'
+                      }`
                 }`}
               >
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-bold leading-tight capitalize">{dayName}</span>
                   {!rAccess.allowed && (
-                    <Lock className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                    <Lock className={`w-2.5 h-2.5 shrink-0 ${uiStyle === 'neon_lime' && isSelected ? 'text-black' : 'text-amber-500'}`} />
                   )}
                 </div>
                 {isToday && (
-                  <span className="text-[8px] font-black uppercase tracking-wider bg-[var(--color-accent-blue)] text-white px-1.5 py-0.5 rounded-full shadow-sm">
+                  <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                    uiStyle === 'neon_lime'
+                      ? isSelected
+                        ? 'bg-black text-[#CCFF00]'
+                        : 'bg-[#CCFF00] text-black shadow-sm'
+                      : 'bg-[var(--color-accent-blue)] text-white shadow-sm'
+                  }`}>
                     Hoy
                   </span>
                 )}
@@ -1290,13 +1329,21 @@ function LiveWorkout({
       ) : (
         <>
           {/* Sub-tabs: Pendientes vs Realizados */}
-          <div className="flex bg-[var(--color-bg-base)] p-1 rounded-2xl shadow-neu-pressed mt-1">
+          <div className={`flex p-1 rounded-2xl mt-1 ${
+            uiStyle === 'neon_lime'
+              ? 'bg-[#121212] border border-white/10'
+              : 'bg-[var(--color-bg-base)] shadow-neu-pressed'
+          }`}>
             <button
               onClick={() => setActiveListTab('pendientes')}
               className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                activeListTab === 'pendientes'
-                  ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
+                uiStyle === 'neon_lime'
+                  ? activeListTab === 'pendientes'
+                    ? 'bg-[#CCFF00] text-black font-extrabold shadow-[0_0_12px_rgba(204,255,0,0.3)]'
+                    : 'text-zinc-400 hover:text-white'
+                  : activeListTab === 'pendientes'
+                    ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-blue)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -1305,9 +1352,13 @@ function LiveWorkout({
             <button
               onClick={() => setActiveListTab('realizados')}
               className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                activeListTab === 'realizados'
-                  ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-green)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
+                uiStyle === 'neon_lime'
+                  ? activeListTab === 'realizados'
+                    ? 'bg-[#CCFF00] text-black font-extrabold shadow-[0_0_12px_rgba(204,255,0,0.3)]'
+                    : 'text-zinc-400 hover:text-white'
+                  : activeListTab === 'realizados'
+                    ? 'bg-[var(--color-bg-base)] shadow-neu-flat text-[var(--color-accent-green)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'
               }`}
             >
               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -1363,6 +1414,70 @@ function LiveWorkout({
                 const ex = ejercicios.find((e) => e.id === er.id_ejercicio);
                 const partial = getPartialProgress(er.id);
                 const hasPartial = partial && partial.series.length > 0;
+
+                if (uiStyle === 'neon_lime') {
+                  const targetKg1 = er.series_objetivo * 5;
+                  const targetKg2 = er.series_objetivo * 5 + 5;
+
+                  return (
+                    <div
+                      key={er.id}
+                      onClick={() => handleStartExercise(er)}
+                      className="bg-[#121212] rounded-[24px] p-4 border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.8)] flex flex-col gap-2.5 cursor-pointer hover:border-[#CCFF00]/60 active:scale-[0.99] transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-2xl bg-black border border-[#CCFF00]/40 flex items-center justify-center text-[#CCFF00] shrink-0 shadow-sm">
+                            <MuscleIcon className="w-6 h-6 text-[#CCFF00]" />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-sm text-white leading-tight">
+                              {ex?.nombre}
+                            </h4>
+                            <span className="text-[11px] font-semibold text-zinc-400">
+                              {ex?.grupo_muscular || 'Fuerza'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="bg-[#CCFF00] hover:bg-[#bbf500] text-black text-[11px] font-black px-3.5 py-1.5 rounded-full flex items-center gap-1 shadow-[0_0_12px_rgba(204,255,0,0.35)] transition-all">
+                          <Play className="w-3 h-3 fill-current" />
+                          <span>Iniciar</span>
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-300 font-semibold pl-14">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#CCFF00] text-base leading-none">•</span>
+                          <span>{er.reps_objetivo || 8} Reps {targetKg1} kg</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#CCFF00] text-base leading-none">•</span>
+                          <span>{er.reps_objetivo || 8} Reps {targetKg1} kg</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#CCFF00] text-base leading-none">•</span>
+                          <span>{Math.max(Number(er.reps_objetivo || 8) + 2, 10)} Reps {targetKg2} kg</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#CCFF00] text-base leading-none">•</span>
+                          <span>{Math.max(Number(er.reps_objetivo || 8) + 2, 10)} Reps {targetKg2} kg</span>
+                        </div>
+                      </div>
+
+                      {hasPartial && (
+                        <div className="pl-14 text-[10px] font-bold text-[#CCFF00] flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-[#CCFF00] animate-pulse"></span>
+                          <span>Avance guardado: {partial.series.length}/{er.series_objetivo} series logradas (Toca para continuar)</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-center text-zinc-500 pt-0.5">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
+                    </div>
+                  );
+                }
 
                 if (uiStyle === 'modern_gold') {
                   const targetKg1 = er.series_objetivo * 5;
