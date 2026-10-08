@@ -150,7 +150,7 @@ export function AthleteLandingView() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020503] text-white font-sans antialiased selection:bg-[#CCFF00] selection:text-black overflow-x-hidden">
+    <div className="relative min-h-screen w-full bg-[#020503] text-white font-sans antialiased selection:bg-[#CCFF00] selection:text-black overflow-x-clip overflow-y-visible touch-pan-y">
       
       {/* GLOW DECORATIONS */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#CCFF00]/5 rounded-full blur-[120px] pointer-events-none" />

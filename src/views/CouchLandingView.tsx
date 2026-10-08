@@ -108,7 +108,7 @@ export function CouchLandingView() {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] text-white font-sans antialiased selection:bg-[#DC2626] selection:text-white overflow-x-hidden">
+    <div className="relative min-h-screen w-full bg-[#000000] text-white font-sans antialiased selection:bg-[#DC2626] selection:text-white overflow-x-clip overflow-y-visible touch-pan-y">
       
       {/* 3-ZONE HEADER (TOP BAR CONTRACT) */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#000000]/90 backdrop-blur-md border-b border-white/5">
