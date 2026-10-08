@@ -15,11 +15,24 @@ import { useStore } from './store';
 export default function App() {
   const { isLoggedIn, currentRole } = useStore();
 
-  const isCouchPath = typeof window !== 'undefined' && 
-    (window.location.pathname === '/couch' || window.location.pathname === '/coach');
+  const cleanPath = typeof window !== 'undefined'
+    ? window.location.pathname.replace(/\/+$/, '').toLowerCase()
+    : '';
+  const cleanHash = typeof window !== 'undefined'
+    ? window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '').toLowerCase()
+    : '';
 
-  const isAthletePath = typeof window !== 'undefined' && 
-    (window.location.pathname === '/atleta' || window.location.pathname === '/athlete');
+  const isCouchPath =
+    cleanPath === '/couch' ||
+    cleanPath === '/coach' ||
+    cleanHash === 'couch' ||
+    cleanHash === 'coach';
+
+  const isAthletePath =
+    cleanPath === '/atleta' ||
+    cleanPath === '/athlete' ||
+    cleanHash === 'atleta' ||
+    cleanHash === 'athlete';
 
   if (isCouchPath) {
     return <CouchLandingView />;
