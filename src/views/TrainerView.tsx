@@ -1108,7 +1108,7 @@ function AthletesList({ onManageRoutines }: { onManageRoutines: (athleteId: stri
                         </NeuButton>
 
                         <NeuButton
-                          className="px-2 py-1 text-[11px] text-[var(--color-accent-blue)] font-bold flex items-center gap-1 h-7 shadow-neu-flat"
+                          className="hidden sm:flex px-2 py-1 text-[11px] text-[var(--color-accent-blue)] font-bold items-center gap-1 h-7 shadow-neu-flat"
                           onClick={() => handleOpenAthleteUsage(athlete.id)}
                           title="Ver ficha de tiempos de uso de esta atleta"
                         >

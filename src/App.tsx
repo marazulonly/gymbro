@@ -8,10 +8,26 @@ import { ClientView } from './views/ClientView';
 import { TrainerView } from './views/TrainerView';
 import { AdminView } from './views/AdminView';
 import { LoginView } from './views/LoginView';
+import { CouchLandingView } from './views/CouchLandingView';
+import { AthleteLandingView } from './views/AthleteLandingView';
 import { useStore } from './store';
 
 export default function App() {
   const { isLoggedIn, currentRole } = useStore();
+
+  const isCouchPath = typeof window !== 'undefined' && 
+    (window.location.pathname === '/couch' || window.location.pathname === '/coach');
+
+  const isAthletePath = typeof window !== 'undefined' && 
+    (window.location.pathname === '/atleta' || window.location.pathname === '/athlete');
+
+  if (isCouchPath) {
+    return <CouchLandingView />;
+  }
+
+  if (isAthletePath) {
+    return <AthleteLandingView />;
+  }
 
   if (!isLoggedIn) {
     return (
@@ -33,3 +49,4 @@ export default function App() {
     </Layout>
   );
 }
+
